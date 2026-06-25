@@ -1,0 +1,99 @@
+-- WokAI Distributed AI OS - Relational SQL Schema Reference
+-- Mapped from the user-scoped Firestore NoSQL collections
+
+-- 1. Users Root Table
+CREATE TABLE users (
+    uid VARCHAR(128) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    photo_url TEXT,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Tasks Sub-Table
+CREATE TABLE tasks (
+    id VARCHAR(128) PRIMARY KEY,
+    uid VARCHAR(128) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    deadline TIMESTAMP NOT NULL,
+    priority VARCHAR(50) NOT NULL CHECK (priority IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
+    status VARCHAR(50) NOT NULL CHECK (status IN ('todo', 'in_progress', 'blocked', 'done')),
+    progress INT NOT NULL DEFAULT 0 CHECK (progress BETWEEN 0 AND 100),
+    subtasks TEXT, -- JSON array representing checking sub-steps
+    source VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (uid) REFERENCES users(uid) ON DELETE CASCADE
+);
+
+-- 3. Memories Sub-Table
+CREATE TABLE memories (
+    id VARCHAR(128) PRIMARY KEY,
+    uid VARCHAR(128) NOT NULL,
+    type VARCHAR(50) NOT NULL CHECK (type IN ('preference', 'habit', 'contact', 'deadline', 'context')),
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    confidence NUMERIC(3,2) NOT NULL DEFAULT 0.00 CHECK (confidence BETWEEN 0.00 AND 1.00),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (uid) REFERENCES users(uid) ON DELETE CASCADE
+);
+
+-- 4. Actions Sub-Table
+CREATE TABLE actions (
+    id VARCHAR(128) PRIMARY KEY,
+    uid VARCHAR(128) NOT NULL,
+    tool VARCHAR(128) NOT NULL,
+    label VARCHAR(255) NOT NULL,
+    status VARCHAR(50) NOT NULL CHECK (status IN ('PLANNED', 'RUNNING', 'NEEDS_APPROVAL', 'QUEUED', 'COMPLETED', 'FAILED')),
+    sensitive BOOLEAN NOT NULL DEFAULT FALSE,
+    output TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (uid) REFERENCES users(uid) ON DELETE CASCADE
+);
+
+-- 5. Devices Sub-Table
+CREATE TABLE devices (
+    id VARCHAR(128) PRIMARY KEY,
+    uid VARCHAR(128) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    kind VARCHAR(50) NOT NULL CHECK (kind IN ('phone', 'laptop', 'tablet', 'desktop')),
+    online BOOLEAN NOT NULL DEFAULT FALSE,
+    last_seen TIMESTAMP NOT NULL,
+    queued_commands INT NOT NULL DEFAULT 0,
+    FOREIGN KEY (uid) REFERENCES users(uid) ON DELETE CASCADE
+);
+
+-- 6. Browser Jobs Sub-Table
+CREATE TABLE browser_jobs (
+    id VARCHAR(128) PRIMARY KEY,
+    uid VARCHAR(128) NOT NULL,
+    goal TEXT NOT NULL,
+    current_step VARCHAR(255) NOT NULL,
+    status VARCHAR(50) NOT NULL CHECK (status IN ('RUNNING', 'NEEDS_APPROVAL', 'COMPLETED', 'FAILED')),
+    approval_required BOOLEAN NOT NULL DEFAULT FALSE,
+    FOREIGN KEY (uid) REFERENCES users(uid) ON DELETE CASCADE
+);
+
+-- 7. Browser Job Steps Details Table
+CREATE TABLE browser_job_steps (
+    step_id SERIAL PRIMARY KEY,
+    job_id VARCHAR(128) NOT NULL,
+    label VARCHAR(255) NOT NULL,
+    status VARCHAR(50) NOT NULL CHECK (status IN ('PLANNED', 'RUNNING', 'COMPLETED', 'FAILED')),
+    FOREIGN KEY (job_id) REFERENCES browser_jobs(id) ON DELETE CASCADE
+);
+
+-- 8. Audit Logs Table
+CREATE TABLE audit_logs (
+    id VARCHAR(128) PRIMARY KEY,
+    uid VARCHAR(128) NOT NULL,
+    type VARCHAR(100) NOT NULL,
+    action_count INT NOT NULL DEFAULT 0,
+    task_count INT NOT NULL DEFAULT 0,
+    memory_count INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (uid) REFERENCES users(uid) ON DELETE CASCADE
+);
