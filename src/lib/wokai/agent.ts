@@ -184,14 +184,22 @@ export function deterministicAgentPlan(message: string): AgentPlan {
   };
 }
 
+const OPENROUTER_MODELS_POOL = [
+  "openrouter/free",
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "meta-llama/llama-3.2-3b-instruct:free",
+  "qwen/qwen3-coder:free",
+  "qwen/qwen3-next-80b-a3b-instruct:free",
+  "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+  "nousresearch/hermes-3-llama-3.1-405b:free",
+  "liquid/lfm-2.5-1.2b-thinking:free",
+  "liquid/lfm-2.5-1.2b-instruct:free",
+  "nvidia/nemotron-3.5-content-safety:free",
+  "nvidia/nemotron-rerank-vl-1b-v2:free",
+  "nvidia/nemotron-embed-vl-1b-v2:free"
+];
+
 export async function generateAgentPlan(message: string) {
-  if (!process.env.GEMINI_API_KEY) return deterministicAgentPlan(message);
-
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({
-    model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
-  });
-
   const baseline = deterministicAgentPlan(message);
   const prompt = `
 You are WokAI, an OMP-inspired work-completion conductor.
@@ -208,7 +216,71 @@ ${JSON.stringify(baseline)}
 User message: ${message}
 `;
 
+  // 1. OpenRouter Integration
+  if (process.env.OPENROUTER_API_KEY) {
+    const modelsToTry = Array.from(new Set([
+      process.env.OPENROUTER_MODEL,
+      ...OPENROUTER_MODELS_POOL
+    ].filter(Boolean) as string[]));
+
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`Trying OpenRouter model: ${modelName}`);
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://wokai.app",
+            "X-Title": "WokAI OS"
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: [
+              {
+                role: "user",
+                content: prompt
+              }
+            ]
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.choices && data.choices[0] && data.choices[0].message) {
+            let text = data.choices[0].message.content.trim();
+            text = text.replace(/```json|```/g, "").trim();
+            const parsed = JSON.parse(text) as Partial<AgentPlan>;
+            console.log(`Successfully generated plan using OpenRouter model: ${modelName}`);
+            return {
+              ...baseline,
+              ...parsed,
+              actions: baseline.actions,
+              suggestedTasks: baseline.suggestedTasks,
+              memoryWrites: baseline.memoryWrites,
+              riskLevel: baseline.riskLevel,
+              needsApproval: baseline.needsApproval
+            } satisfies AgentPlan;
+          }
+        } else {
+          const errText = await response.text().catch(() => "");
+          console.warn(`OpenRouter model ${modelName} returned status ${response.status}: ${errText}`);
+        }
+      } catch (err) {
+        console.error(`OpenRouter error with model ${modelName}:`, err);
+      }
+    }
+    console.error("All OpenRouter models failed or returned invalid responses. Trying Gemini fallback...");
+  }
+
+  // 2. Gemini Fallback
+  if (!process.env.GEMINI_API_KEY) return baseline;
+
   try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
+    });
     const result = await model.generateContent(prompt);
     const text = result.response.text().replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(text) as Partial<AgentPlan>;
