@@ -378,6 +378,8 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
   if (!showAny) return null;
 
   async function handleApproveAction(actionId: string, tool: string, label: string) {
+    console.log(`[WokAI OS] Approve Action Triggered - Action ID: ${actionId}, Tool: ${tool}, Label: "${label}"`);
+
     if (onUpdateActionStatus) {
       await onUpdateActionStatus(actionId, "RUNNING");
     }
@@ -396,45 +398,83 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
       let output = "Action completed successfully.";
       let finalStatus: ActionStatus = "COMPLETED";
 
+      // 10 second timeout controller helper
+      const createTimeoutSignal = (timeoutMs = 10000) => {
+        const controller = new AbortController();
+        const id = setTimeout(() => {
+          console.warn(`[WokAI OS] Request to ${tool} timed out after ${timeoutMs}ms. Aborting...`);
+          controller.abort();
+        }, timeoutMs);
+        return { signal: controller.signal, clear: () => clearTimeout(id) };
+      };
+
       try {
         if (tool === "browser.plan") {
-          // Trigger Playwright adapter endpoint
-          const res = await fetch("/api/browser-agent", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ goal: label })
-          });
-          const data = await res.json();
-          output = data.currentStep || "Successfully completed form fill and submission on Playwright agent.";
-        } else if (tool === "calls.prepare") {
-          // Trigger Twilio call endpoint
-          const res = await fetch("/api/calls", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ to: "+14155552671", message: "This is a call from WokAI OS to schedule the project standup." })
-          });
-          const data = await res.json();
-          output = data.sid
-            ? `Twilio outbound call placed sid: ${data.sid}`
-            : `Outbound dialer script ready: "${data.script}"`;
-        } else if (tool === "devices.terminal") {
+          console.log(`[WokAI OS] [Browser Agent] Triggering local browser agent for goal: "${label}"`);
+          const { signal, clear } = createTimeoutSignal(15000); // Browser task can take slightly longer
           try {
-            let command = "dir";
-            const match = label.match(/(?:run|exec|execute)\s+[`'"]?([^`'"]+)[`'"]?/i);
-            if (match && match[1]) {
-              command = match[1];
-            } else if (label.toLowerCase().includes("terminal")) {
-              const cmdMatch = label.match(/terminal:\s*(.+)/i) || label.match(/command:\s*(.+)/i);
-              if (cmdMatch && cmdMatch[1]) command = cmdMatch[1];
-            }
+            const res = await fetch("/api/browser-agent", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ goal: label }),
+              signal
+            });
+            console.log(`[WokAI OS] [Browser Agent] Response Status: ${res.status}`);
+            const data = await res.json();
+            console.log(`[WokAI OS] [Browser Agent] Response Data:`, data);
+            output = data.currentStep || "Successfully completed form fill and submission on Playwright agent.";
+          } catch (err: any) {
+            console.error(`[WokAI OS] [Browser Agent] Fetch Error:`, err);
+            throw err;
+          } finally {
+            clear();
+          }
 
+        } else if (tool === "calls.prepare") {
+          console.log(`[WokAI OS] [Calls Agent] Placing Twilio outbound call...`);
+          const { signal, clear } = createTimeoutSignal();
+          try {
+            const res = await fetch("/api/calls", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ to: "+14155552671", message: `This is a call from WokAI OS: ${label}` }),
+              signal
+            });
+            console.log(`[WokAI OS] [Calls Agent] Response Status: ${res.status}`);
+            const data = await res.json();
+            console.log(`[WokAI OS] [Calls Agent] Response Data:`, data);
+            output = data.sid
+              ? `Twilio outbound call placed sid: ${data.sid}`
+              : `Outbound dialer script ready: "${data.script}"`;
+          } catch (err: any) {
+            console.error(`[WokAI OS] [Calls Agent] Fetch Error:`, err);
+            throw err;
+          } finally {
+            clear();
+          }
+
+        } else if (tool === "devices.terminal") {
+          let command = "dir";
+          const match = label.match(/(?:run|exec|execute)\s+[`'"]?([^`'"]+)[`'"]?/i);
+          if (match && match[1]) {
+            command = match[1];
+          } else if (label.toLowerCase().includes("terminal")) {
+            const cmdMatch = label.match(/terminal:\s*(.+)/i) || label.match(/command:\s*(.+)/i);
+            if (cmdMatch && cmdMatch[1]) command = cmdMatch[1];
+          }
+
+          console.log(`[WokAI OS] [Terminal Exec] Posting local shell command: "${command}" to /api/devices/exec`);
+          const { signal, clear } = createTimeoutSignal();
+          try {
             const res = await fetch("/api/devices/exec", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ command })
+              body: JSON.stringify({ command }),
+              signal
             });
-
+            console.log(`[WokAI OS] [Terminal Exec] Response Status: ${res.status}`);
             const data = await res.json();
+            console.log(`[WokAI OS] [Terminal Exec] Response Data:`, data);
             if (res.ok) {
               output = data.stdout || data.stderr || "Command executed with no output.";
             } else {
@@ -442,32 +482,46 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
               finalStatus = "FAILED";
             }
           } catch (err: any) {
-            finalStatus = "FAILED";
-            output = `Terminal execution error: ${err.message || err}`;
+            console.error(`[WokAI OS] [Terminal Exec] Fetch Error:`, err);
+            throw err;
+          } finally {
+            clear();
           }
+
         } else if (tool === "gmail.summarize") {
+          console.log("[WokAI OS] [Gmail API] Checking Google Access Token...");
           const token = localStorage.getItem("googleAccessToken");
           if (!token) {
+            console.error("[WokAI OS] [Gmail API] Error: googleAccessToken is missing from localStorage.");
             output = "Error: Google access token not found. Please log out and sign in again with Google to authorize.";
             finalStatus = "FAILED";
           } else {
+            console.log("[WokAI OS] [Gmail API] Listing latest messages: GET https://gmail.googleapis.com/gmail/v1/users/me/messages");
+            const { signal, clear } = createTimeoutSignal();
             try {
               const listRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5", {
-                headers: { "Authorization": `Bearer ${token}` }
+                headers: { "Authorization": `Bearer ${token}` },
+                signal
               });
+              console.log(`[WokAI OS] [Gmail API] List Response Status: ${listRes.status}`);
               if (!listRes.ok) {
                 const errText = await listRes.text();
+                console.error(`[WokAI OS] [Gmail API] List Request Failed:`, errText);
                 throw new Error(`Gmail API list failed: ${errText}`);
               }
               const listData = await listRes.json();
+              console.log("[WokAI OS] [Gmail API] List Response Data:", listData);
               const messages = listData.messages || [];
               if (messages.length === 0) {
+                console.log("[WokAI OS] [Gmail API] Inbox is empty.");
                 output = "No emails found in your Gmail inbox.";
               } else {
                 let summaryLines = [];
                 for (const msg of messages) {
+                  console.log(`[WokAI OS] [Gmail API] Fetching details for message ID: ${msg.id}`);
                   const detailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
-                    headers: { "Authorization": `Bearer ${token}` }
+                    headers: { "Authorization": `Bearer ${token}` },
+                    signal
                   });
                   if (detailRes.ok) {
                     const detail = await detailRes.json();
@@ -476,61 +530,79 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
                     const subject = headers.find((h: any) => h.name.toLowerCase() === "subject")?.value || "(No Subject)";
                     const from = headers.find((h: any) => h.name.toLowerCase() === "from")?.value || "(Unknown Sender)";
                     summaryLines.push(`• From: ${from}\n  Subject: ${subject}\n  Snippet: ${snippet}`);
+                  } else {
+                    console.warn(`[WokAI OS] [Gmail API] Failed to fetch details for message ID ${msg.id}`);
                   }
                 }
                 output = `Successfully retrieved and summarized your Gmail inbox:\n\n${summaryLines.join("\n\n")}`;
+                console.log("[WokAI OS] [Gmail API] Completed summary of inbox.");
               }
             } catch (err: any) {
+              console.error(`[WokAI OS] [Gmail API] Execution Error:`, err);
               finalStatus = "FAILED";
               output = `Gmail execution error: ${err.message || err}`;
+            } finally {
+              clear();
             }
           }
+
         } else if (tool === "calendar.createEvent") {
+          console.log("[WokAI OS] [Calendar API] Checking Google Access Token...");
           const token = localStorage.getItem("googleAccessToken");
           if (!token) {
+            console.error("[WokAI OS] [Calendar API] Error: googleAccessToken is missing from localStorage.");
             output = "Error: Google access token not found. Please log out and sign in again with Google to authorize.";
             finalStatus = "FAILED";
           } else {
-            try {
-              const start = new Date(Date.now() + 60 * 60 * 1000);
-              const end = new Date(Date.now() + 120 * 60 * 1000);
-              const eventBody = {
-                summary: "WokAI Task Focus Meeting",
-                description: `Created automatically by WokAI OS: "${label}"`,
-                start: {
-                  dateTime: start.toISOString(),
-                  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
-                },
-                end: {
-                  dateTime: end.toISOString(),
-                  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
-                }
-              };
+            const start = new Date(Date.now() + 60 * 60 * 1000);
+            const end = new Date(Date.now() + 120 * 60 * 1000);
+            const eventBody = {
+              summary: "WokAI Task Focus Meeting",
+              description: `Created automatically by WokAI OS: "${label}"`,
+              start: {
+                dateTime: start.toISOString(),
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+              },
+              end: {
+                dateTime: end.toISOString(),
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+              }
+            };
 
+            console.log("[WokAI OS] [Calendar API] Creating event: POST https://www.googleapis.com/calendar/v3/calendars/primary/events", eventBody);
+            const { signal, clear } = createTimeoutSignal();
+            try {
               const createRes = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
                 method: "POST",
                 headers: {
                   "Authorization": `Bearer ${token}`,
                   "Content-Type": "application/json"
                 },
-                body: JSON.stringify(eventBody)
+                body: JSON.stringify(eventBody),
+                signal
               });
-
+              console.log(`[WokAI OS] [Calendar API] Create Event Response Status: ${createRes.status}`);
               if (!createRes.ok) {
                 const errText = await createRes.text();
+                console.error(`[WokAI OS] [Calendar API] Create Request Failed:`, errText);
                 throw new Error(`Google Calendar API failed: ${errText}`);
               }
               const eventData = await createRes.json();
+              console.log("[WokAI OS] [Calendar API] Create Event Response Data:", eventData);
               output = `Successfully created Google Calendar event:\n- Title: ${eventData.summary}\n- Time: ${new Date(eventData.start.dateTime).toLocaleString()}\n- Link: ${eventData.htmlLink}`;
             } catch (err: any) {
+              console.error(`[WokAI OS] [Calendar API] Execution Error:`, err);
               finalStatus = "FAILED";
               output = `Calendar execution error: ${err.message || err}`;
+            } finally {
+              clear();
             }
           }
         }
-      } catch (err) {
+      } catch (err: any) {
+        console.error("[WokAI OS] Tool Execution Exception:", err);
         finalStatus = "FAILED";
-        output = "Execution failed.";
+        output = `Execution failed: ${err.message || err}`;
       }
 
       if (onUpdateActionStatus) {

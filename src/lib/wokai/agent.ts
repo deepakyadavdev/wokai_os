@@ -199,34 +199,31 @@ const OPENROUTER_MODELS_POOL = [
   "nvidia/nemotron-embed-vl-1b-v2:free"
 ];
 
-export async function generateAgentPlan(message: string) {
+export async function generateAgentPlan(message: string): Promise<AgentPlan> {
   const baseline = deterministicAgentPlan(message);
-  const prompt = `
-You are WokAI, an OMP-inspired work-completion conductor.
-Return concise JSON only. Preserve these keys:
-intent, response, reasoning, plan.
-Do not claim external actions completed. Sensitive actions need approval.
 
-Workspace snapshot:
-${JSON.stringify(demoSnapshot).slice(0, 6000)}
+  // 1. Greeting Bypass
+  if (baseline.intent === "greeting") {
+    console.log("WokAI Conductor: Greeting detected. Bypassing LLM planning loop.");
+    return baseline;
+  }
 
-Baseline plan:
-${JSON.stringify(baseline)}
+  let conversationReply = baseline.response;
+  let parsedPlan: Partial<AgentPlan> = {};
 
-User message: ${message}
-`;
-
-  // 1. OpenRouter Integration
+  // 2. OpenRouter Integration
   if (process.env.OPENROUTER_API_KEY) {
-    const modelsToTry = Array.from(new Set([
-      process.env.OPENROUTER_MODEL,
-      ...OPENROUTER_MODELS_POOL
-    ].filter(Boolean) as string[]));
+    // Model 1: Conversational Reply Generation (Lightweight)
+    const replyModels = [
+      "meta-llama/llama-3.2-3b-instruct:free",
+      "liquid/lfm-2.5-1.2b-thinking:free",
+      "openrouter/free"
+    ];
 
-    for (const modelName of modelsToTry) {
+    for (const model of replyModels) {
       try {
-        console.log(`Trying OpenRouter model: ${modelName}`);
-        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        console.log(`WokAI Conductor: Requesting conversational reply from ${model}`);
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
@@ -235,65 +232,179 @@ User message: ${message}
             "X-Title": "WokAI OS"
           },
           body: JSON.stringify({
-            model: modelName,
+            model,
             messages: [
               {
+                role: "system",
+                content: "You are WokAI, a friendly AI operating system assistant. Generate a natural, helpful, conversational response to the user's message. Keep it to max 2 sentences. Do not mention technical tools, actions, JSON, or plans."
+              },
+              {
                 role: "user",
-                content: prompt
+                content: message
               }
             ]
           })
         });
 
-        if (response.ok) {
-          const data = await response.json();
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.choices && data.choices[0] && data.choices[0].message) {
+            conversationReply = data.choices[0].message.content.trim();
+            console.log("WokAI Conductor: Successfully generated reply via model:", model);
+            break;
+          }
+        }
+      } catch (err) {
+        console.warn(`WokAI Conductor: Reply generation failed for model ${model}:`, err);
+      }
+    }
+
+    // Model 2: Strict JSON Action Planner (High-Capability)
+    const plannerModels = Array.from(new Set([
+      process.env.OPENROUTER_MODEL,
+      ...OPENROUTER_MODELS_POOL
+    ].filter(Boolean) as string[]));
+
+    const plannerPrompt = `
+You are the WokAI Conductor, the backend planning engine of WokAI OS.
+Analyze the user's message and generate a structured JSON object representing the action plan to execute.
+
+You MUST choose tools from this strict allowed list:
+- "gmail.summarize": Summarizes the user's Gmail inbox. Use when the user asks to read, check, or summarize emails/inbox.
+- "calendar.createEvent": Schedules meetings/events on Google Calendar. Use when the user asks to schedule, book, or block time.
+- "devices.terminal": Executes shell commands on the user's local host machine. Use when the user asks to run commands, CLI scripts, directory listings (ls, dir), or terminal execution.
+- "browser.plan": Automates web form fills and submissions. Use when the user asks to automate browser work (e.g. apply to internships, fill out forms).
+- "memory.retain": Saves personal preferences or habits.
+
+Security status guidelines:
+- Sensitive actions ("devices.terminal", "gmail.summarize", "calendar.createEvent", "browser.plan") must have "sensitive: true" and "status: 'NEEDS_APPROVAL'".
+- All action objects must have the keys: "id" (format: "action-[random]"), "tool", "label" (detailed description of what will be done), "status", "sensitive", and "createdAt" (ISO string).
+
+Return ONLY a raw JSON block matching this format (do NOT wrap it in markdown codeblocks):
+{
+  "intent": "work_completion" | "daily_planning",
+  "riskLevel": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
+  "reasoning": ["step-by-step logic detailing why these actions were chosen"],
+  "plan": ["friendly summary of the steps to execute"],
+  "actions": [
+    {
+      "id": "action-12345",
+      "tool": "gmail.summarize",
+      "label": "Summarize inbox and find chemistry lab info",
+      "status": "NEEDS_APPROVAL",
+      "sensitive": true,
+      "createdAt": "2026-06-25T10:00:00.000Z"
+    }
+  ],
+  "suggestedTasks": [
+    {
+      "id": "task-12345",
+      "title": "Chemistry lab rescue preparation",
+      "description": "Created from user prompt to handle chemistry sprint",
+      "deadline": "2026-06-26T10:00:00.000Z",
+      "priority": "HIGH",
+      "status": "todo",
+      "progress": 0,
+      "subtasks": ["Check chemistry emails", "Schedule slot", "Execute lab report outline"],
+      "source": "chat"
+    }
+  ]
+}
+
+User Message: "${message}"
+`;
+
+    for (const model of plannerModels) {
+      try {
+        console.log(`WokAI Conductor: Requesting technical plan from planner model ${model}`);
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://wokai.app",
+            "X-Title": "WokAI OS"
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              {
+                role: "user",
+                content: plannerPrompt
+              }
+            ]
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
           if (data && data.choices && data.choices[0] && data.choices[0].message) {
             let text = data.choices[0].message.content.trim();
             text = text.replace(/```json|```/g, "").trim();
-            const parsed = JSON.parse(text) as Partial<AgentPlan>;
-            console.log(`Successfully generated plan using OpenRouter model: ${modelName}`);
-            return {
-              ...baseline,
-              ...parsed,
-              actions: baseline.actions,
-              suggestedTasks: baseline.suggestedTasks,
-              memoryWrites: baseline.memoryWrites,
-              riskLevel: baseline.riskLevel,
-              needsApproval: baseline.needsApproval
-            } satisfies AgentPlan;
+            parsedPlan = JSON.parse(text) as Partial<AgentPlan>;
+            console.log(`WokAI Conductor: Successfully generated plan via model: ${model}`);
+            break;
           }
         } else {
-          const errText = await response.text().catch(() => "");
-          console.warn(`OpenRouter model ${modelName} returned status ${response.status}: ${errText}`);
+          const errText = await res.text().catch(() => "");
+          console.warn(`WokAI Conductor: Planner model ${model} failed with status ${res.status}: ${errText}`);
         }
       } catch (err) {
-        console.error(`OpenRouter error with model ${modelName}:`, err);
+        console.error(`WokAI Conductor: Plan generation failed for model ${model}:`, err);
       }
     }
-    console.error("All OpenRouter models failed or returned invalid responses. Trying Gemini fallback...");
   }
 
-  // 2. Gemini Fallback
-  if (!process.env.GEMINI_API_KEY) return baseline;
+  // 3. Gemini Fallback (if OpenRouter fails or is unconfigured)
+  if (Object.keys(parsedPlan).length === 0 && process.env.GEMINI_API_KEY) {
+    try {
+      console.log("WokAI Conductor: Falling back to Gemini for plan generation.");
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({
+        model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
+      });
 
-  try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({
-      model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
-    });
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(text) as Partial<AgentPlan>;
-    return {
-      ...baseline,
-      ...parsed,
-      actions: baseline.actions,
-      suggestedTasks: baseline.suggestedTasks,
-      memoryWrites: baseline.memoryWrites,
-      riskLevel: baseline.riskLevel,
-      needsApproval: baseline.needsApproval
-    } satisfies AgentPlan;
-  } catch {
-    return baseline;
+      const promptText = `
+You are the WokAI Conductor. Return strict JSON ONLY for:
+${message}
+Choose from tools: "gmail.summarize", "calendar.createEvent", "devices.terminal", "browser.plan".
+Schema:
+{
+  "intent": "work_completion",
+  "riskLevel": "LOW",
+  "reasoning": string[],
+  "plan": string[],
+  "actions": Array<{ id: string, tool: string, label: string, status: "NEEDS_APPROVAL", sensitive: true, createdAt: string }>,
+  "suggestedTasks": Array<{ id: string, title: string, description: string, deadline: string, priority: string, status: "todo", progress: 0, subtasks: string[], source: "chat" }>
+}
+`;
+      const result = await model.generateContent(promptText);
+      const text = result.response.text().replace(/```json|```/g, "").trim();
+      parsedPlan = JSON.parse(text) as Partial<AgentPlan>;
+    } catch (err) {
+      console.error("WokAI Conductor: Gemini fallback failed:", err);
+    }
   }
+
+  // 4. Merge Logic
+  const mergedActions = parsedPlan.actions && parsedPlan.actions.length > 0
+    ? parsedPlan.actions
+    : baseline.actions;
+
+  const mergedTasks = parsedPlan.suggestedTasks && parsedPlan.suggestedTasks.length > 0
+    ? parsedPlan.suggestedTasks
+    : baseline.suggestedTasks;
+
+  const mergedMemories = parsedPlan.memoryWrites || baseline.memoryWrites;
+
+  return {
+    ...baseline,
+    ...parsedPlan,
+    response: conversationReply,
+    actions: mergedActions,
+    suggestedTasks: mergedTasks,
+    memoryWrites: mergedMemories,
+    riskLevel: parsedPlan.riskLevel || baseline.riskLevel,
+    needsApproval: mergedActions.some((a) => a.status === "NEEDS_APPROVAL")
+  } satisfies AgentPlan;
 }
