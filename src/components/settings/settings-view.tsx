@@ -53,12 +53,11 @@ const NAV_ITEMS: { id: SettingsCategory; label: string; icon: React.ElementType 
 // Status badge
 // ---------------------------------------------------------------------------
 
-type ServiceStatus = 'connected' | 'demo' | 'not_configured';
+type ServiceStatus = 'connected' | 'not_configured';
 
 function StatusBadge({ status }: { status: ServiceStatus }) {
   const config: Record<ServiceStatus, { cls: string; label: string }> = {
     connected: { cls: 'bg-emerald-500/20 text-emerald-400', label: 'Connected' },
-    demo: { cls: 'bg-yellow-500/20 text-yellow-400', label: 'Demo' },
     not_configured: { cls: 'bg-red-500/20 text-red-400', label: 'Not configured' },
   };
   const { cls, label } = config[status];
@@ -167,9 +166,9 @@ function ProfilePanel({ firebaseConfigured }: { firebaseConfigured: boolean }) {
         </div>
         <div>
           <p className="text-lg font-semibold text-foreground">{user?.name ?? 'WokAI User'}</p>
-          <p className="text-sm text-muted-foreground">{user?.email ?? 'demo@wokai.local'}</p>
+          <p className="text-sm text-muted-foreground">{user?.email ?? ''}</p>
           <p className="mt-1 text-xs text-muted-foreground/60">
-            {firebaseConfigured ? 'Google account linked' : 'Demo mode — no account required'}
+            Google account linked
           </p>
         </div>
       </div>
@@ -181,23 +180,15 @@ function ProfilePanel({ firebaseConfigured }: { firebaseConfigured: boolean }) {
         </div>
         <div className="rounded-xl border border-border/50 bg-card/60 p-4">
           <p className="text-xs text-muted-foreground mb-1">Email</p>
-          <p className="text-sm font-medium text-foreground">{user?.email ?? 'demo@wokai.local'}</p>
+          <p className="text-sm font-medium text-foreground">{user?.email ?? ''}</p>
         </div>
-        {!firebaseConfigured && (
-          <div className="flex items-start gap-3 rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-4">
-            <AlertCircle size={16} className="text-yellow-400 mt-0.5 shrink-0" />
-            <p className="text-sm text-muted-foreground">
-              Profile is read-only in demo mode. Connect Firebase to enable account management.
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
 function GooglePanel({ firebaseConfigured }: { firebaseConfigured: boolean }) {
-  const status: ServiceStatus = firebaseConfigured ? 'connected' : 'demo';
+  const status: ServiceStatus = firebaseConfigured ? 'connected' : 'not_configured';
 
   const services: Omit<ServiceRowProps, 'onConnect'>[] = [
     {
@@ -465,16 +456,7 @@ function McpPanel() {
   );
 }
 
-function DataPanel({ resetDemo }: { resetDemo: () => void }) {
-  const [resetting, setResetting] = React.useState(false);
-
-  async function handleReset() {
-    setResetting(true);
-    await new Promise((r) => setTimeout(r, 700));
-    resetDemo();
-    setResetting(false);
-  }
-
+function DataPanel() {
   return (
     <div>
       <h2 className="text-xl font-semibold mb-2">Data</h2>
@@ -483,38 +465,13 @@ function DataPanel({ resetDemo }: { resetDemo: () => void }) {
       </p>
 
       <div className="flex flex-col gap-4">
-        {/* Reset demo */}
-        <div className="rounded-xl border border-border/50 bg-card/60 p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="font-medium text-foreground">Reset Demo Data</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                Restore all tasks, memories, and actions to the original demo state.
-              </p>
-            </div>
-            <Button
-              onClick={handleReset}
-              disabled={resetting}
-              variant="outline"
-              className="shrink-0 gap-2 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500/50"
-            >
-              {resetting ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <RotateCcw size={14} />
-              )}
-              {resetting ? 'Resetting…' : 'Reset Demo'}
-            </Button>
-          </div>
-        </div>
-
         {/* Export */}
         <div className="rounded-xl border border-border/50 bg-card/60 p-5 opacity-50">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="font-medium text-foreground">Export Workspace Data</p>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                Download your tasks, memories, and audit log as JSON. Requires Firebase.
+                Download your tasks, memories, and audit log as JSON.
               </p>
             </div>
             <Button disabled variant="outline" className="shrink-0 gap-2">
@@ -534,7 +491,6 @@ function DataPanel({ resetDemo }: { resetDemo: () => void }) {
 
 export function SettingsView() {
   const { user, firebaseConfigured } = useAuth();
-  const { resetDemo } = useWorkspaceData(user);
   const [activeCategory, setActiveCategory] = React.useState<SettingsCategory>('profile');
 
   const renderPanel = () => {
@@ -550,7 +506,7 @@ export function SettingsView() {
       case 'safety':
         return <SafetyPanel />;
       case 'data':
-        return <DataPanel resetDemo={resetDemo} />;
+        return <DataPanel />;
     }
   };
 

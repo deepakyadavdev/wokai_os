@@ -139,12 +139,10 @@ function SessionItem({
 function UserCard({
   name,
   email,
-  isDemo,
   onSignOut
 }: {
   name: string;
   email: string;
-  isDemo: boolean;
   onSignOut: () => void;
 }) {
   return (
@@ -163,16 +161,6 @@ function UserCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <p className="text-[13px] font-medium leading-tight truncate">{name}</p>
-          <span
-            className={cn(
-              "shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider",
-              isDemo
-                ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-            )}
-          >
-            {isDemo ? "Demo" : "Live"}
-          </span>
         </div>
         <p className="text-[11px] text-muted-foreground truncate">{email}</p>
       </div>
@@ -391,7 +379,6 @@ function Sidebar() {
           <UserCard
             name={user.name}
             email={user.email}
-            isDemo={isDemo}
             onSignOut={signOut}
           />
         ) : (
@@ -401,7 +388,7 @@ function Sidebar() {
                 {user ? user.name : "Not signed in"}
               </p>
               <p className="text-[11px] text-muted-foreground truncate">
-                {user ? user.email : "Demo mode active"}
+                {user ? user.email : "Please sign in to proceed"}
               </p>
             </div>
             <Link

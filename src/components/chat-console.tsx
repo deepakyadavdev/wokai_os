@@ -43,6 +43,7 @@ export function ChatConsole({
   ]);
   const [input, setInput] = React.useState("");
   const [pending, setPending] = React.useState(false);
+  const [progressStatus, setProgressStatus] = React.useState<string>("routing");
 
   async function submit(message = input) {
     const trimmed = message.trim();
@@ -53,6 +54,7 @@ export function ChatConsole({
     setInput("");
     setPending(true);
 
+    setProgressStatus("routing");
     try {
       const response = await fetch("/api/agent/chat", {
         method: "POST",
@@ -61,7 +63,39 @@ export function ChatConsole({
       });
 
       if (!response.ok) throw new Error("The agent route did not accept the request.");
-      const result = (await response.json()) as AgentPlan;
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let result: AgentPlan | null = null;
+
+      if (reader) {
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const data = JSON.parse(line);
+              if (data.status && data.status !== "done" && data.status !== "error") {
+                setProgressStatus(data.status);
+              } else if (data.status === "done") {
+                result = data.result;
+              } else if (data.status === "error") {
+                throw new Error(data.error || "Streaming error occurred.");
+              }
+            } catch (e) {
+              console.error("Error parsing stream line:", e);
+            }
+          }
+        }
+      }
+
+      if (!result) throw new Error("No plan returned from streaming conductor.");
+
       await onAgentResult(result);
       setMessages((current) => [
         ...current,
@@ -123,7 +157,17 @@ export function ChatConsole({
             {pending ? (
               <div className="flex items-center gap-2 rounded-lg border border-border bg-background/60 px-4 py-3 text-sm text-muted-foreground">
                 <Loader2 className="animate-spin" />
-                Running conductor, memory, task, and tool-routing checks...
+                {progressStatus === "routing"
+                  ? "Routing request..."
+                  : progressStatus === "agent1"
+                  ? "Agent 1: Generating response..."
+                  : progressStatus === "agent2"
+                  ? "Agent 2: Structuring plan..."
+                  : progressStatus === "agent3"
+                  ? "Agent 3: Analyzing context..."
+                  : progressStatus === "api"
+                  ? "Conductor: Preparing API layers..."
+                  : "WokAI is thinking..."}
               </div>
             ) : null}
           </div>

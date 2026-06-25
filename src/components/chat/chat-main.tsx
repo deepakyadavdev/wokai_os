@@ -26,7 +26,24 @@ import type { AgentPlan } from "@/lib/types";
 
 /* ─────────────────────────── Loading dots ─────────────────────────── */
 
-function ThinkingIndicator() {
+function ThinkingIndicator({ status }: { status: string }) {
+  const getStatusText = () => {
+    switch (status) {
+      case "routing":
+        return "Routing request...";
+      case "agent1":
+        return "Agent 1: Generating response...";
+      case "agent2":
+        return "Agent 2: Structuring plan...";
+      case "agent3":
+        return "Agent 3: Analyzing context...";
+      case "api":
+        return "Conductor: Preparing API layers...";
+      default:
+        return "WokAI is thinking...";
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -34,7 +51,7 @@ function ThinkingIndicator() {
       exit={{ opacity: 0, y: -4 }}
       className="mr-auto flex max-w-[85%] items-center gap-3 rounded-2xl rounded-bl-sm border border-border/50 bg-card/90 px-4 py-3"
     >
-      <span className="text-sm text-muted-foreground">WokAI is thinking</span>
+      <span className="text-sm text-muted-foreground">{getStatusText()}</span>
       <span className="flex items-center gap-1">
         {[0, 1, 2].map((i) => (
           <motion.span
@@ -94,6 +111,7 @@ export function ChatMain() {
   } = useChatSessions();
 
   const [pending, setPending] = React.useState(false);
+  const [progressStatus, setProgressStatus] = React.useState<string>("routing");
   const [inputValue, setInputValue] = React.useState("");
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -137,6 +155,7 @@ export function ChatMain() {
     }
     setPending(true);
 
+    setProgressStatus("routing");
     try {
       const res = await fetch("/api/agent/chat", {
         method: "POST",
@@ -145,7 +164,38 @@ export function ChatMain() {
       });
 
       if (!res.ok) throw new Error("The agent did not accept the request.");
-      const result = (await res.json()) as AgentPlan;
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let result: AgentPlan | null = null;
+
+      if (reader) {
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const data = JSON.parse(line);
+              if (data.status && data.status !== "done" && data.status !== "error") {
+                setProgressStatus(data.status);
+              } else if (data.status === "done") {
+                result = data.result;
+              } else if (data.status === "error") {
+                throw new Error(data.error || "Streaming error occurred.");
+              }
+            } catch (e) {
+              console.error("Error parsing stream line:", e);
+            }
+          }
+        }
+      }
+
+      if (!result) throw new Error("No plan returned from streaming conductor.");
 
       await mergeAgentResult(result);
 
@@ -175,12 +225,13 @@ export function ChatMain() {
   }
 
   /* Greeting */
-  const greeting = (() => {
+  const [greeting, setGreeting] = React.useState("day");
+  React.useEffect(() => {
     const h = new Date().getHours();
-    if (h < 12) return "morning";
-    if (h < 17) return "afternoon";
-    return "evening";
-  })();
+    if (h < 12) setGreeting("morning");
+    else if (h < 17) setGreeting("afternoon");
+    else setGreeting("evening");
+  }, []);
 
   const userName = user?.name?.split(" ")[0] ?? "Deepak";
 
@@ -268,7 +319,7 @@ export function ChatMain() {
               {/* Thinking indicator */}
               {pending && (
                 <motion.div key="thinking" className="flex flex-col items-start">
-                  <ThinkingIndicator />
+                  <ThinkingIndicator status={progressStatus} />
                 </motion.div>
               )}
             </AnimatePresence>

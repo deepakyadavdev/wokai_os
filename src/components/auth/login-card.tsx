@@ -66,22 +66,9 @@ export function LoginCard() {
           }}
         >
           <ShieldCheck size={18} />
-          {firebaseConfigured ? "Continue with Google" : "Continue in demo mode"}
+          Continue with Google
           <ArrowRight size={16} />
         </Button>
-
-        {/* Demo badge */}
-        <div className="mt-5 flex justify-center">
-          <span
-            className={
-              firebaseConfigured
-                ? "rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold text-emerald-400"
-                : "rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-[11px] font-semibold text-yellow-400"
-            }
-          >
-            {firebaseConfigured ? "✦ Firebase ready" : "✦ Demo mode — no secrets required"}
-          </span>
-        </div>
       </div>
     </div>
   );

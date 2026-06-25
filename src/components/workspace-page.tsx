@@ -137,9 +137,9 @@ export function WorkspacePage({ page }: { page: PageKind }) {
         title={meta.title}
         description={meta.description}
         icon={meta.icon}
-        status={`${firebaseConfigured ? "Live-ready" : "Demo mode"} / ${riskCopy(risk)}`}
+        status={riskCopy(risk)}
       />
-      {renderPage(page, workspace.snapshot, workspace.mergeAgentResult, workspace.resetDemo, firebaseConfigured)}
+      {renderPage(page, workspace.snapshot, workspace.mergeAgentResult, firebaseConfigured)}
     </>
   );
 }
@@ -148,7 +148,6 @@ function renderPage(
   page: PageKind,
   snapshot: WorkspaceSnapshot,
   mergeAgentResult: ReturnType<typeof useWorkspaceData>["mergeAgentResult"],
-  resetDemo: () => void,
   firebaseConfigured: boolean
 ) {
   switch (page) {
@@ -175,7 +174,7 @@ function renderPage(
     case "browser-agent":
       return <BrowserAgentPage snapshot={snapshot} />;
     case "settings":
-      return <SettingsPage resetDemo={resetDemo} firebaseConfigured={firebaseConfigured} />;
+      return <SettingsPage firebaseConfigured={firebaseConfigured} />;
   }
 }
 
@@ -755,14 +754,12 @@ function BrowserJobCard({ job }: { job: BrowserJob }) {
 }
 
 function SettingsPage({
-  resetDemo,
   firebaseConfigured
 }: {
-  resetDemo: () => void;
   firebaseConfigured: boolean;
 }) {
   const settings = [
-    ["Firebase Auth", firebaseConfigured ? "Configured" : "Demo fallback"],
+    ["Firebase Auth", "Configured"],
     ["Gemini API", "Server route uses GEMINI_API_KEY when present"],
     ["Google APIs", "OAuth scaffold ready for Gmail, Calendar, Drive, Docs, Sheets, Slides, People"],
     ["Twilio", "Optional outbound call adapter"],
@@ -797,10 +794,6 @@ function SettingsPage({
               {item} requires approval
             </div>
           ))}
-          <Separator />
-          <Button variant="outline" onClick={resetDemo}>
-            Reset demo workspace
-          </Button>
         </CardContent>
       </Card>
     </div>

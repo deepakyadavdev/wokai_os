@@ -68,14 +68,33 @@ function makeMemory(message: string): WokaiMemory | null {
 
 export function deterministicAgentPlan(message: string): AgentPlan {
   const lower = message.toLowerCase().trim();
-  const greetings = ["hi", "hey", "hello", "greetings", "good morning", "good afternoon", "good evening", "yo", "sup"];
-  if (greetings.includes(lower)) {
+  const cleanLower = lower.replace(/[^\w\s]/g, "").trim();
+  const greetings = [
+    "hi", "hey", "hello", "greetings", "good morning", "good afternoon",
+    "good evening", "yo", "sup", "heelo", "hi there", "hello there", "hey there"
+  ];
+
+  const isGreeting = greetings.includes(cleanLower) ||
+                     greetings.some(g => cleanLower.startsWith(g + " "));
+
+  const isCapabilityQuestion =
+    /(what can you do|what are you able to do|how can you help|what tools do you have|help|who are you|what is this|options|features|commands)/i.test(cleanLower) ||
+    (cleanLower.includes("can you") && cleanLower.includes("do")) ||
+    (cleanLower.includes("what") && cleanLower.includes("do"));
+
+  const hasTaskKeywords = /email|inbox|gmail|reply|meeting|schedule|calendar|rahul|file|drive|notes|docs|sheet|slides|pitch|deck|call|phone|browser|apply|internship|website|form|device|laptop|tablet|terminal|run|exec|cmd|ls|dir|scan|due|assignment|project|bill|deadline|rescue/i.test(cleanLower);
+
+  if ((isGreeting || isCapabilityQuestion) && !hasTaskKeywords) {
+    const response = isGreeting
+      ? "Hello! I am WokAI, your AI OS companion. How can I help you manage your tasks, check emails, control devices, or schedule calendar events today?"
+      : "I can assist you with information and tasks based on your needs. For example, I can check your Gmail inbox, manage your Google Calendar events, search Google Drive files, automate browser workflows, and run terminal commands. Let me know what you'd like help with!";
+
     return {
       intent: "greeting",
       riskLevel: "LOW",
-      response: "Hello! I am WokAI, your AI OS companion. How can I help you manage your tasks, check emails, control devices, or schedule calendar events today?",
+      response,
       reasoning: [
-        "Identified user message as a simple greeting.",
+        "Identified user message as a simple greeting or general inquiry.",
         "Skipped task creation and planning loop."
       ],
       plan: ["Awaiting user instructions"],
@@ -199,7 +218,11 @@ const OPENROUTER_MODELS_POOL = [
   "nvidia/nemotron-embed-vl-1b-v2:free"
 ];
 
-export async function generateAgentPlan(message: string): Promise<AgentPlan> {
+export async function generateAgentPlan(
+  message: string,
+  onProgress?: (phase: string) => void
+): Promise<AgentPlan> {
+  onProgress?.("routing");
   const baseline = deterministicAgentPlan(message);
 
   // 1. Greeting Bypass
@@ -211,6 +234,7 @@ export async function generateAgentPlan(message: string): Promise<AgentPlan> {
   let conversationReply = baseline.response;
   let parsedPlan: Partial<AgentPlan> = {};
 
+  onProgress?.("agent1");
   // 2. OpenRouter Integration
   if (process.env.OPENROUTER_API_KEY) {
     // Model 1: Conversational Reply Generation (Lightweight)
@@ -259,6 +283,7 @@ export async function generateAgentPlan(message: string): Promise<AgentPlan> {
       }
     }
 
+    onProgress?.("agent2");
     // Model 2: Strict JSON Action Planner (High-Capability)
     const plannerModels = Array.from(new Set([
       process.env.OPENROUTER_MODEL,
@@ -355,6 +380,7 @@ User Message: "${message}"
     }
   }
 
+  onProgress?.("agent3");
   // 3. Gemini Fallback (if OpenRouter fails or is unconfigured)
   if (Object.keys(parsedPlan).length === 0 && process.env.GEMINI_API_KEY) {
     try {
@@ -386,16 +412,21 @@ Schema:
     }
   }
 
-  // 4. Merge Logic
-  const mergedActions = parsedPlan.actions && parsedPlan.actions.length > 0
-    ? parsedPlan.actions
+  onProgress?.("api");
+  // 4. Merge Logic (use LLM outputs directly if successful, fallback to baseline only on full failure)
+  const llmSucceeded = Object.keys(parsedPlan).length > 0;
+
+  const mergedActions = llmSucceeded
+    ? (parsedPlan.actions || [])
     : baseline.actions;
 
-  const mergedTasks = parsedPlan.suggestedTasks && parsedPlan.suggestedTasks.length > 0
-    ? parsedPlan.suggestedTasks
+  const mergedTasks = llmSucceeded
+    ? (parsedPlan.suggestedTasks || [])
     : baseline.suggestedTasks;
 
-  const mergedMemories = parsedPlan.memoryWrites || baseline.memoryWrites;
+  const mergedMemories = llmSucceeded
+    ? (parsedPlan.memoryWrites || [])
+    : baseline.memoryWrites;
 
   return {
     ...baseline,
