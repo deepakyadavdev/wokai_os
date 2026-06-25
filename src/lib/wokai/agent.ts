@@ -185,13 +185,13 @@ export function deterministicAgentPlan(message: string): AgentPlan {
 }
 
 const OPENROUTER_MODELS_POOL = [
-  "openrouter/free",
   "meta-llama/llama-3.3-70b-instruct:free",
-  "meta-llama/llama-3.2-3b-instruct:free",
   "qwen/qwen3-coder:free",
+  "nousresearch/hermes-3-llama-3.1-405b:free",
   "qwen/qwen3-next-80b-a3b-instruct:free",
   "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
-  "nousresearch/hermes-3-llama-3.1-405b:free",
+  "meta-llama/llama-3.2-3b-instruct:free",
+  "openrouter/free",
   "liquid/lfm-2.5-1.2b-thinking:free",
   "liquid/lfm-2.5-1.2b-instruct:free",
   "nvidia/nemotron-3.5-content-safety:free",

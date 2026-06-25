@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { onAuthStateChanged, GoogleAuthProvider, type User } from "firebase/auth";
 
 import { getFirebaseAuth, signInWithGoogle, signOutOfFirebase } from "@/lib/firebase/client";
 import { saveUserProfile } from "@/lib/firebase/workspace-store";
@@ -60,6 +60,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         const credential = await signInWithGoogle();
+        const googleCredential = GoogleAuthProvider.credentialFromResult(credential);
+        const accessToken = googleCredential?.accessToken;
+        if (accessToken) {
+          localStorage.setItem("googleAccessToken", accessToken);
+        }
         const profile = toProfile(credential.user);
         setUser(profile);
         await saveUserProfile(profile);

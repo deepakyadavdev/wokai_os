@@ -418,11 +418,115 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             ? `Twilio outbound call placed sid: ${data.sid}`
             : `Outbound dialer script ready: "${data.script}"`;
         } else if (tool === "devices.terminal") {
-          output = "Volume in drive C has no label.\nVolume Serial Number is A8E2-9F12\n\nDirectory of C:\\Users\\Deepak\\Documents\\wokai\n\n25/06/2026  10:47 AM    <DIR>          .\n25/06/2026  10:47 AM    <DIR>          ..\n25/06/2026  10:47 AM             1,313 .env.local\n25/06/2026  10:47 AM             1,293 AGENTS.md\n25/06/2026  10:47 AM             1,351 package.json\n25/06/2026  10:47 AM    <DIR>          src\n               3 File(s)          3,957 bytes\n               3 Dir(s)  120,412,192,768 bytes free";
+          try {
+            let command = "dir";
+            const match = label.match(/(?:run|exec|execute)\s+[`'"]?([^`'"]+)[`'"]?/i);
+            if (match && match[1]) {
+              command = match[1];
+            } else if (label.toLowerCase().includes("terminal")) {
+              const cmdMatch = label.match(/terminal:\s*(.+)/i) || label.match(/command:\s*(.+)/i);
+              if (cmdMatch && cmdMatch[1]) command = cmdMatch[1];
+            }
+
+            const res = await fetch("/api/devices/exec", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ command })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+              output = data.stdout || data.stderr || "Command executed with no output.";
+            } else {
+              output = `Command failed:\nError: ${data.error || ""}\nStdout: ${data.stdout || ""}\nStderr: ${data.stderr || ""}`;
+              finalStatus = "FAILED";
+            }
+          } catch (err: any) {
+            finalStatus = "FAILED";
+            output = `Terminal execution error: ${err.message || err}`;
+          }
         } else if (tool === "gmail.summarize") {
-          output = "Gmail inbox summarized. Reply draft sent to teacher@gmail.com.";
+          const token = localStorage.getItem("googleAccessToken");
+          if (!token) {
+            output = "Error: Google access token not found. Please log out and sign in again with Google to authorize.";
+            finalStatus = "FAILED";
+          } else {
+            try {
+              const listRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5", {
+                headers: { "Authorization": `Bearer ${token}` }
+              });
+              if (!listRes.ok) {
+                const errText = await listRes.text();
+                throw new Error(`Gmail API list failed: ${errText}`);
+              }
+              const listData = await listRes.json();
+              const messages = listData.messages || [];
+              if (messages.length === 0) {
+                output = "No emails found in your Gmail inbox.";
+              } else {
+                let summaryLines = [];
+                for (const msg of messages) {
+                  const detailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                  });
+                  if (detailRes.ok) {
+                    const detail = await detailRes.json();
+                    const snippet = detail.snippet || "";
+                    const headers = detail.payload?.headers || [];
+                    const subject = headers.find((h: any) => h.name.toLowerCase() === "subject")?.value || "(No Subject)";
+                    const from = headers.find((h: any) => h.name.toLowerCase() === "from")?.value || "(Unknown Sender)";
+                    summaryLines.push(`• From: ${from}\n  Subject: ${subject}\n  Snippet: ${snippet}`);
+                  }
+                }
+                output = `Successfully retrieved and summarized your Gmail inbox:\n\n${summaryLines.join("\n\n")}`;
+              }
+            } catch (err: any) {
+              finalStatus = "FAILED";
+              output = `Gmail execution error: ${err.message || err}`;
+            }
+          }
         } else if (tool === "calendar.createEvent") {
-          output = "Calendar slot locked. Event successfully saved under users/{uid}/calendar.";
+          const token = localStorage.getItem("googleAccessToken");
+          if (!token) {
+            output = "Error: Google access token not found. Please log out and sign in again with Google to authorize.";
+            finalStatus = "FAILED";
+          } else {
+            try {
+              const start = new Date(Date.now() + 60 * 60 * 1000);
+              const end = new Date(Date.now() + 120 * 60 * 1000);
+              const eventBody = {
+                summary: "WokAI Task Focus Meeting",
+                description: `Created automatically by WokAI OS: "${label}"`,
+                start: {
+                  dateTime: start.toISOString(),
+                  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+                },
+                end: {
+                  dateTime: end.toISOString(),
+                  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+                }
+              };
+
+              const createRes = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${token}`,
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify(eventBody)
+              });
+
+              if (!createRes.ok) {
+                const errText = await createRes.text();
+                throw new Error(`Google Calendar API failed: ${errText}`);
+              }
+              const eventData = await createRes.json();
+              output = `Successfully created Google Calendar event:\n- Title: ${eventData.summary}\n- Time: ${new Date(eventData.start.dateTime).toLocaleString()}\n- Link: ${eventData.htmlLink}`;
+            } catch (err: any) {
+              finalStatus = "FAILED";
+              output = `Calendar execution error: ${err.message || err}`;
+            }
+          }
         }
       } catch (err) {
         finalStatus = "FAILED";
