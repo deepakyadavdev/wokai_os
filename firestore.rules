@@ -1,0 +1,26 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownsUser(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      allow read, create, update, delete: if ownsUser(uid);
+
+      match /{collection}/{docId} {
+        allow read, create, update, delete: if ownsUser(uid);
+      }
+    }
+
+    match /public/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

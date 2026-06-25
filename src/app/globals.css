@@ -1,0 +1,140 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 42% 5%;
+    --foreground: 210 40% 96%;
+    --card: 224 34% 8%;
+    --card-foreground: 210 40% 96%;
+    --popover: 224 34% 8%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 166 79% 48%;
+    --primary-foreground: 220 42% 5%;
+    --secondary: 226 23% 15%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 225 20% 16%;
+    --muted-foreground: 218 13% 68%;
+    --accent: 224 28% 17%;
+    --accent-foreground: 210 40% 96%;
+    --destructive: 350 86% 62%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 224 20% 22%;
+    --input: 224 20% 22%;
+    --ring: 166 79% 48%;
+    --success: 143 71% 50%;
+    --warning: 38 92% 56%;
+    --danger: 350 86% 62%;
+    --signal: 199 89% 58%;
+    --radius: 0.5rem;
+    --font-geist-sans: "Inter", "Geist", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+    --font-geist-mono: "Geist Mono", "Cascadia Code", "SFMono-Regular", ui-monospace, monospace;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+    font-family: "Inter", "Geist", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    letter-spacing: 0;
+    font-family: "Inter", "Geist", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  /* ── Custom scrollbar ──────────────────────────────────────── */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(224 20% 28%);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(224 20% 38%);
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(224 20% 28%) transparent;
+  }
+}
+
+/* ── Keyframe animations ───────────────────────────────────── */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.25s ease-out both;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out both;
+  }
+
+  .animate-slide-in-left {
+    animation: slideInLeft 0.25s ease-out both;
+  }
+
+  .animate-pulse-soft {
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+}
