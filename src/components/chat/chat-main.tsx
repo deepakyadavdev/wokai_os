@@ -178,9 +178,10 @@ export function ChatMain() {
           const lines = buffer.split("\n");
           buffer = lines.pop() || "";
           for (const line of lines) {
-            if (!line.trim()) continue;
+            const trimmed = line.trim();
+            if (!trimmed) continue;
             try {
-              const data = JSON.parse(line);
+              const data = JSON.parse(trimmed);
               if (data.status && data.status !== "done" && data.status !== "error") {
                 setProgressStatus(data.status);
               } else if (data.status === "done") {
@@ -191,6 +192,19 @@ export function ChatMain() {
             } catch (e) {
               console.error("Error parsing stream line:", e);
             }
+          }
+        }
+        const finalTrimmed = buffer.trim();
+        if (finalTrimmed) {
+          try {
+            const data = JSON.parse(finalTrimmed);
+            if (data.status === "done") {
+              result = data.result;
+            } else if (data.status === "error") {
+              throw new Error(data.error || "Streaming error occurred.");
+            }
+          } catch (e) {
+            console.error("Error parsing final stream chunk:", e);
           }
         }
       }
