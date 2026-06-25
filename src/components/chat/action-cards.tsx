@@ -19,6 +19,7 @@ import {
   Cpu
 } from "lucide-react";
 
+import { toast } from "sonner";
 import { RiskBadge } from "@/components/risk-badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -122,22 +123,18 @@ function EmailCard({ action, onApprove }: { action: WokaiAction; onApprove: () =
   return (
     <ResultCard className="border-blue-500/30 bg-blue-500/10">
       <CardHeader icon={Mail} label={isDone ? "Email Sent Successfully" : "Email Draft Created"} iconClass="text-blue-400" />
-      <div className="space-y-1 text-sm">
+      <div className="space-y-1.5 text-sm">
         <div>
-          <span className="text-muted-foreground">To: </span>teacher@gmail.com
+          <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
-        <div>
-          <span className="text-muted-foreground">Subject: </span>Assignment Submission
-        </div>
-        <div className="mt-2 text-xs italic text-muted-foreground">
-          &ldquo;Hi, I am writing to submit my chemistry assignment…&rdquo;
-        </div>
+        {action.output && (
+          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-blue-500/20 font-mono">
+            {action.output}
+          </div>
+        )}
       </div>
       {!isDone && (
         <div className="mt-3 flex gap-2">
-          <Button size="sm" variant="outline" className="border-blue-500/40 text-blue-400 hover:bg-blue-500/10">
-            Edit
-          </Button>
           <Button size="sm" onClick={onApprove} className="bg-blue-600 text-white hover:bg-blue-500" disabled={action.status === "RUNNING"}>
             {action.status === "RUNNING" ? <Loader2 className="size-3 animate-spin" /> : "Send"}
           </Button>
@@ -154,14 +151,15 @@ function CalendarCard({ action, onApprove }: { action: WokaiAction; onApprove: (
   return (
     <ResultCard className="border-violet-500/30 bg-violet-500/10">
       <CardHeader icon={CalendarDays} label={isDone ? "Event Confirmed on Calendar" : "Event Drafted"} iconClass="text-violet-400" />
-      <div className="space-y-1 text-sm">
+      <div className="space-y-1.5 text-sm">
         <div>
-          <span className="text-muted-foreground">Title: </span>Meeting with Rahul
+          <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
-        <div className="flex items-center gap-1 text-muted-foreground">
-          <Clock className="size-3" />
-          <span className="text-foreground">Tomorrow · 4:00 PM – 5:00 PM</span>
-        </div>
+        {action.output && (
+          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-violet-500/20 font-mono">
+            {action.output}
+          </div>
+        )}
       </div>
       {!isDone && (
         <div className="mt-3">
@@ -181,13 +179,15 @@ function CallCard({ action, onApprove }: { action: WokaiAction; onApprove: () =>
   return (
     <ResultCard className="border-green-500/30 bg-green-500/10">
       <CardHeader icon={Phone} label={isDone ? "Call Placed and Logged" : "Contact Found"} iconClass="text-green-400" />
-      <div className="space-y-1 text-sm">
+      <div className="space-y-1.5 text-sm">
         <div>
-          <span className="text-muted-foreground">Name: </span>Rahul
+          <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
-        <div className="mt-1 text-xs italic text-muted-foreground">
-          {action.output || "Calling about tomorrow's meeting schedule…"}
-        </div>
+        {action.output && (
+          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-green-500/20 font-mono">
+            {action.output}
+          </div>
+        )}
       </div>
       {!isDone && (
         <div className="mt-3">
@@ -202,22 +202,19 @@ function CallCard({ action, onApprove }: { action: WokaiAction; onApprove: () =>
 
 /* ─────────────────────────── DRIVE card ─────────────────────────── */
 
-function DriveCard() {
+function DriveCard({ action }: { action: WokaiAction }) {
   return (
     <ResultCard className="border-orange-500/30 bg-orange-500/10">
       <CardHeader icon={HardDrive} label="File Located" iconClass="text-orange-400" />
-      <div className="space-y-1 text-sm">
+      <div className="space-y-1.5 text-sm">
         <div>
-          <span className="text-muted-foreground">File: </span>Chemistry_Assignment_Draft.docx
+          <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
-        <div className="mt-1 text-xs text-muted-foreground">
-          Last edited 2 hours ago · Google Drive
-        </div>
-      </div>
-      <div className="mt-3">
-        <Button size="sm" variant="outline" className="border-orange-500/40 text-orange-400 hover:bg-orange-500/10">
-          Open File
-        </Button>
+        {action.output && (
+          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-orange-500/20 font-mono">
+            {action.output}
+          </div>
+        )}
       </div>
     </ResultCard>
   );
@@ -267,10 +264,10 @@ function TerminalCard({ action, onApprove }: { action: WokaiAction; onApprove: (
       <div className="space-y-2 text-xs">
         <div className="flex items-center gap-1.5 text-zinc-500">
           <span>$</span>
-          <span className="text-zinc-200">dir C:\Users\Deepak\Documents\wokai</span>
+          <span className="text-zinc-200">{action.label}</span>
         </div>
         {isDone ? (
-          <div className="bg-black/50 p-2 rounded text-[11px] leading-4 text-emerald-400/90 whitespace-pre overflow-x-auto">
+          <div className="bg-black/50 p-2 rounded text-[11px] leading-4 text-emerald-400/90 whitespace-pre overflow-x-auto font-mono">
             {action.output || "No output returned."}
           </div>
         ) : (
@@ -292,6 +289,7 @@ function TerminalCard({ action, onApprove }: { action: WokaiAction; onApprove: (
 
 function RescueCard({ result }: { result: AgentPlan }) {
   const task = result.suggestedTasks[0];
+  const [accepted, setAccepted] = React.useState(false);
   if (!task) return null;
   return (
     <ResultCard className="border-red-500/30 bg-red-500/10">
@@ -311,8 +309,16 @@ function RescueCard({ result }: { result: AgentPlan }) {
         ))}
       </div>
       <div className="mt-3">
-        <Button size="sm" className="bg-red-600 text-white hover:bg-red-500">
-          Accept Plan
+        <Button
+          size="sm"
+          onClick={() => {
+            setAccepted(true);
+            toast.success("Rescue plan accepted and initialized!");
+          }}
+          disabled={accepted}
+          className="bg-red-600 text-white hover:bg-red-500 disabled:bg-emerald-600/50 disabled:text-emerald-300"
+        >
+          {accepted ? "Plan Accepted ✓" : "Accept Plan"}
         </Button>
       </div>
     </ResultCard>
@@ -648,6 +654,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
   const gmailAction = actions.find((a) => a.tool.startsWith("gmail"));
   const calendarAction = actions.find((a) => a.tool.startsWith("calendar"));
   const callsAction = actions.find((a) => a.tool.startsWith("calls"));
+  const driveAction = actions.find((a) => a.tool.startsWith("drive"));
   const browserAction = actions.find((a) => a.tool === "browser.plan");
   const terminalAction = actions.find((a) => a.tool === "devices.terminal");
 
@@ -678,7 +685,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
           onApprove={() => handleApproveAction(callsAction.id, callsAction.tool, callsAction.label)}
         />
       )}
-      {hasDrive && <DriveCard />}
+      {hasDrive && driveAction && <DriveCard action={driveAction} />}
       {hasBrowser && browserAction && (
         <BrowserCard
           result={result}
