@@ -67,7 +67,25 @@ function makeMemory(message: string): WokaiMemory | null {
 }
 
 export function deterministicAgentPlan(message: string): AgentPlan {
-  const lower = message.toLowerCase();
+  const lower = message.toLowerCase().trim();
+  const greetings = ["hi", "hey", "hello", "greetings", "good morning", "good afternoon", "good evening", "yo", "sup"];
+  if (greetings.includes(lower)) {
+    return {
+      intent: "greeting",
+      riskLevel: "LOW",
+      response: "Hello! I am WokAI, your AI OS companion. How can I help you manage your tasks, check emails, control devices, or schedule calendar events today?",
+      reasoning: [
+        "Identified user message as a simple greeting.",
+        "Skipped task creation and planning loop."
+      ],
+      plan: ["Awaiting user instructions"],
+      actions: [],
+      suggestedTasks: [],
+      memoryWrites: [],
+      needsApproval: false
+    };
+  }
+
   const riskLevel = detectRisk(message);
   const actions: WokaiAction[] = [
     makeAction("memory.recall", "Loaded preferences, habits, deadlines, and recent actions")
