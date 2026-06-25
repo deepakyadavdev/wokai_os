@@ -10,6 +10,7 @@ import {
   HardDrive,
   Phone,
   CheckSquare,
+  Loader2,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -302,6 +303,19 @@ export function ActivityView() {
   const { user } = useAuth();
   const { snapshot } = useWorkspaceData(user);
   const [activeFilter, setActiveFilter] = React.useState<ActivityCategory>('all');
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   // Convert WokaiAction items into ActivityItem shape
   const actionItems: ActivityItem[] = snapshot.actions.map((a) => ({

@@ -59,6 +59,16 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function ClientOnlyTime({ iso }: { iso: string }) {
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return <span className="opacity-0">...</span>;
+  return <>{relativeTime(iso)}</>;
+}
+
 /* ─────────────────────────── Quick chips ─────────────────────────── */
 
 const CHIPS = [
@@ -250,7 +260,7 @@ export function ChatMain() {
 
                   {/* Relative timestamp */}
                   <span className="mt-1 px-1 text-xs text-muted-foreground">
-                    {relativeTime(message.timestamp)}
+                    <ClientOnlyTime iso={message.timestamp} />
                   </span>
                 </motion.div>
               ))}

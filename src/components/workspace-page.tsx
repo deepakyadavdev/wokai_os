@@ -27,7 +27,8 @@ import {
   Sheet,
   ShieldCheck,
   SquareCheckBig,
-  Users
+  Users,
+  Loader2
 } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
@@ -450,6 +451,19 @@ function InboxPage({ snapshot }: { snapshot: WorkspaceSnapshot }) {
 }
 
 function CalendarPage({ snapshot }: { snapshot: WorkspaceSnapshot }) {
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="flex h-32 items-center justify-center">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       {snapshot.events.map((event) => (
