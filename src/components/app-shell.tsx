@@ -387,7 +387,7 @@ function Sidebar() {
 
       {/* ── User Card ── */}
       <div className="shrink-0">
-        {user ? (
+        {user && user.uid !== "demo-user" ? (
           <UserCard
             name={user.name}
             email={user.email}
@@ -395,7 +395,22 @@ function Sidebar() {
             onSignOut={signOut}
           />
         ) : (
-          <div className="px-3 py-3 text-[12px] text-muted-foreground">Not signed in</div>
+          <div className="px-3 py-3 flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-medium leading-tight text-foreground truncate">
+                {user ? user.name : "Not signed in"}
+              </p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                {user ? user.email : "Demo mode active"}
+              </p>
+            </div>
+            <Link
+              href="/auth/login"
+              className="shrink-0 px-2.5 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs select-none transition-colors duration-150"
+            >
+              Sign In
+            </Link>
+          </div>
         )}
       </div>
     </aside>
