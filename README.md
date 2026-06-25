@@ -1,4 +1,4 @@
-# WokAI
+LI # WokAI
 
 **The AI That Helps You Finish Work Before It's Too Late.**
 
