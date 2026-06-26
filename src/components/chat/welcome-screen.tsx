@@ -14,16 +14,16 @@ interface WelcomeScreenProps {
 
 const PROMPT_CARDS = [
   {
-    id: "chemistry",
+    id: "project",
     icon: BookOpen,
-    label: "My chemistry assignment is due tomorrow",
+    label: "My project presentation is due tomorrow",
     description: "Rescue plan · deadline tracking",
     color: "from-amber-500/10 to-orange-500/5 border-amber-500/20 hover:border-amber-400/40"
   },
   {
     id: "meeting",
     icon: Calendar,
-    label: "Schedule a meeting with Rahul tomorrow",
+    label: "Schedule a team sync meeting tomorrow",
     description: "Calendar · contacts · reminder",
     color: "from-violet-500/10 to-purple-500/5 border-violet-500/20 hover:border-violet-400/40"
   },

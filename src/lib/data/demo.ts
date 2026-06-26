@@ -13,17 +13,6 @@ const now = Date.now();
 
 export const demoTasks: WokaiTask[] = [
   {
-    id: "task-chemistry",
-    title: "Chemistry assignment rescue",
-    description: "Finish organic chemistry report with citations and final review.",
-    deadline: new Date(now + 18 * 36e5).toISOString(),
-    priority: "HIGH",
-    status: "in_progress",
-    progress: 42,
-    subtasks: ["Find notes", "Write reaction mechanism", "Add references", "Final review"],
-    source: "chat"
-  },
-  {
     id: "task-investor",
     title: "Investor pitch deck",
     description: "Prepare 10-slide founder update for Friday.",
@@ -63,14 +52,6 @@ export const demoMemories: WokaiMemory[] = [
     content: "Prefers concise, friendly email drafts with clear next steps.",
     confidence: 0.88,
     updatedAt: new Date(now - 5 * 36e5).toISOString()
-  },
-  {
-    id: "mem-rahul",
-    type: "contact",
-    title: "Rahul",
-    content: "Common meeting contact. Usually available after 4 PM.",
-    confidence: 0.76,
-    updatedAt: new Date(now - 8 * 36e5).toISOString()
   }
 ];
 
@@ -157,13 +138,6 @@ export const demoEvents: WokaiCalendarEvent[] = [
     start: new Date(now + 2 * 36e5).toISOString(),
     end: new Date(now + 2.5 * 36e5).toISOString(),
     risk: "LOW"
-  },
-  {
-    id: "evt-study",
-    title: "Chemistry focus block",
-    start: new Date(now + 4 * 36e5).toISOString(),
-    end: new Date(now + 5.5 * 36e5).toISOString(),
-    risk: "HIGH"
   }
 ];
 

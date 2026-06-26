@@ -29,8 +29,8 @@ function makeAction(toolName: WokaiAction["tool"], label: string): WokaiAction {
 
 function makeTask(message: string, riskLevel: RiskLevel): WokaiTask {
   const deadlineHours = riskLevel === "CRITICAL" ? 5 : riskLevel === "HIGH" ? 18 : 72;
-  const title = /chemistry/i.test(message)
-    ? "Chemistry assignment rescue"
+  const title = /project|presentation/i.test(message)
+    ? "Project delivery rescue"
     : /pitch|investor/i.test(message)
       ? "Prepare investor pitch"
       : /bill/i.test(message)
@@ -82,7 +82,7 @@ export function deterministicAgentPlan(message: string): AgentPlan {
     (cleanLower.includes("can you") && cleanLower.includes("do")) ||
     (cleanLower.includes("what") && cleanLower.includes("do"));
 
-  const hasTaskKeywords = /email|inbox|gmail|reply|meeting|schedule|calendar|rahul|file|drive|notes|docs|sheet|slides|pitch|deck|call|phone|browser|apply|internship|website|form|device|laptop|tablet|terminal|run|exec|cmd|ls|dir|scan|due|assignment|project|bill|deadline|rescue/i.test(cleanLower);
+  const hasTaskKeywords = /email|inbox|gmail|reply|meeting|schedule|calendar|file|drive|notes|docs|sheet|slides|pitch|deck|call|phone|browser|apply|internship|website|form|device|laptop|tablet|terminal|run|exec|cmd|ls|dir|scan|due|assignment|project|bill|deadline|rescue/i.test(cleanLower);
 
   if ((isGreeting || isCapabilityQuestion) && !hasTaskKeywords) {
     const response = isGreeting
@@ -118,7 +118,7 @@ export function deterministicAgentPlan(message: string): AgentPlan {
       const toMatch = lower.match(/to\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i) || lower.match(/to\s+(\S+)/i);
       const recipient = toMatch ? toMatch[1] : "recipient@gmail.com";
       const bodyMatch = message.match(/about\s+(.+)/i) || message.match(/saying\s+(.+)/i) || message.match(/body\s+(.+)/i);
-      const bodyText = bodyMatch ? bodyMatch[1] : "Chemistry Assignment is completed";
+      const bodyText = bodyMatch ? bodyMatch[1] : "Drafting email content";
       actions.push(makeAction("gmail.send", `Send email to ${recipient} about ${bodyText}`));
       plan.push("Construct email draft", "Verify recipient details", "Send email after approval");
     } else if (/search|find|filter/i.test(lower)) {
@@ -132,7 +132,7 @@ export function deterministicAgentPlan(message: string): AgentPlan {
     }
   }
 
-  if (/meeting|schedule|calendar|rahul/.test(lower)) {
+  if (/meeting|schedule|calendar/.test(lower)) {
     if (/cancel|delete|remove/i.test(lower)) {
       actions.push(makeAction("calendar.deleteEvent", `Delete meeting: ${message}`));
       plan.push("Find target event", "Delete event after approval");
@@ -159,7 +159,7 @@ export function deterministicAgentPlan(message: string): AgentPlan {
 
   if (/file|drive|notes|docs|sheet|slides|pitch|deck/.test(lower)) {
     const fileMatch = message.match(/(?:named|titled|for|file)\s+['"]?([^'"]+)['"]?/i);
-    const fileName = fileMatch ? fileMatch[1] : "Chemistry Assignment Notes";
+    const fileName = fileMatch ? fileMatch[1] : "New Document";
     actions.push(makeAction("drive.search", `Search files for ${fileName}`));
     if (/doc|assignment|notes/.test(lower)) actions.push(makeAction("docs.create", `Create document named ${fileName}`));
     if (/sheet|tracker|budget/.test(lower)) actions.push(makeAction("sheets.createTracker", `Create sheet named ${fileName}`));

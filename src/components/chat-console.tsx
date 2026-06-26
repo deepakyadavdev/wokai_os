@@ -21,8 +21,8 @@ interface Message {
 }
 
 const examples = [
-  "My chemistry assignment is due tomorrow.",
-  "Schedule a meeting with Rahul tomorrow at 4 PM.",
+  "My project presentation is due tomorrow.",
+  "Schedule a team sync meeting tomorrow at 4 PM.",
   "Check important emails and draft replies.",
   "Apply for internship and pause before submit."
 ];
