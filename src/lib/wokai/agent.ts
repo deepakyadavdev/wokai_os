@@ -525,7 +525,7 @@ Otherwise return:
             messages: [
               {
                 role: "system",
-                content: "You are WokAI, a friendly AI operating system assistant. Generate a natural, helpful, conversational response to the user's message. Keep it to max 2 sentences. Do not mention technical tools, actions, JSON, or plans."
+                content: "You are WokAI, a friendly AI operating system assistant. Generate a natural, helpful, conversational response to the user's message. This is a simple chat like chatting with ChatGPT, so feel free to respond fully and naturally. Do not mention technical tools, actions, JSON, or plans."
               },
               {
                 role: "user",
