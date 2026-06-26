@@ -376,10 +376,76 @@ Return strict JSON ONLY. Do NOT wrap it in markdown codeblocks. The output must 
   return [];
 }
 
+async function evaluatePlanWithAgent5(
+  message: string,
+  plan: AgentPlan
+): Promise<{ approved: boolean; feedback?: string; refinedPrompt?: string }> {
+  const promptText = `
+You are WokAI Agent 5 (Quality Assurance & Evaluator Agent).
+WokAI is an AI operating system companion that integrates tasks, calendar, email, drive, local files, terminal execution, phone calls, and browser automation to help users finish work efficiently.
+
+Your job is to evaluate if the calculated WokAI Action Plan is appropriate, safe, and fully matches the user's initial request.
+- The user request is: "${message}"
+- The proposed plan is: ${JSON.stringify(plan)}
+
+Inspect:
+1. Are the selected actions/tools correct and relevant? (e.g., if user wants to create a doc, is docs.create planned? If user wants to send email, is gmail.send planned?)
+2. Is the conversational response friendly and helpful?
+3. Are there any security issues or missing steps?
+
+Return a strict JSON object ONLY. Do NOT wrap it in markdown codeblocks. The output must contain "approved", "feedback", and "refinedPrompt":
+{
+  "approved": true | false,
+  "feedback": "Why the plan is not approved, or empty if approved",
+  "refinedPrompt": "If not approved, write a highly descriptive prompt combining the user's request and instructions to correct the action plan"
+}
+`;
+
+  if (!process.env.OPENROUTER_API_KEY) {
+    console.log("Agent 5: OpenRouter API key missing, auto-approving.");
+    return { approved: true };
+  }
+
+  try {
+    console.log("Agent 5: Evaluating plan quality via OpenRouter.");
+    const model = process.env.OPENROUTER_MODEL || "qwen/qwen3-coder:free";
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://wokai.app",
+        "X-Title": "WokAI OS"
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: promptText }]
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const text = data.choices?.[0]?.message?.content || "";
+      const cleanJson = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(cleanJson);
+      return {
+        approved: !!parsed.approved,
+        feedback: parsed.feedback || "",
+        refinedPrompt: parsed.refinedPrompt || ""
+      };
+    }
+  } catch (err) {
+    console.error("Agent 5: Evaluation failed:", err);
+  }
+
+  return { approved: true };
+}
+
 export async function generateAgentPlan(
   message: string,
   onProgress?: (phase: string) => void,
-  googleToken?: string
+  googleToken?: string,
+  pass = 1
 ): Promise<AgentPlan> {
   onProgress?.("routing");
   const baseline = deterministicAgentPlan(message);
@@ -688,6 +754,42 @@ User Message: "${message}"
       });
     } catch (err) {
       console.error("WokAI Conductor: Agent 4 content generation failed:", err);
+    }
+  }
+
+  if (mergedActions.length > 0 && pass === 1) {
+    onProgress?.("agent5");
+    const currentPlan = {
+      ...baseline,
+      ...parsedPlan,
+      response: conversationReply,
+      actions: mergedActions,
+      suggestedTasks: mergedTasks,
+      memoryWrites: mergedMemories,
+      riskLevel: parsedPlan.riskLevel || baseline.riskLevel,
+      needsApproval: mergedActions.some((a) => a.status === "NEEDS_APPROVAL")
+    } satisfies AgentPlan;
+
+    const evaluation = await evaluatePlanWithAgent5(message, currentPlan);
+    if (!evaluation.approved && evaluation.refinedPrompt) {
+      console.log(`Agent 5: Action plan rejected. Retrying with refined prompt: "${evaluation.refinedPrompt}"`);
+      const refinedPlan = await generateAgentPlan(evaluation.refinedPrompt, onProgress, googleToken, 2);
+      
+      onProgress?.("agent5");
+      const secondEvaluation = await evaluatePlanWithAgent5(evaluation.refinedPrompt, refinedPlan);
+      if (secondEvaluation.approved) {
+        console.log("Agent 5: Refined action plan approved on second pass.");
+        return refinedPlan;
+      } else {
+        console.warn("Agent 5: Refined action plan still rejected on second pass. Providing safe fallback response.");
+        return {
+          ...refinedPlan,
+          response: "I encountered a problem creating the exact plan for your request. Please try again later.",
+          actions: [],
+          suggestedTasks: [],
+          needsApproval: false
+        };
+      }
     }
   }
 
