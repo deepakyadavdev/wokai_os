@@ -1217,7 +1217,139 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
                 throw new Error(`Slides create failed: ${errText}`);
               }
               const data = await res.json();
-              output = `Successfully created Google Slides presentation:\n- Title: ${data.title}\n- Link: https://docs.google.com/presentation/d/${data.presentationId}/edit`;
+              const presentationId = data.presentationId;
+
+              if (action?.content) {
+                console.log(`[WokAI OS] [Slides API] Writing slides to presentation ${presentationId}...`);
+                let slidesContent = action.content.trim();
+                slidesContent = slidesContent.replace(/^```[a-zA-Z]*\n?|```$/g, "").trim();
+
+                const slideSections: { title: string; body: string }[] = [];
+                const lines = slidesContent.split("\n");
+                let currentSlide: { title: string; body: string[] } | null = null;
+
+                for (const line of lines) {
+                  const trimmed = line.trim();
+                  if (!trimmed) continue;
+
+                  const isHeader = /^##|Slide\s*\d+|Slide:/i.test(trimmed);
+                  if (isHeader) {
+                    if (currentSlide) {
+                      slideSections.push({
+                        title: currentSlide.title,
+                        body: currentSlide.body.join("\n")
+                      });
+                    }
+                    currentSlide = {
+                      title: trimmed.replace(/^#+\s*|Slide\s*\d+\s*:\s*|Slide:\s*/i, ""),
+                      body: []
+                    };
+                  } else {
+                    if (!currentSlide) {
+                      currentSlide = { title: trimmed, body: [] };
+                    } else {
+                      currentSlide.body.push(trimmed);
+                    }
+                  }
+                }
+                if (currentSlide) {
+                  slideSections.push({
+                    title: currentSlide.title,
+                    body: currentSlide.body.join("\n")
+                  });
+                }
+
+                const requests: any[] = [];
+                const suffix = Math.random().toString(36).slice(2, 6);
+                slideSections.slice(0, 10).forEach((slide, idx) => {
+                  const slideId = `slide_${idx}_${suffix}`;
+                  const titleBoxId = `title_${idx}_${suffix}`;
+                  const bodyBoxId = `body_${idx}_${suffix}`;
+
+                  requests.push({
+                    createSlide: {
+                      objectId: slideId,
+                      slideLayoutCategory: "BLANK"
+                    }
+                  });
+
+                  requests.push({
+                    createShape: {
+                      objectId: titleBoxId,
+                      shapeType: "TEXT_BOX",
+                      elementProperties: {
+                        pageObjectId: slideId,
+                        size: {
+                          width: { magnitude: 620, unit: "PT" },
+                          height: { magnitude: 80, unit: "PT" }
+                        },
+                        transform: {
+                          scaleX: 1, scaleY: 1,
+                          translateX: 50, translateY: 40,
+                          unit: "PT"
+                        }
+                      }
+                    }
+                  });
+
+                  requests.push({
+                    insertText: {
+                      objectId: titleBoxId,
+                      text: slide.title
+                    }
+                  });
+
+                  requests.push({
+                    createShape: {
+                      objectId: bodyBoxId,
+                      shapeType: "TEXT_BOX",
+                      elementProperties: {
+                        pageObjectId: slideId,
+                        size: {
+                          width: { magnitude: 620, unit: "PT" },
+                          height: { magnitude: 250, unit: "PT" }
+                        },
+                        transform: {
+                          scaleX: 1, scaleY: 1,
+                          translateX: 50, translateY: 130,
+                          unit: "PT"
+                        }
+                      }
+                    }
+                  });
+
+                  requests.push({
+                    insertText: {
+                      objectId: bodyBoxId,
+                      text: slide.body
+                    }
+                  });
+                });
+
+                if (requests.length > 0) {
+                  const updateRes = await fetch(`https://slides.googleapis.com/v1/presentations/${presentationId}:batchUpdate`, {
+                    method: "POST",
+                    headers: {
+                      "Authorization": `Bearer ${token}`,
+                      "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ requests }),
+                    signal
+                  });
+
+                  if (!updateRes.ok) {
+                    const updateErr = await updateRes.text();
+                    console.error(`[WokAI OS] [Slides API] batchUpdate failed:`, updateErr);
+                    output = `Successfully created Google Slides (slides write failed):\n- Title: ${data.title}\n- Link: https://docs.google.com/presentation/d/${presentationId}/edit`;
+                  } else {
+                    output = `Successfully created Google Slides presentation with outline:\n- Title: ${data.title}\n- Link: https://docs.google.com/presentation/d/${presentationId}/edit`;
+                  }
+                } else {
+                  output = `Successfully created Google Slides presentation:\n- Title: ${data.title}\n- Link: https://docs.google.com/presentation/d/${presentationId}/edit`;
+                }
+              } else {
+                output = `Successfully created Google Slides presentation:\n- Title: ${data.title}\n- Link: https://docs.google.com/presentation/d/${presentationId}/edit`;
+              }
             } catch (err: any) {
               console.error("[WokAI OS] [Slides API] Error:", err);
               finalStatus = "FAILED";
@@ -1319,20 +1451,49 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
           }
 
         } else if (tool === "devices.fileAccess") {
-          console.log(`[WokAI OS] [File Access] Listing files...`);
+          console.log(`[WokAI OS] [File Access] Executing file access operation...`);
           const { signal, clear } = createTimeoutSignal();
           try {
+            let command = "dir";
+            const isWrite = /write|create|save|output|add/i.test(label);
+            const isRead = /read|view|cat|show/i.test(label);
+            let filename = "notes.txt";
+
+            if (isWrite && action?.content) {
+              const fileMatch = label.match(/(?:write|create|save|to|named|titled)\s+(?:file|document)?\s*['"]?([a-zA-Z0-9_\-\.\/\\:]+)['"]?/i);
+              if (fileMatch && fileMatch[1]) {
+                filename = fileMatch[1];
+              }
+              const b64 = btoa(unescape(encodeURIComponent(action.content)));
+              command = `powershell -Command "[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${b64}')) | Out-File -FilePath '${filename}' -Encoding utf8"`;
+            } else if (isRead) {
+              const fileMatch = label.match(/(?:read|view|cat|show)\s+(?:file|document)?\s*['"]?([a-zA-Z0-9_\-\.\/\\:]+)['"]?/i);
+              if (fileMatch && fileMatch[1]) {
+                filename = fileMatch[1];
+                command = `powershell -Command "Get-Content -Path '${filename}'"`;
+              }
+            } else {
+              const pathMatch = label.match(/(?:in|of|scan|dir|directory)\s+['"]?([a-zA-Z0-9_\-\.\/\\:]+)['"]?/i);
+              if (pathMatch && pathMatch[1]) {
+                command = `dir "${pathMatch[1]}"`;
+              }
+            }
+
             const res = await fetch("/api/devices/exec", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ command: "dir" }),
+              body: JSON.stringify({ command }),
               signal
             });
             const data = await res.json();
             if (res.ok) {
-              output = data.stdout || "Directory scanned successfully.";
+              if (isWrite && action?.content) {
+                output = `Successfully wrote content to local file: ${filename}`;
+              } else {
+                output = data.stdout || data.stderr || "Operation completed successfully.";
+              }
             } else {
-              output = `Failed to scan directory: ${data.error || ""}`;
+              output = `Failed to execute file access operation: ${data.error || ""}`;
               finalStatus = "FAILED";
             }
           } catch (err: any) {
