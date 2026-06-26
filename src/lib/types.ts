@@ -75,6 +75,7 @@ export interface WokaiAction {
   sensitive: boolean;
   createdAt: string;
   output?: string;
+  content?: string;
 }
 
 export interface WokaiDevice {

@@ -270,6 +270,119 @@ const OPENROUTER_MODELS_POOL = [
   "nvidia/nemotron-embed-vl-1b-v2:free"
 ];
 
+async function generateAgent4Content(
+  message: string,
+  actions: WokaiAction[],
+  geminiKey?: string,
+  googleToken?: string
+): Promise<Array<{ id: string; content: string }>> {
+  const promptText = `
+You are WokAI Agent 4 (Content Generator). Your job is to generate the precise content/payload that should be added or used when executing each tool in the action plan.
+For each action, you must generate the detailed content based on the user's request:
+- For "docs.create": Write the actual full text content of the document (use proper markdown headings like "# Heading", introduction, sections, bullet points, etc. to make it a complete draft).
+- For "gmail.send": Write the actual full email body to be sent.
+- For "gmail.search": Write the raw search query string.
+- For "gmail.summarize": Write specific instructions on what to summarize.
+- For "calendar.createEvent": Write a descriptive explanation/agenda for the event.
+- For "calendar.listEvents": Write the search/filter query.
+- For "calendar.deleteEvent": Write the details of the event to target.
+- For "sheets.createTracker": Write a CSV-like representation of the initial rows and columns (e.g. Header1,Header2\\nValue1,Value2).
+- For "slides.createDeck": Write a detailed slide-by-slide outline structure.
+- For "devices.terminal": Write the exact terminal command(s) to run.
+- For "devices.openApp": Write the target application or details.
+- For "devices.fileAccess": Write the search pattern or directory path.
+- For "calls.prepare": Write the exact phone script.
+- For "browser.plan": Write the specific automation steps.
+- For "search.google": Write the query to search.
+- For "maps.getDirections": Write the origin and destination details.
+- For any other tool: Write appropriate content.
+
+User Request: "${message}"
+Current Action Plan: ${JSON.stringify(actions)}
+
+Return strict JSON ONLY. Do NOT wrap it in markdown codeblocks. The output must be a JSON array of objects, where each object has "id" and "content" fields:
+[
+  { "id": "action-xxx", "content": "..." }
+]
+`;
+
+  let responseText = "";
+
+  if (geminiKey) {
+    try {
+      console.log("Agent 4: Requesting content generation via primary Gemini API Key.");
+      const genAI = new GoogleGenerativeAI(geminiKey);
+      const model = genAI.getGenerativeModel({
+        model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
+      });
+      const result = await model.generateContent(promptText);
+      responseText = result.response.text();
+    } catch (err) {
+      console.error("Agent 4: Primary Gemini API Key failed:", err);
+    }
+  }
+
+  if (!responseText && googleToken) {
+    try {
+      console.log("Agent 4: Requesting content generation via primary Gemini OAuth.");
+      const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${googleToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }]
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      }
+    } catch (err) {
+      console.error("Agent 4: Primary Gemini OAuth failed:", err);
+    }
+  }
+
+  if (!responseText && process.env.OPENROUTER_API_KEY) {
+    try {
+      console.log("Agent 4: Requesting content generation via OpenRouter.");
+      const model = process.env.OPENROUTER_MODEL || "qwen/qwen3-coder:free";
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://wokai.app",
+          "X-Title": "WokAI OS"
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: promptText }]
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        responseText = data.choices?.[0]?.message?.content || "";
+      }
+    } catch (err) {
+      console.error("Agent 4: OpenRouter failed:", err);
+    }
+  }
+
+  if (responseText) {
+    try {
+      const cleanJson = responseText.replace(/```json|```/g, "").trim();
+      return JSON.parse(cleanJson) as Array<{ id: string; content: string }>;
+    } catch (err) {
+      console.error("Agent 4: Failed to parse generated content JSON:", err);
+    }
+  }
+
+  return [];
+}
+
 export async function generateAgentPlan(
   message: string,
   onProgress?: (phase: string) => void,
@@ -558,7 +671,7 @@ User Message: "${message}"
   // 4. Merge Logic (use LLM outputs directly if successful, fallback to baseline only on full failure)
   const llmSucceeded = Object.keys(parsedPlan).length > 0;
 
-  const mergedActions = llmSucceeded
+  let mergedActions = llmSucceeded
     ? (parsedPlan.actions || [])
     : baseline.actions;
 
@@ -570,6 +683,20 @@ User Message: "${message}"
     ...baseline.memoryWrites,
     ...(parsedPlan.memoryWrites || [])
   ];
+
+  // 5. Agent 4: Generate Content
+  if (mergedActions.length > 0) {
+    onProgress?.("agent4");
+    try {
+      const actionContents = await generateAgent4Content(message, mergedActions, geminiKey, googleToken);
+      mergedActions = mergedActions.map(action => {
+        const found = actionContents.find((ac) => ac.id === action.id);
+        return found ? { ...action, content: found.content } : action;
+      });
+    } catch (err) {
+      console.error("WokAI Conductor: Agent 4 content generation failed:", err);
+    }
+  }
 
   if (mergedActions.length > 0) {
     onProgress?.("api");

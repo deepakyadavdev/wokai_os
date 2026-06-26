@@ -183,6 +183,8 @@ export function ChatConsole({
                   ? "Agent 2: Structuring plan..."
                   : progressStatus === "agent3"
                   ? "Agent 3: Analyzing context..."
+                  : progressStatus === "agent4"
+                  ? "Agent 4: Generating tool content..."
                   : progressStatus === "api"
                   ? "Conductor: Preparing API layers..."
                   : "WokAI is thinking..."}

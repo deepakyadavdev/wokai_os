@@ -38,6 +38,8 @@ function ThinkingIndicator({ status }: { status: string }) {
         return "Agent 2: Structuring plan...";
       case "agent3":
         return "Agent 3: Analyzing context...";
+      case "agent4":
+        return "Agent 4: Generating tool content...";
       case "api":
         return "Conductor: Preparing API layers...";
       default:

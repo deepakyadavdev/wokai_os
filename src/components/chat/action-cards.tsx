@@ -122,6 +122,16 @@ function CardHeader({
   );
 }
 
+function ContentPreview({ content, title = "Generated Content Preview" }: { content?: string; title?: string }) {
+  if (!content) return null;
+  return (
+    <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-border/20 font-mono max-h-40 overflow-y-auto">
+      <div className="text-[10px] text-zinc-400 uppercase tracking-wider mb-1 font-semibold">{title}:</div>
+      {content}
+    </div>
+  );
+}
+
 /* ─────────────────────────── EMAIL card ─────────────────────────── */
 
 function EmailCard({ action, onApprove }: { action: WokaiAction; onApprove: () => void }) {
@@ -133,6 +143,7 @@ function EmailCard({ action, onApprove }: { action: WokaiAction; onApprove: () =
         <div>
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
+        <ContentPreview content={action.content} title="Email Body Preview" />
         {action.output && (
           <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-blue-500/20 font-mono">
             {action.output}
@@ -161,6 +172,7 @@ function CalendarCard({ action, onApprove }: { action: WokaiAction; onApprove: (
         <div>
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
+        <ContentPreview content={action.content} title="Event Description" />
         {action.output && (
           <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-violet-500/20 font-mono">
             {action.output}
@@ -189,6 +201,7 @@ function CallCard({ action, onApprove }: { action: WokaiAction; onApprove: () =>
         <div>
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
+        <ContentPreview content={action.content} title="Call Script" />
         {action.output && (
           <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-green-500/20 font-mono">
             {action.output}
@@ -272,6 +285,7 @@ function TerminalCard({ action, onApprove }: { action: WokaiAction; onApprove: (
           <span>$</span>
           <span className="text-zinc-200">{action.label}</span>
         </div>
+        <ContentPreview content={action.content} title="Command to execute" />
         {isDone ? (
           <div className="bg-black/50 p-2 rounded text-[11px] leading-4 text-emerald-400/90 whitespace-pre overflow-x-auto font-mono">
             {action.output || "No output returned."}
@@ -418,6 +432,7 @@ function DocsCard({ action, onApprove }: { action: WokaiAction; onApprove?: () =
         <div>
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
+        <ContentPreview content={action.content} title="Document Content Draft" />
         {action.output && (
           <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-blue-400/20 font-mono">
             {action.output}
@@ -447,6 +462,7 @@ function SheetsCard({ action, onApprove }: { action: WokaiAction; onApprove?: ()
         <div>
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
+        <ContentPreview content={action.content} title="Spreadsheet Data Draft" />
         {action.output && (
           <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-emerald-500/20 font-mono">
             {action.output}
@@ -476,6 +492,7 @@ function SlidesCard({ action, onApprove }: { action: WokaiAction; onApprove?: ()
         <div>
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
+        <ContentPreview content={action.content} title="Slide Outline Draft" />
         {action.output && (
           <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-orange-400/20 font-mono">
             {action.output}
@@ -634,6 +651,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
     }
 
     setTimeout(async () => {
+      const action = result.actions.find((a) => a.id === actionId);
       let output = "Action completed successfully.";
       let finalStatus: ActionStatus = "COMPLETED";
 
@@ -649,13 +667,14 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
 
       try {
         if (tool === "browser.plan") {
-          console.log(`[WokAI OS] [Browser Agent] Triggering local browser agent for goal: "${label}"`);
+          const goal = action?.content || label;
+          console.log(`[WokAI OS] [Browser Agent] Triggering local browser agent for goal: "${goal}"`);
           const { signal, clear } = createTimeoutSignal(15000); // Browser task can take slightly longer
           try {
             const res = await fetch("/api/browser-agent", {
               method: "POST",
               headers: { "content-type": "application/json" },
-              body: JSON.stringify({ goal: label }),
+              body: JSON.stringify({ goal }),
               signal
             });
             console.log(`[WokAI OS] [Browser Agent] Response Status: ${res.status}`);
@@ -670,13 +689,14 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
           }
 
         } else if (tool === "calls.prepare") {
+          const message = action?.content || `This is a call from WokAI OS: ${label}`;
           console.log(`[WokAI OS] [Calls Agent] Placing Twilio outbound call...`);
           const { signal, clear } = createTimeoutSignal();
           try {
             const res = await fetch("/api/calls", {
               method: "POST",
               headers: { "content-type": "application/json" },
-              body: JSON.stringify({ to: "+14155552671", message: `This is a call from WokAI OS: ${label}` }),
+              body: JSON.stringify({ to: "+14155552671", message }),
               signal
             });
             console.log(`[WokAI OS] [Calls Agent] Response Status: ${res.status}`);
@@ -693,13 +713,15 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
           }
 
         } else if (tool === "devices.terminal") {
-          let command = "dir";
-          const match = label.match(/(?:run|exec|execute)\s+[`'"]?([^`'"]+)[`'"]?/i);
-          if (match && match[1]) {
-            command = match[1];
-          } else if (label.toLowerCase().includes("terminal")) {
-            const cmdMatch = label.match(/terminal:\s*(.+)/i) || label.match(/command:\s*(.+)/i);
-            if (cmdMatch && cmdMatch[1]) command = cmdMatch[1];
+          let command = action?.content || "dir";
+          if (!action?.content) {
+            const match = label.match(/(?:run|exec|execute)\s+[`'"]?([^`'"]+)[`'"]?/i);
+            if (match && match[1]) {
+              command = match[1];
+            } else if (label.toLowerCase().includes("terminal")) {
+              const cmdMatch = label.match(/terminal:\s*(.+)/i) || label.match(/command:\s*(.+)/i);
+              if (cmdMatch && cmdMatch[1]) command = cmdMatch[1];
+            }
           }
 
           console.log(`[WokAI OS] [Terminal Exec] Posting local shell command: "${command}" to /api/devices/exec`);
@@ -805,12 +827,17 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             const toMatch = label.match(/to\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i) || label.match(/to\s+(\S+)/i);
             const recipient = toMatch ? toMatch[1] : "recipient@gmail.com";
             let subject = "Message from WokAI OS";
-            let body = label;
+            let body = action?.content || label;
 
-            const aboutMatch = label.match(/about\s+(.+)/i) || label.match(/body\s+(.+)/i);
-            if (aboutMatch && aboutMatch[1]) {
-              subject = aboutMatch[1].slice(0, 40) + "...";
-              body = aboutMatch[1];
+            if (action?.content) {
+              const firstLine = action.content.split("\n")[0].replace(/[#*_\r]/g, "").trim();
+              subject = firstLine.slice(0, 50) || "Message from WokAI OS";
+            } else {
+              const aboutMatch = label.match(/about\s+(.+)/i) || label.match(/body\s+(.+)/i);
+              if (aboutMatch && aboutMatch[1]) {
+                subject = aboutMatch[1].slice(0, 40) + "...";
+                body = aboutMatch[1];
+              }
             }
 
             const emailContent = [
@@ -915,7 +942,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
 
             const eventBody = {
               summary,
-              description: `Created automatically by WokAI OS: "${label}"`,
+              description: action?.content || `Created automatically by WokAI OS: "${label}"`,
               start: {
                 dateTime: start.toISOString(),
                 timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
@@ -1022,7 +1049,39 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
                 throw new Error(`Docs create failed: ${errText}`);
               }
               const data = await res.json();
-              output = `Successfully created Google Doc:\n- Title: ${data.title}\n- Link: https://docs.google.com/document/d/${data.documentId}/edit`;
+              const documentId = data.documentId;
+
+              if (action?.content) {
+                console.log(`[WokAI OS] [Docs API] Writing content to document ${documentId}...`);
+                const updateRes = await fetch(`https://docs.googleapis.com/v1/documents/${documentId}:batchUpdate`, {
+                  method: "POST",
+                  headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({
+                    requests: [
+                      {
+                        insertText: {
+                          text: action.content,
+                          location: { index: 1 }
+                        }
+                      }
+                    ]
+                  }),
+                  signal
+                });
+
+                if (!updateRes.ok) {
+                  const updateErrText = await updateRes.text();
+                  console.error(`[WokAI OS] [Docs API] batchUpdate failed:`, updateErrText);
+                  output = `Successfully created Google Doc (content write failed):\n- Title: ${data.title}\n- Link: https://docs.google.com/document/d/${documentId}/edit`;
+                } else {
+                  output = `Successfully created Google Doc with content:\n- Title: ${data.title}\n- Link: https://docs.google.com/document/d/${documentId}/edit`;
+                }
+              } else {
+                output = `Successfully created Google Doc:\n- Title: ${data.title}\n- Link: https://docs.google.com/document/d/${documentId}/edit`;
+              }
             } catch (err: any) {
               console.error("[WokAI OS] [Docs API] Error:", err);
               finalStatus = "FAILED";
@@ -1060,7 +1119,41 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
                 throw new Error(`Sheets create failed: ${errText}`);
               }
               const data = await res.json();
-              output = `Successfully created Google Sheet:\n- Title: ${data.properties.title}\n- Link: ${data.spreadsheetUrl}`;
+              const spreadsheetId = data.spreadsheetId;
+
+              if (action?.content) {
+                console.log(`[WokAI OS] [Sheets API] Populating spreadsheet ${spreadsheetId} data...`);
+                let rows: string[][] = [];
+                if (action.content.includes("\n") || action.content.includes(",")) {
+                  rows = action.content.split("\n").map(row => 
+                    row.split(",").map(cell => cell.trim().replace(/^"(.*)"$/, '$1'))
+                  );
+                } else {
+                  rows = [[action.content]];
+                }
+
+                const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1?valueInputOption=USER_ENTERED`, {
+                  method: "PUT",
+                  headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({
+                    values: rows
+                  }),
+                  signal
+                });
+
+                if (!updateRes.ok) {
+                  const updateErr = await updateRes.text();
+                  console.error(`[WokAI OS] [Sheets API] Failed to update values:`, updateErr);
+                  output = `Successfully created Google Sheet (data population failed):\n- Title: ${data.properties.title}\n- Link: ${data.spreadsheetUrl}`;
+                } else {
+                  output = `Successfully created Google Sheet with populated tracker:\n- Title: ${data.properties.title}\n- Link: ${data.spreadsheetUrl}`;
+                }
+              } else {
+                output = `Successfully created Google Sheet:\n- Title: ${data.properties.title}\n- Link: ${data.spreadsheetUrl}`;
+              }
             } catch (err: any) {
               console.error("[WokAI OS] [Sheets API] Error:", err);
               finalStatus = "FAILED";
