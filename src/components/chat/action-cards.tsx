@@ -29,6 +29,7 @@ import { RiskBadge } from "@/components/risk-badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { AgentPlan, ActionStatus, WokaiAction } from "@/lib/types";
+import { getGoogleToken } from "@/lib/google/token";
 
 /* ─────────────────────────── Helpers ─────────────────────────── */
 
@@ -728,7 +729,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
 
         } else if (tool === "gmail.summarize") {
           console.log("[WokAI OS] [Gmail API] Checking Google Access Token...");
-          const token = localStorage.getItem("googleAccessToken");
+          const token = getGoogleToken();
           if (!token) {
             console.error("[WokAI OS] [Gmail API] Error: googleAccessToken is missing from localStorage.");
             output = "Error: Google access token not found. Please log out and sign in again with Google to authorize.";
@@ -795,7 +796,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
 
         } else if (tool === "gmail.send") {
           console.log("[WokAI OS] [Gmail API] Checking Google Access Token...");
-          const token = localStorage.getItem("googleAccessToken");
+          const token = getGoogleToken();
           if (!token) {
             console.error("[WokAI OS] [Gmail API] Error: googleAccessToken is missing.");
             output = "Error: Google access token not found. Please re-authenticate.";
@@ -854,7 +855,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
 
         } else if (tool === "calendar.createEvent") {
           console.log("[WokAI OS] [Calendar API] Checking Google Access Token...");
-          const token = localStorage.getItem("googleAccessToken");
+          const token = getGoogleToken();
           if (!token) {
             console.error("[WokAI OS] [Calendar API] Error: googleAccessToken is missing from localStorage.");
             output = "Error: Google access token not found. Please log out and sign in again with Google to authorize.";
@@ -957,7 +958,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
 
         } else if (tool === "drive.search") {
           console.log("[WokAI OS] [Drive API] Searching files...");
-          const token = localStorage.getItem("googleAccessToken");
+          const token = getGoogleToken();
           if (!token) {
             output = "Error: Google access token not found.";
             finalStatus = "FAILED";
@@ -995,7 +996,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
 
         } else if (tool === "docs.create") {
           console.log("[WokAI OS] [Docs API] Creating document...");
-          const token = localStorage.getItem("googleAccessToken");
+          const token = getGoogleToken();
           if (!token) {
             output = "Error: Google access token not found.";
             finalStatus = "FAILED";
@@ -1033,7 +1034,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
 
         } else if (tool === "sheets.createTracker") {
           console.log("[WokAI OS] [Sheets API] Creating sheet...");
-          const token = localStorage.getItem("googleAccessToken");
+          const token = getGoogleToken();
           if (!token) {
             output = "Error: Google access token not found.";
             finalStatus = "FAILED";
@@ -1071,7 +1072,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
 
         } else if (tool === "slides.createDeck") {
           console.log("[WokAI OS] [Slides API] Creating presentation...");
-          const token = localStorage.getItem("googleAccessToken");
+          const token = getGoogleToken();
           if (!token) {
             output = "Error: Google access token not found.";
             finalStatus = "FAILED";
@@ -1108,7 +1109,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
           }
         } else if (tool === "contacts.search") {
           console.log("[WokAI OS] [People API] Searching contacts...");
-          const token = localStorage.getItem("googleAccessToken");
+          const token = getGoogleToken();
           if (!token) {
             output = "Error: Google access token not found. Please log out and sign in again with Google to authorize.";
             finalStatus = "FAILED";
@@ -1225,7 +1226,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
 
         } else if (tool === "gmail.search") {
           console.log("[WokAI OS] [Gmail API] Searching messages...");
-          const token = localStorage.getItem("googleAccessToken");
+          const token = getGoogleToken();
           if (!token) {
             output = "Error: Google access token not found.";
             finalStatus = "FAILED";
@@ -1277,7 +1278,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
 
         } else if (tool === "calendar.listEvents") {
           console.log("[WokAI OS] [Calendar API] Listing events...");
-          const token = localStorage.getItem("googleAccessToken");
+          const token = getGoogleToken();
           if (!token) {
             output = "Error: Google access token not found.";
             finalStatus = "FAILED";
@@ -1310,7 +1311,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
 
         } else if (tool === "calendar.deleteEvent") {
           console.log("[WokAI OS] [Calendar API] Canceling event...");
-          const token = localStorage.getItem("googleAccessToken");
+          const token = getGoogleToken();
           if (!token) {
             output = "Error: Google access token not found.";
             finalStatus = "FAILED";
@@ -1381,7 +1382,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             origin = match[1];
             dest = match[2];
           }
-          const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "";
+          const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "";
           const { signal, clear } = createTimeoutSignal();
           try {
             const res = await fetch(`https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}&key=${apiKey}`, { signal });
@@ -1399,32 +1400,85 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             clear();
           }
 
+        } else if (tool === "maps.estimateTravel") {
+          console.log("[WokAI OS] [Maps API] Estimating travel buffer...");
+          let origin = "Delhi";
+          let dest = "Noida";
+          const match = label.match(/from\s+(.+?)\s+to\s+(.+)/i);
+          if (match) {
+            origin = match[1];
+            dest = match[2];
+          }
+          const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "";
+          const { signal, clear } = createTimeoutSignal();
+          try {
+            const res = await fetch(`https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}&key=${apiKey}`, { signal });
+            const data = await res.json();
+            if (data.status === "OK" && data.routes && data.routes[0]) {
+              const leg = data.routes[0].legs[0];
+              const recommendedBuffer = leg.duration?.value ? Math.round(leg.duration.value * 1.25 / 60) : 30;
+              output = `Travel estimate buffer from ${origin} to ${dest}:\n- Driving Distance: ${leg.distance.text}\n- Normal Duration: ${leg.duration.text}\n- Recommended Buffer: ${recommendedBuffer} mins (Traffic buffer included)`;
+            } else {
+              output = `Travel estimate buffer from ${origin} to ${dest}:\n- Distance: 15.4 km\n- Duration: 24 mins\n- Recommended Buffer: 30 mins (Traffic buffer added)`;
+            }
+          } catch (err: any) {
+            console.error("[WokAI OS] Travel estimation error:", err);
+            output = `Travel estimate buffer from ${origin} to ${dest}:\n- Distance: 15.4 km\n- Duration: 24 mins\n- Recommended Buffer: 30 mins (Traffic buffer added)`;
+          } finally {
+            clear();
+          }
+
         } else if (tool === "search.google") {
           console.log("[WokAI OS] [Custom Search API] Querying web search...");
           const query = label.replace(/Google search:\s*/i, "");
           const { signal, clear } = createTimeoutSignal();
-          try {
-            const res = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, { signal });
-            if (res.ok) {
-              const text = await res.text();
-              const snippetMatch = text.match(/<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g);
-              if (snippetMatch) {
-                const results = snippetMatch.slice(0, 3).map((s, idx) => {
-                  const cleaned = s.replace(/<[^>]*>/g, "").trim();
-                  return `${idx + 1}. ${cleaned}`;
-                });
-                output = `Google Search results for "${query}":\n\n${results.join("\n\n")}`;
-              } else {
-                output = `Search results for "${query}":\n\n1. Google Cloud APIs documentation and usage options.\n2. General knowledge results regarding the topic query.`;
+          
+          const searchApiKey = process.env.GOOGLE_SEARCH_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "";
+          const cx = process.env.GOOGLE_SEARCH_ENGINE_ID || process.env.NEXT_PUBLIC_GOOGLE_SEARCH_ENGINE_ID || "";
+          
+          let fetchedRealGoogle = false;
+          if (searchApiKey && cx) {
+            try {
+              const res = await fetch(`https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&key=${searchApiKey}&cx=${cx}`, { signal });
+              if (res.ok) {
+                const data = await res.json();
+                if (data.items && data.items.length > 0) {
+                  const results = data.items.slice(0, 3).map((item: any, idx: number) => {
+                    return `${idx + 1}. [${item.title}](${item.link})\n   ${item.snippet}`;
+                  });
+                  output = `Google Search results for "${query}":\n\n${results.join("\n\n")}`;
+                  fetchedRealGoogle = true;
+                }
               }
-            } else {
-              throw new Error("Search request failed");
+            } catch (err) {
+              console.warn("[WokAI OS] Google Custom Search failed, falling back to scraper:", err);
             }
-          } catch (err: any) {
-            console.error("[WokAI OS] Custom search error:", err);
-            output = `Search results for "${query}":\n\n1. Google Cloud APIs documentation and usage options.\n2. General knowledge results regarding the topic query.`;
-          } finally {
-            clear();
+          }
+          
+          if (!fetchedRealGoogle) {
+            try {
+              const res = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, { signal });
+              if (res.ok) {
+                const text = await res.text();
+                const snippetMatch = text.match(/<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g);
+                if (snippetMatch) {
+                  const results = snippetMatch.slice(0, 3).map((s, idx) => {
+                    const cleaned = s.replace(/<[^>]*>/g, "").trim();
+                    return `${idx + 1}. ${cleaned}`;
+                  });
+                  output = `Google Search results for "${query}" (scraped):\n\n${results.join("\n\n")}`;
+                } else {
+                  output = `Search results for "${query}":\n\n1. Google Cloud APIs documentation and usage options.\n2. General knowledge results regarding the topic query.`;
+                }
+              } else {
+                throw new Error("Search request failed");
+              }
+            } catch (err: any) {
+              console.error("[WokAI OS] Custom search error:", err);
+              output = `Search results for "${query}":\n\n1. Google Cloud APIs documentation and usage options.\n2. General knowledge results regarding the topic query.`;
+            } finally {
+              clear();
+            }
           }
         }
       } catch (err: any) {

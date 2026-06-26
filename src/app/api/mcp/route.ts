@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-// Simulated in-memory MCP configuration (normally loaded from .mcp.json)
-let mcpClients = [
+import { getAdminDb } from "@/lib/firebase/admin";
+
+// ── In-memory fallback (used when Firebase Admin is not configured) ──
+let memClients = [
   {
     name: "GitHub Client",
     url: "mcp://github.com/wokai-integration",
@@ -16,6 +18,39 @@ let mcpClients = [
     tools: ["slack.postMessage", "slack.readChannel", "slack.findUser"]
   }
 ];
+
+// ── Firestore helpers ──
+const MCP_CLIENT_COLLECTION = "wokai_mcp_clients";
+
+async function getClientsFromStore() {
+  const db = getAdminDb();
+  if (!db) return { clients: memClients, persisted: false };
+
+  const snap = await db.collection(MCP_CLIENT_COLLECTION).get();
+
+  // Seed defaults if Firestore collection is empty
+  if (snap.empty) {
+    for (const c of memClients) {
+      await db.collection(MCP_CLIENT_COLLECTION).doc(c.name.replace(/\s+/g, "-").toLowerCase()).set(c);
+    }
+    return { clients: memClients, persisted: true };
+  }
+
+  const clients = snap.docs.map((d) => ({ ...d.data() })) as typeof memClients;
+  return { clients, persisted: true };
+}
+
+async function addClientToStore(client: typeof memClients[number]) {
+  const db = getAdminDb();
+  if (!db) {
+    memClients.push(client);
+    return memClients;
+  }
+  const docId = client.name.replace(/\s+/g, "-").toLowerCase();
+  await db.collection(MCP_CLIENT_COLLECTION).doc(docId).set(client);
+  const { clients } = await getClientsFromStore();
+  return clients;
+}
 
 const registerSchema = z.object({
   name: z.string().min(2),
@@ -33,7 +68,8 @@ export async function GET(request: NextRequest) {
   const action = searchParams.get("action");
 
   if (action === "listClients") {
-    return NextResponse.json({ clients: mcpClients });
+    const { clients } = await getClientsFromStore();
+    return NextResponse.json({ clients });
   }
 
   // Otherwise, return MCP Server details (exposing WokAI capabilities to external clients)
@@ -108,9 +144,9 @@ export async function POST(request: NextRequest) {
         `${hostDomain}.syncState`
       ]
     };
-    mcpClients.push(newClient);
+    const clients = await addClientToStore(newClient);
 
-    return NextResponse.json({ success: true, clients: mcpClients });
+    return NextResponse.json({ success: true, clients });
   }
 
   // Handle Tool execution (MCP Server role)

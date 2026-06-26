@@ -17,7 +17,8 @@ import {
   X,
   Gauge,
   Globe,
-  MonitorSmartphone
+  MonitorSmartphone,
+  BriefcaseBusiness
 } from "lucide-react";
 
 import { cn, initials } from "@/lib/utils";
@@ -29,6 +30,7 @@ import type { ChatSession } from "@/hooks/use-chat-sessions";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: Gauge },
+  { href: "/workspace", label: "Workspace", icon: BriefcaseBusiness },
   { href: "/browser-agent", label: "Browser Agent", icon: Globe },
   { href: "/devices", label: "Devices", icon: MonitorSmartphone },
   { href: "/activity", label: "Activity", icon: Activity },
@@ -39,6 +41,7 @@ const NAV_ITEMS = [
 const MOBILE_TABS = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/dashboard", label: "Dashboard", icon: Gauge },
+  { href: "/workspace", label: "Workspace", icon: BriefcaseBusiness },
   { href: "/devices", label: "Devices", icon: MonitorSmartphone },
   { href: "/activity", label: "Activity", icon: Activity },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },

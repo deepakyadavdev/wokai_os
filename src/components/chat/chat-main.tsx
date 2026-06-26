@@ -23,6 +23,7 @@ import { useWorkspaceData } from "@/hooks/use-workspace-data";
 import { useChatSessions } from "@/hooks/use-chat-sessions";
 import { cn } from "@/lib/utils";
 import type { AgentPlan } from "@/lib/types";
+import { getGoogleToken } from "@/lib/google/token";
 
 /* ─────────────────────────── Loading dots ─────────────────────────── */
 
@@ -160,7 +161,10 @@ export function ChatMain() {
       const res = await fetch("/api/agent/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message: msg })
+        body: JSON.stringify({
+          message: msg,
+          googleToken: getGoogleToken() || undefined
+        })
       });
 
       if (!res.ok) throw new Error("The agent did not accept the request.");

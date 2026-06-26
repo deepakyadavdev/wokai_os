@@ -272,7 +272,8 @@ const OPENROUTER_MODELS_POOL = [
 
 export async function generateAgentPlan(
   message: string,
-  onProgress?: (phase: string) => void
+  onProgress?: (phase: string) => void,
+  googleToken?: string
 ): Promise<AgentPlan> {
   onProgress?.("routing");
   const baseline = deterministicAgentPlan(message);
@@ -286,8 +287,114 @@ export async function generateAgentPlan(
   let conversationReply = baseline.response;
   let parsedPlan: Partial<AgentPlan> = {};
 
-  // 2. OpenRouter Integration
-  if (process.env.OPENROUTER_API_KEY) {
+  // 2. Primary Choice: Gemini API (API key or OAuth access token)
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  if (geminiKey || googleToken) {
+    const promptText = `
+You are the WokAI Conductor. Return strict JSON ONLY for:
+${message}
+
+You MUST choose tools from this strict allowed list:
+- "gmail.summarize": Summarize inbox, detect urgency, draft replies.
+- "gmail.send": Send a fresh email to a specific recipient.
+- "gmail.search": Search Gmail messages using filters.
+- "calendar.findSlots": Find free time slots.
+- "calendar.createEvent": Schedule a meeting or event.
+- "calendar.listEvents": List upcoming calendar events.
+- "calendar.deleteEvent": Cancel or delete a calendar event.
+- "drive.search": Search Drive for files.
+- "docs.create": Create a Google Doc.
+- "sheets.createTracker": Create a Google Sheet tracker.
+- "slides.createDeck": Create a Google Slides deck.
+- "contacts.search": Find contact email or phone.
+- "calls.prepare": Prepare a phone call script.
+- "browser.plan": Plan browser automation with approval pause.
+- "devices.openApp": Launch an application on host device.
+- "devices.terminal": Execute a shell command on host.
+- "devices.fileAccess": Scan local directories for files.
+- "devices.queueCommand": Queue a command for an offline device.
+- "maps.searchPlaces": Search Google Places for locations.
+- "maps.getDirections": Calculate directions and travel time.
+- "maps.estimateTravel": Estimate travel buffer for meetings.
+- "search.google": Search the web using Google Search.
+- "notifications.create": Create an in-app alert.
+- "memory.retain": Save personal preferences.
+
+Security: Sensitive actions must have "sensitive": true, "status": "NEEDS_APPROVAL".
+All action objects must have keys: "id", "tool", "label", "status", "sensitive", "createdAt".
+
+If the user message is a simple greeting or capability question with no actionable request, return:
+{ "intent": "greeting", "response": "friendly greeting", "riskLevel": "LOW", "reasoning": [], "plan": [], "actions": [], "suggestedTasks": [] }
+
+Otherwise return:
+{
+  "intent": "work_completion",
+  "response": "friendly conversational response to the user's message (max 2 sentences, natural and helpful)",
+  "riskLevel": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
+  "reasoning": string[],
+  "plan": string[],
+  "actions": Array<{ id: string, tool: string, label: string, status: string, sensitive: boolean, createdAt: string }>,
+  "suggestedTasks": Array<{ id: string, title: string, description: string, deadline: string, priority: string, status: "todo", progress: 0, subtasks: string[], source: "chat" }>
+}
+`;
+
+    if (geminiKey) {
+      onProgress?.("agent3");
+      try {
+        console.log("WokAI Conductor: Requesting plan from primary Gemini API (via API Key).");
+        const genAI = new GoogleGenerativeAI(geminiKey);
+        const model = genAI.getGenerativeModel({
+          model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
+        });
+        const result = await model.generateContent(promptText);
+        const text = result.response.text().replace(/```json|```/g, "").trim();
+        parsedPlan = JSON.parse(text) as Partial<AgentPlan>;
+        if (parsedPlan.response) {
+          conversationReply = parsedPlan.response;
+        }
+        console.log("WokAI Conductor: Successfully generated plan via primary Gemini API Key.");
+      } catch (err) {
+        console.error("WokAI Conductor: Primary Gemini API Key failed:", err);
+      }
+    }
+
+    if (Object.keys(parsedPlan).length === 0 && googleToken) {
+      onProgress?.("agent3");
+      try {
+        console.log("WokAI Conductor: Requesting plan from primary Gemini API (via OAuth token).");
+        const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${googleToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }]
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.replace(/```json|```/g, "").trim();
+          if (text) {
+            parsedPlan = JSON.parse(text) as Partial<AgentPlan>;
+            if (parsedPlan.response) {
+              conversationReply = parsedPlan.response;
+            }
+            console.log("WokAI Conductor: Successfully generated plan via Gemini OAuth.");
+          }
+        } else {
+          const errText = await res.text().catch(() => "");
+          console.warn(`WokAI Conductor: Primary Gemini OAuth failed with status ${res.status}: ${errText}`);
+        }
+      } catch (err) {
+        console.error("WokAI Conductor: Primary Gemini OAuth failed:", err);
+      }
+    }
+  }
+
+  // 3. Fallback Choice: OpenRouter Integration (only if Gemini failed or is unconfigured)
+  if (Object.keys(parsedPlan).length === 0 && process.env.OPENROUTER_API_KEY) {
     onProgress?.("agent1");
     // Model 1: Conversational Reply Generation (Lightweight)
     const replyModels = [
@@ -298,7 +405,7 @@ export async function generateAgentPlan(
 
     for (const model of replyModels) {
       try {
-        console.log(`WokAI Conductor: Requesting conversational reply from ${model}`);
+        console.log(`WokAI Conductor: Requesting fallback conversational reply from OpenRouter model ${model}`);
         const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -326,12 +433,12 @@ export async function generateAgentPlan(
           const data = await res.json();
           if (data && data.choices && data.choices[0] && data.choices[0].message) {
             conversationReply = data.choices[0].message.content.trim();
-            console.log("WokAI Conductor: Successfully generated reply via model:", model);
+            console.log("WokAI Conductor: Successfully generated fallback reply via model:", model);
             break;
           }
         }
       } catch (err) {
-        console.warn(`WokAI Conductor: Reply generation failed for model ${model}:`, err);
+        console.warn(`WokAI Conductor: Fallback reply generation failed for model ${model}:`, err);
       }
     }
 
@@ -409,7 +516,7 @@ User Message: "${message}"
 
     for (const model of plannerModels) {
       try {
-        console.log(`WokAI Conductor: Requesting technical plan from planner model ${model}`);
+        console.log(`WokAI Conductor: Requesting technical plan from fallback planner model ${model}`);
         const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -435,59 +542,16 @@ User Message: "${message}"
             let text = data.choices[0].message.content.trim();
             text = text.replace(/```json|```/g, "").trim();
             parsedPlan = JSON.parse(text) as Partial<AgentPlan>;
-            console.log(`WokAI Conductor: Successfully generated plan via model: ${model}`);
+            console.log(`WokAI Conductor: Successfully generated plan via fallback model: ${model}`);
             break;
           }
         } else {
           const errText = await res.text().catch(() => "");
-          console.warn(`WokAI Conductor: Planner model ${model} failed with status ${res.status}: ${errText}`);
+          console.warn(`WokAI Conductor: Fallback planner model ${model} failed with status ${res.status}: ${errText}`);
         }
       } catch (err) {
-        console.error(`WokAI Conductor: Plan generation failed for model ${model}:`, err);
+        console.error(`WokAI Conductor: Fallback plan generation failed for model ${model}:`, err);
       }
-    }
-  }
-
-  // 3. Gemini Fallback (if OpenRouter fails or is unconfigured)
-  if (Object.keys(parsedPlan).length === 0 && process.env.GEMINI_API_KEY) {
-    onProgress?.("agent3");
-    try {
-      console.log("WokAI Conductor: Falling back to Gemini for plan generation.");
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({
-        model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
-      });
-
-      const promptText = `
-You are the WokAI Conductor. Return strict JSON ONLY for:
-${message}
-Choose from tools: "gmail.summarize", "calendar.createEvent", "devices.terminal", "browser.plan".
-
-If this is a simple greeting or conversation check, return:
-{
-  "intent": "greeting",
-  "riskLevel": "LOW",
-  "reasoning": [],
-  "plan": [],
-  "actions": [],
-  "suggestedTasks": []
-}
-
-Otherwise, follow schema:
-{
-  "intent": "work_completion",
-  "riskLevel": "LOW",
-  "reasoning": string[],
-  "plan": string[],
-  "actions": Array<{ id: string, tool: string, label: string, status: "NEEDS_APPROVAL", sensitive: true, createdAt: string }>,
-  "suggestedTasks": Array<{ id: string, title: string, description: string, deadline: string, priority: string, status: "todo", progress: 0, subtasks: string[], source: "chat" }>
-}
-`;
-      const result = await model.generateContent(promptText);
-      const text = result.response.text().replace(/```json|```/g, "").trim();
-      parsedPlan = JSON.parse(text) as Partial<AgentPlan>;
-    } catch (err) {
-      console.error("WokAI Conductor: Gemini fallback failed:", err);
     }
   }
 

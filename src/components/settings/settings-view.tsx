@@ -27,6 +27,9 @@ import { cn, initials } from '@/lib/utils';
 import { useAuth } from '@/components/auth/auth-provider';
 import { useWorkspaceData } from '@/hooks/use-workspace-data';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { getGoogleToken, saveGoogleToken, clearGoogleToken, tokenExpiresIn } from '@/lib/google/token';
+import { Globe } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Types / constants
@@ -187,8 +190,94 @@ function ProfilePanel({ firebaseConfigured }: { firebaseConfigured: boolean }) {
   );
 }
 
+function GoogleTokenManager() {
+  const [token, setToken] = React.useState("");
+  const [expiryMs, setExpiryMs] = React.useState(0);
+  const [authUrl, setAuthUrl] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setToken(getGoogleToken() || "");
+    setExpiryMs(tokenExpiresIn());
+    const interval = setInterval(() => setExpiryMs(tokenExpiresIn()), 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  React.useEffect(() => {
+    fetch("/api/google/auth-url")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.configured && data.url) {
+          setAuthUrl(data.url);
+        }
+      })
+      .catch((err) => console.error("Error loading auth URL:", err));
+  }, []);
+
+  const handleSave = () => {
+    if (token.trim()) {
+      saveGoogleToken(token.trim());
+      setExpiryMs(tokenExpiresIn());
+      toast.success("Google Access Token saved successfully!");
+      setTimeout(() => window.location.reload(), 800);
+    } else {
+      clearGoogleToken();
+      setExpiryMs(0);
+      toast.error("Google Access Token removed.");
+      setTimeout(() => window.location.reload(), 800);
+    }
+  };
+
+  const expiryMinutes = Math.round(expiryMs / 60000);
+
+  return (
+    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5 mb-6 flex flex-col gap-4">
+      <div>
+        <h3 className="text-sm font-semibold flex items-center gap-2 text-emerald-400">
+          <ShieldCheck className="size-4" />
+          Google Cloud Console OAuth Authorization
+        </h3>
+        <p className="text-xs text-muted-foreground mt-1">
+          {expiryMs > 0
+            ? `Status: Token active — expires in ~${expiryMinutes} minutes.`
+            : "Status: Not authorized. Connect via your Google Cloud Console OAuth setup or enter an Access Token."}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <input
+          type="password"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder="ya29.a0Acv..."
+          className="flex-1 rounded-lg bg-accent/40 border border-border/40 text-foreground text-xs p-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+        />
+        <div className="flex gap-2 shrink-0">
+          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-4" onClick={handleSave}>
+            Save Token
+          </Button>
+          
+          {authUrl && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 text-xs gap-1.5"
+              onClick={() => {
+                window.location.href = authUrl;
+              }}
+            >
+              <Globe className="size-3.5" />
+              Authorize via Cloud Console
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GooglePanel({ firebaseConfigured }: { firebaseConfigured: boolean }) {
-  const status: ServiceStatus = firebaseConfigured ? 'connected' : 'not_configured';
+  const hasToken = getGoogleToken() !== null;
+  const status: ServiceStatus = hasToken ? 'connected' : 'not_configured';
 
   const services: Omit<ServiceRowProps, 'onConnect'>[] = [
     {
@@ -232,9 +321,11 @@ function GooglePanel({ firebaseConfigured }: { firebaseConfigured: boolean }) {
     <div>
       <h2 className="text-xl font-semibold mb-2">Google Account</h2>
       <p className="text-sm text-muted-foreground mb-6">
-        WokAI uses Google services to act on your behalf. All actions require your approval when
-        sensitive.
+        WokAI uses Google Cloud Console OAuth scopes to act on your behalf across your Google workspace apps.
       </p>
+
+      <GoogleTokenManager />
+
       <div className="flex flex-col gap-3">
         {services.map((s) => (
           <ServiceRow key={s.name} {...s} />
@@ -457,17 +548,6 @@ function McpPanel() {
 }
 
 function DataPanel() {
-  const { user } = useAuth();
-  const { resetDemo } = useWorkspaceData(user);
-
-  const handleReset = () => {
-    if (window.confirm("Are you sure you want to reset all local workspace and chat data to the initial demo state?")) {
-      resetDemo();
-      window.localStorage.removeItem("wokai-chat-sessions-v2");
-      window.location.reload();
-    }
-  };
-
   return (
     <div>
       <h2 className="text-xl font-semibold mb-2">Data</h2>
@@ -491,22 +571,6 @@ function DataPanel() {
             </Button>
           </div>
         </div>
-
-        {/* Reset */}
-        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="font-medium text-foreground">Reset Workspace</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                Reset all tasks, actions, memories, and chat sessions to the default demo state.
-              </p>
-            </div>
-            <Button onClick={handleReset} variant="destructive" className="shrink-0 gap-2 bg-red-600 hover:bg-red-500 text-white border-0">
-              <RotateCcw size={14} />
-              Reset Demo
-            </Button>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -519,6 +583,22 @@ function DataPanel() {
 export function SettingsView() {
   const { user, firebaseConfigured } = useAuth();
   const [activeCategory, setActiveCategory] = React.useState<SettingsCategory>('profile');
+
+  // Capture Google access token from OAuth callback redirect
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const accessToken = params.get("access_token");
+      const expiresIn = params.get("expires_in");
+      if (accessToken) {
+        saveGoogleToken(accessToken, expiresIn ? Number(expiresIn) : 3600);
+        toast.success("Google Access Token saved from OAuth callback!");
+        setActiveCategory('google');
+        // Clean URL
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    }
+  }, []);
 
   const renderPanel = () => {
     switch (activeCategory) {

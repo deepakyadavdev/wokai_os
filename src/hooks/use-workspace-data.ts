@@ -20,7 +20,7 @@ const emptySnapshot: WorkspaceSnapshot = {
   browserJobs: []
 };
 
-export function useWorkspaceData(user: UserProfile | null) {
+export function useWorkspaceData(user: UserProfile | null, currentPage?: string) {
   const fallback = demoSnapshot;
 
   const [snapshot, setSnapshot] = React.useState<WorkspaceSnapshot>(() => {
@@ -54,33 +54,38 @@ export function useWorkspaceData(user: UserProfile | null) {
       }
     }
     loadDevices();
-    const interval = setInterval(loadDevices, 10000);
-    return () => clearInterval(interval);
-  }, []);
+    // Only poll every 30s when on dashboard or devices pages
+    const shouldPoll = !currentPage || currentPage === "dashboard" || currentPage === "devices";
+    const interval = shouldPoll ? setInterval(loadDevices, 30000) : null;
+    return () => { if (interval) clearInterval(interval); };
+  }, [currentPage]);
 
   // Real-time Firestore sync
   React.useEffect(() => {
     if (!firebaseReady || !user?.uid) return undefined;
 
-    const { subscribeToUserCollection } = require("@/lib/firebase/workspace-store");
+    let unsubTasks: (() => void) | undefined;
+    let unsubMemories: (() => void) | undefined;
+    let unsubActions: (() => void) | undefined;
 
-    const unsubTasks = subscribeToUserCollection(user.uid, "tasks", (tasks: any[]) => {
-      // Sort tasks by priority / deadline
-      setSnapshot((current) => ({ ...current, tasks: [...tasks].sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()) }));
-    });
+    import("@/lib/firebase/workspace-store").then(({ subscribeToUserCollection }) => {
+      unsubTasks = subscribeToUserCollection(user.uid, "tasks", (tasks: any[]) => {
+        setSnapshot((current) => ({ ...current, tasks: [...tasks].sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()) }));
+      });
 
-    const unsubMemories = subscribeToUserCollection(user.uid, "memories", (memories: any[]) => {
-      setSnapshot((current) => ({ ...current, memories }));
-    });
+      unsubMemories = subscribeToUserCollection(user.uid, "memories", (memories: any[]) => {
+        setSnapshot((current) => ({ ...current, memories }));
+      });
 
-    const unsubActions = subscribeToUserCollection(user.uid, "actions", (actions: any[]) => {
-      setSnapshot((current) => ({ ...current, actions }));
+      unsubActions = subscribeToUserCollection(user.uid, "actions", (actions: any[]) => {
+        setSnapshot((current) => ({ ...current, actions }));
+      });
     });
 
     return () => {
-      unsubTasks();
-      unsubMemories();
-      unsubActions();
+      unsubTasks?.();
+      unsubMemories?.();
+      unsubActions?.();
     };
   }, [firebaseReady, user?.uid]);
 

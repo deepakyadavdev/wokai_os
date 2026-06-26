@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import type { AgentPlan } from "@/lib/types";
+import { getGoogleToken } from "@/lib/google/token";
 
 interface Message {
   id: string;
@@ -38,15 +39,15 @@ export function ChatConsole({
       id: "welcome",
       role: "assistant",
       content:
-        "Tell me what is about to slip. I will recall context, make a rescue plan, queue safe actions, and pause sensitive steps for approval."
+        "Hello! I am WokAI, your intelligent execution companion. How can I help you finish your tasks today?"
     }
   ]);
   const [input, setInput] = React.useState("");
   const [pending, setPending] = React.useState(false);
-  const [progressStatus, setProgressStatus] = React.useState<string>("routing");
+  const [progressStatus, setProgressStatus] = React.useState<string | null>(null);
 
-  async function submit(message = input) {
-    const trimmed = message.trim();
+  async function handleSend(text?: string) {
+    const trimmed = (text ?? input).trim();
     if (!trimmed || pending) return;
 
     const userMessage: Message = { id: crypto.randomUUID(), role: "user", content: trimmed };
@@ -59,7 +60,10 @@ export function ChatConsole({
       const response = await fetch("/api/agent/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message: trimmed })
+        body: JSON.stringify({
+          message: trimmed,
+          googleToken: getGoogleToken() || undefined
+        })
       });
 
       if (!response.ok) throw new Error("The agent route did not accept the request.");
@@ -189,7 +193,7 @@ export function ChatConsole({
 
         <div className="flex flex-wrap gap-2">
           {examples.map((example) => (
-            <Button key={example} variant="outline" size="sm" onClick={() => submit(example)}>
+            <Button key={example} variant="outline" size="sm" onClick={() => handleSend(example)}>
               {example}
             </Button>
           ))}
@@ -204,11 +208,11 @@ export function ChatConsole({
             onKeyDown={(event) => {
               if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
                 event.preventDefault();
-                void submit();
+                void handleSend();
               }
             }}
           />
-          <Button className="h-auto self-stretch" onClick={() => submit()} disabled={pending || !input.trim()}>
+          <Button className="h-auto self-stretch" onClick={() => handleSend()} disabled={pending || !input.trim()}>
             {pending ? <Loader2 className="animate-spin" /> : <ArrowUp />}
           </Button>
         </div>

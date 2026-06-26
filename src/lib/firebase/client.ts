@@ -11,6 +11,7 @@ import {
 import { getFirestore, type Firestore } from "firebase/firestore";
 
 import { isFirebaseConfigured } from "@/lib/config/env";
+import { saveGoogleToken } from "@/lib/google/token";
 
 let app: FirebaseApp | null = null;
 
@@ -50,11 +51,26 @@ export async function signInWithGoogle() {
   provider.addScope("https://www.googleapis.com/auth/gmail.modify");
   provider.addScope("https://www.googleapis.com/auth/calendar");
   provider.addScope("https://www.googleapis.com/auth/drive");
+  provider.addScope("https://www.googleapis.com/auth/documents");
+  provider.addScope("https://www.googleapis.com/auth/spreadsheets");
+  provider.addScope("https://www.googleapis.com/auth/presentations");
   provider.addScope("https://www.googleapis.com/auth/contacts.readonly");
-  return signInWithPopup(auth, provider);
+  const result = await signInWithPopup(auth, provider);
+
+  // Capture the Google OAuth access token and persist it
+  const credential = GoogleAuthProvider.credentialFromResult(result);
+  if (credential?.accessToken) {
+    saveGoogleToken(credential.accessToken, 3300); // 55 min safety margin
+  }
+
+  return result;
 }
 
 export async function signOutOfFirebase() {
   const auth = getFirebaseAuth();
   if (auth) await signOut(auth);
+}
+
+export async function refreshGoogleToken() {
+  return signInWithGoogle();
 }

@@ -76,9 +76,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       signOut: async () => {
         if (auth) await signOutOfFirebase();
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("googleAccessToken");
-        }
         setUser(firebaseConfigured ? null : localUser);
       }
     }),

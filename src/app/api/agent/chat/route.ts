@@ -6,7 +6,8 @@ import { generateAgentPlan } from "@/lib/wokai/agent";
 export const runtime = "nodejs";
 
 const chatRequestSchema = z.object({
-  message: z.string().min(1).max(4000)
+  message: z.string().min(1).max(4000),
+  googleToken: z.string().optional()
 });
 
 export async function POST(request: NextRequest) {
@@ -25,9 +26,13 @@ export async function POST(request: NextRequest) {
       };
 
       try {
-        const result = await generateAgentPlan(parsed.data.message, (phase) => {
-          sendStatus(phase);
-        });
+        const result = await generateAgentPlan(
+          parsed.data.message,
+          (phase) => {
+            sendStatus(phase);
+          },
+          parsed.data.googleToken
+        );
         // Introduce a tiny delay so the transition of steps is visible/pleasant if it runs super fast
         await new Promise((r) => setTimeout(r, 100));
         controller.enqueue(encoder.encode(JSON.stringify({ status: "done", result }) + "\n"));

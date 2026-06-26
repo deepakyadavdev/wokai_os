@@ -1,4 +1,5 @@
-import { redirect } from "next/navigation";
-export default function WorkspacePage() {
-  redirect("/chat");
+import { WorkspacePage } from "@/components/workspace-page";
+
+export default function WorkspaceRoutePage() {
+  return <WorkspacePage page="workspace" />;
 }
