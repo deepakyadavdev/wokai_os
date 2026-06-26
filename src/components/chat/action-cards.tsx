@@ -17,7 +17,11 @@ import {
   TriangleAlert,
   Zap,
   Cpu,
-  MonitorSmartphone
+  MonitorSmartphone,
+  Users,
+  FileText,
+  Sheet,
+  Presentation
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -372,6 +376,122 @@ function SearchCard({ action, onApprove }: { action: WokaiAction; onApprove?: ()
   );
 }
 
+/* ─────────────────────────── CONTACTS card ─────────────────────────── */
+
+function ContactsCard({ action, onApprove }: { action: WokaiAction; onApprove?: () => void }) {
+  const isDone = action.status === "COMPLETED";
+  const needsApprove = action.status === "NEEDS_APPROVAL";
+  return (
+    <ResultCard className="border-indigo-500/30 bg-indigo-500/10">
+      <CardHeader icon={Users} label={isDone ? "Contact Details Found" : "Search Google Contacts"} iconClass="text-indigo-400" />
+      <div className="space-y-1.5 text-sm">
+        <div>
+          <span className="text-muted-foreground">Action: </span>{action.label}
+        </div>
+        {action.output && (
+          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-indigo-500/20 font-mono">
+            {action.output}
+          </div>
+        )}
+      </div>
+      {needsApprove && onApprove && (
+        <div className="mt-3">
+          <Button size="sm" onClick={onApprove} className="bg-indigo-600 text-white hover:bg-indigo-500" disabled={action.status === "RUNNING"}>
+            {action.status === "RUNNING" ? <Loader2 className="size-3 animate-spin" /> : "Search Contacts"}
+          </Button>
+        </div>
+      )}
+    </ResultCard>
+  );
+}
+
+/* ─────────────────────────── DOCS card ─────────────────────────── */
+
+function DocsCard({ action, onApprove }: { action: WokaiAction; onApprove?: () => void }) {
+  const isDone = action.status === "COMPLETED";
+  const needsApprove = action.status === "NEEDS_APPROVAL";
+  return (
+    <ResultCard className="border-blue-400/30 bg-blue-400/10">
+      <CardHeader icon={FileText} label={isDone ? "Document Created" : "Create Google Doc"} iconClass="text-blue-400" />
+      <div className="space-y-1.5 text-sm">
+        <div>
+          <span className="text-muted-foreground">Action: </span>{action.label}
+        </div>
+        {action.output && (
+          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-blue-400/20 font-mono">
+            {action.output}
+          </div>
+        )}
+      </div>
+      {needsApprove && onApprove && (
+        <div className="mt-3">
+          <Button size="sm" onClick={onApprove} className="bg-blue-600 text-white hover:bg-blue-500" disabled={action.status === "RUNNING"}>
+            {action.status === "RUNNING" ? <Loader2 className="size-3 animate-spin" /> : "Create Document"}
+          </Button>
+        </div>
+      )}
+    </ResultCard>
+  );
+}
+
+/* ─────────────────────────── SHEETS card ─────────────────────────── */
+
+function SheetsCard({ action, onApprove }: { action: WokaiAction; onApprove?: () => void }) {
+  const isDone = action.status === "COMPLETED";
+  const needsApprove = action.status === "NEEDS_APPROVAL";
+  return (
+    <ResultCard className="border-emerald-500/30 bg-emerald-500/10">
+      <CardHeader icon={Sheet} label={isDone ? "Spreadsheet Created" : "Create Google Sheet"} iconClass="text-emerald-400" />
+      <div className="space-y-1.5 text-sm">
+        <div>
+          <span className="text-muted-foreground">Action: </span>{action.label}
+        </div>
+        {action.output && (
+          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-emerald-500/20 font-mono">
+            {action.output}
+          </div>
+        )}
+      </div>
+      {needsApprove && onApprove && (
+        <div className="mt-3">
+          <Button size="sm" onClick={onApprove} className="bg-emerald-600 text-white hover:bg-emerald-500" disabled={action.status === "RUNNING"}>
+            {action.status === "RUNNING" ? <Loader2 className="size-3 animate-spin" /> : "Create Sheet"}
+          </Button>
+        </div>
+      )}
+    </ResultCard>
+  );
+}
+
+/* ─────────────────────────── SLIDES card ─────────────────────────── */
+
+function SlidesCard({ action, onApprove }: { action: WokaiAction; onApprove?: () => void }) {
+  const isDone = action.status === "COMPLETED";
+  const needsApprove = action.status === "NEEDS_APPROVAL";
+  return (
+    <ResultCard className="border-orange-400/30 bg-orange-400/10">
+      <CardHeader icon={Presentation} label={isDone ? "Presentation Created" : "Create Google Slides Presentation"} iconClass="text-orange-400" />
+      <div className="space-y-1.5 text-sm">
+        <div>
+          <span className="text-muted-foreground">Action: </span>{action.label}
+        </div>
+        {action.output && (
+          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-orange-400/20 font-mono">
+            {action.output}
+          </div>
+        )}
+      </div>
+      {needsApprove && onApprove && (
+        <div className="mt-3">
+          <Button size="sm" onClick={onApprove} className="bg-orange-600 text-white hover:bg-orange-500" disabled={action.status === "RUNNING"}>
+            {action.status === "RUNNING" ? <Loader2 className="size-3 animate-spin" /> : "Create Presentation"}
+          </Button>
+        </div>
+      )}
+    </ResultCard>
+  );
+}
+
 /* ─────────────────────────── RESCUE / TASK card ─────────────────────────── */
 
 function RescueCard({ result }: { result: AgentPlan }) {
@@ -618,7 +738,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             if (/unread|urgent/i.test(label)) {
               queryParam = "q=is:unread";
             } else {
-              const fMatch = label.match(/find\s+(\w+)/i) || label.match(/search\s+(\w+)/i) || label.match(/for\s+(\w+)/i) || label.match(/about\s+(\w+)/i);
+              const fMatch = label.match(/find\s+['"]?([^'"]+)['"]?/i) || label.match(/search\s+['"]?([^'"]+)['"]?/i) || label.match(/for\s+['"]?([^'"]+)['"]?/i) || label.match(/about\s+['"]?([^'"]+)['"]?/i);
               if (fMatch && fMatch[1]) {
                 queryParam = `q=${fMatch[1]}`;
               }
@@ -843,7 +963,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             finalStatus = "FAILED";
           } else {
             let query = "";
-            const qMatch = label.match(/search\s+(\w+)/i) || label.match(/find\s+(\w+)/i) || label.match(/for\s+(\w+)/i);
+            const qMatch = label.match(/search\s+['"]?([^'"]+)['"]?/i) || label.match(/find\s+['"]?([^'"]+)['"]?/i) || label.match(/for\s+['"]?([^'"]+)['"]?/i);
             if (qMatch && qMatch[1]) {
               query = `name contains '${qMatch[1]}' and `;
             }
@@ -982,6 +1102,56 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
               console.error("[WokAI OS] [Slides API] Error:", err);
               finalStatus = "FAILED";
               output = `Slides error: ${err.message || err}`;
+            } finally {
+              clear();
+            }
+          }
+        } else if (tool === "contacts.search") {
+          console.log("[WokAI OS] [People API] Searching contacts...");
+          const token = localStorage.getItem("googleAccessToken");
+          if (!token) {
+            output = "Error: Google access token not found. Please log out and sign in again with Google to authorize.";
+            finalStatus = "FAILED";
+          } else {
+            // Extract search query from label or input
+            let query = label.replace(/Find contact details|Find phone contact|Search contacts:\s*/i, "").trim();
+            if (!query || query === "Find contact details" || query === "Find phone contact") {
+              query = "me";
+            }
+            const { signal, clear } = createTimeoutSignal();
+            try {
+              // Fetch connections from Google People API
+              const res = await fetch("https://people.googleapis.com/v1/people/me/connections?personFields=names,emailAddresses,phoneNumbers&pageSize=100", {
+                headers: { "Authorization": `Bearer ${token}` },
+                signal
+              });
+              if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`People API failed: ${errText}`);
+              }
+              const data = await res.json();
+              const connections = data.connections || [];
+              const lowerQuery = query.toLowerCase();
+              const matches = connections.filter((conn: any) => {
+                const name = conn.names?.[0]?.displayName || "";
+                const emails = conn.emailAddresses?.map((e: any) => e.value).join(" ") || "";
+                return name.toLowerCase().includes(lowerQuery) || emails.toLowerCase().includes(lowerQuery);
+              });
+
+              if (matches.length === 0) {
+                output = `No contacts found matching: "${query}" in your Google Connections.`;
+              } else {
+                output = `Found contacts matching "${query}":\n` + matches.map((m: any) => {
+                  const name = m.names?.[0]?.displayName || "Unnamed";
+                  const emails = m.emailAddresses?.map((e: any) => e.value).join(", ") || "No Email";
+                  const phones = m.phoneNumbers?.map((p: any) => p.value).join(", ") || "No Phone";
+                  return `• ${name}\n  Email: ${emails}\n  Phone: ${phones}`;
+                }).join("\n\n");
+              }
+            } catch (err: any) {
+              console.error("[WokAI OS] [People API] Error:", err);
+              finalStatus = "FAILED";
+              output = `People API error: ${err.message || err}`;
             } finally {
               clear();
             }
@@ -1342,6 +1512,42 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
         }
         if (action.tool.startsWith("drive")) {
           return <DriveCard key={action.id} action={action} />;
+        }
+        if (action.tool.startsWith("contacts")) {
+          return (
+            <ContactsCard
+              key={action.id}
+              action={action}
+              onApprove={action.status === "NEEDS_APPROVAL" ? () => handleApproveAction(action.id, action.tool, action.label) : undefined}
+            />
+          );
+        }
+        if (action.tool.startsWith("docs")) {
+          return (
+            <DocsCard
+              key={action.id}
+              action={action}
+              onApprove={action.status === "NEEDS_APPROVAL" ? () => handleApproveAction(action.id, action.tool, action.label) : undefined}
+            />
+          );
+        }
+        if (action.tool.startsWith("sheets")) {
+          return (
+            <SheetsCard
+              key={action.id}
+              action={action}
+              onApprove={action.status === "NEEDS_APPROVAL" ? () => handleApproveAction(action.id, action.tool, action.label) : undefined}
+            />
+          );
+        }
+        if (action.tool.startsWith("slides")) {
+          return (
+            <SlidesCard
+              key={action.id}
+              action={action}
+              onApprove={action.status === "NEEDS_APPROVAL" ? () => handleApproveAction(action.id, action.tool, action.label) : undefined}
+            />
+          );
         }
         if (action.tool === "browser.plan") {
           return (

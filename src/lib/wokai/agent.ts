@@ -117,10 +117,14 @@ export function deterministicAgentPlan(message: string): AgentPlan {
     if (/send|write|mail to/i.test(lower)) {
       const toMatch = lower.match(/to\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i) || lower.match(/to\s+(\S+)/i);
       const recipient = toMatch ? toMatch[1] : "recipient@gmail.com";
-      actions.push(makeAction("gmail.send", `Send email to ${recipient} about the task`));
+      const bodyMatch = message.match(/about\s+(.+)/i) || message.match(/saying\s+(.+)/i) || message.match(/body\s+(.+)/i);
+      const bodyText = bodyMatch ? bodyMatch[1] : "Chemistry Assignment is completed";
+      actions.push(makeAction("gmail.send", `Send email to ${recipient} about ${bodyText}`));
       plan.push("Construct email draft", "Verify recipient details", "Send email after approval");
     } else if (/search|find|filter/i.test(lower)) {
-      actions.push(makeAction("gmail.search", `Search emails for: ${message}`));
+      const forMatch = message.match(/(?:search|find|for|query)\s+['"]?([^'"]+)['"]?/i);
+      const searchTerm = forMatch ? forMatch[1] : "urgent";
+      actions.push(makeAction("gmail.search", `Search emails for ${searchTerm}`));
       plan.push("Query Gmail messages with filter", "Summarize matching threads");
     } else {
       actions.push(makeAction("gmail.summarize", "Prepare inbox summary and draft replies"));
@@ -136,18 +140,30 @@ export function deterministicAgentPlan(message: string): AgentPlan {
       actions.push(makeAction("calendar.listEvents", "List upcoming calendar events"));
       plan.push("Fetch calendar agenda");
     } else {
+      const nameMatch = message.match(/named\s+['"]?([^'"]+)['"]?/i) || message.match(/event\s+['"]?([^'"]+)['"]?/i) || message.match(/meeting\s+['"]?([^'"]+)['"]?/i);
+      const eventName = nameMatch ? nameMatch[1] : "Project Sync";
+      const isTomorrow = /tomorrow/i.test(lower);
+      const timeMatch = message.match(/at\s+(\d+)(?::(\d+))?\s*(pm|am)?/i) || message.match(/from\s+(\d+)(?::(\d+))?\s*(pm|am)?/i);
+      let timeText = "";
+      if (timeMatch) {
+        timeText = ` at ${timeMatch[1]}${timeMatch[2] ? `:${timeMatch[2]}` : ""}${timeMatch[3] ? ` ${timeMatch[3]}` : ""}`;
+      }
+      const dayText = isTomorrow ? " tomorrow" : " today";
+      
       actions.push(makeAction("contacts.search", "Find contact details"));
       actions.push(makeAction("calendar.findSlots", "Find conflict-free meeting slots"));
-      actions.push(makeAction("calendar.createEvent", "Create event after approval"));
+      actions.push(makeAction("calendar.createEvent", `Create event: meeting with ${eventName}${dayText}${timeText}`));
       plan.push("Find attendee", "Check calendar availability", "Propose best slot", "Create event after approval");
     }
   }
 
   if (/file|drive|notes|docs|sheet|slides|pitch|deck/.test(lower)) {
-    actions.push(makeAction("drive.search", "Find relevant workspace files"));
-    if (/doc|assignment|notes/.test(lower)) actions.push(makeAction("docs.create", "Create a working draft"));
-    if (/sheet|tracker|budget/.test(lower)) actions.push(makeAction("sheets.createTracker", "Create tracker sheet"));
-    if (/slide|pitch|deck|presentation/.test(lower)) actions.push(makeAction("slides.createDeck", "Create deck outline"));
+    const fileMatch = message.match(/(?:named|titled|for|file)\s+['"]?([^'"]+)['"]?/i);
+    const fileName = fileMatch ? fileMatch[1] : "Chemistry Assignment Notes";
+    actions.push(makeAction("drive.search", `Search files for ${fileName}`));
+    if (/doc|assignment|notes/.test(lower)) actions.push(makeAction("docs.create", `Create document named ${fileName}`));
+    if (/sheet|tracker|budget/.test(lower)) actions.push(makeAction("sheets.createTracker", `Create sheet named ${fileName}`));
+    if (/slide|pitch|deck|presentation/.test(lower)) actions.push(makeAction("slides.createDeck", `Create presentation named ${fileName}`));
     plan.push("Search files", "Open relevant source material", "Generate structured output");
   }
 
@@ -486,9 +502,10 @@ Otherwise, follow schema:
     ? (parsedPlan.suggestedTasks || [])
     : baseline.suggestedTasks;
 
-  const mergedMemories = llmSucceeded
-    ? (parsedPlan.memoryWrites || [])
-    : baseline.memoryWrites;
+  const mergedMemories = [
+    ...baseline.memoryWrites,
+    ...(parsedPlan.memoryWrites || [])
+  ];
 
   if (mergedActions.length > 0) {
     onProgress?.("api");
