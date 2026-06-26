@@ -17,8 +17,11 @@ export type WokaiToolName =
   | "task.rescuePlan"
   | "gmail.summarize"
   | "gmail.send"
+  | "gmail.search"
   | "calendar.findSlots"
   | "calendar.createEvent"
+  | "calendar.listEvents"
+  | "calendar.deleteEvent"
   | "drive.search"
   | "docs.create"
   | "sheets.createTracker"
@@ -31,7 +34,10 @@ export type WokaiToolName =
   | "devices.terminal"
   | "devices.fileAccess"
   | "notifications.create"
-  | "maps.estimateTravel";
+  | "maps.estimateTravel"
+  | "maps.searchPlaces"
+  | "maps.getDirections"
+  | "search.google";
 
 export interface UserProfile {
   uid: string;

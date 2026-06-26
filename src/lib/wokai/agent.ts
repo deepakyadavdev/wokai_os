@@ -119,6 +119,9 @@ export function deterministicAgentPlan(message: string): AgentPlan {
       const recipient = toMatch ? toMatch[1] : "recipient@gmail.com";
       actions.push(makeAction("gmail.send", `Send email to ${recipient} about the task`));
       plan.push("Construct email draft", "Verify recipient details", "Send email after approval");
+    } else if (/search|find|filter/i.test(lower)) {
+      actions.push(makeAction("gmail.search", `Search emails for: ${message}`));
+      plan.push("Query Gmail messages with filter", "Summarize matching threads");
     } else {
       actions.push(makeAction("gmail.summarize", "Prepare inbox summary and draft replies"));
       plan.push("Scan urgent threads", "Extract deadlines and commitments", "Draft replies for approval");
@@ -126,10 +129,18 @@ export function deterministicAgentPlan(message: string): AgentPlan {
   }
 
   if (/meeting|schedule|calendar|rahul/.test(lower)) {
-    actions.push(makeAction("contacts.search", "Find contact details"));
-    actions.push(makeAction("calendar.findSlots", "Find conflict-free meeting slots"));
-    actions.push(makeAction("calendar.createEvent", "Create event after approval"));
-    plan.push("Find attendee", "Check calendar availability", "Propose best slot", "Create event after approval");
+    if (/cancel|delete|remove/i.test(lower)) {
+      actions.push(makeAction("calendar.deleteEvent", `Delete meeting: ${message}`));
+      plan.push("Find target event", "Delete event after approval");
+    } else if (/show|list|check/i.test(lower)) {
+      actions.push(makeAction("calendar.listEvents", "List upcoming calendar events"));
+      plan.push("Fetch calendar agenda");
+    } else {
+      actions.push(makeAction("contacts.search", "Find contact details"));
+      actions.push(makeAction("calendar.findSlots", "Find conflict-free meeting slots"));
+      actions.push(makeAction("calendar.createEvent", "Create event after approval"));
+      plan.push("Find attendee", "Check calendar availability", "Propose best slot", "Create event after approval");
+    }
   }
 
   if (/file|drive|notes|docs|sheet|slides|pitch|deck/.test(lower)) {
@@ -151,8 +162,26 @@ export function deterministicAgentPlan(message: string): AgentPlan {
     plan.push("Open target website", "Fill safe fields", "Pause before final submit");
   }
 
+  if (/search .* on google|google search|search web|find on web/i.test(lower)) {
+    actions.push(makeAction("search.google", `Google search: ${message}`));
+    plan.push("Query Google Search API", "Format search results");
+  }
+
+  if (/directions|route|maps|how to go/i.test(lower)) {
+    actions.push(makeAction("maps.getDirections", `Calculate directions: ${message}`));
+    plan.push("Calculate route", "Fetch transit duration");
+  } else if (/places|find near|locate places/i.test(lower)) {
+    actions.push(makeAction("maps.searchPlaces", `Search places: ${message}`));
+    plan.push("Search Google Places");
+  }
+
   if (/device|laptop|phone|tablet|open .* on|terminal|run |exec |cmd|ls |dir |scan |find file/.test(lower)) {
-    if (/terminal|run |exec |cmd|ls |dir /i.test(lower)) {
+    if (/open\s+(chrome|browser|vscode|vs code|terminal|powershell|cmd)/i.test(lower)) {
+      const appMatch = lower.match(/open\s+(chrome|browser|vscode|vs code|terminal|powershell|cmd)/i);
+      const app = appMatch ? appMatch[1] : "browser";
+      actions.push(makeAction("devices.openApp", `Open ${app} on host device`));
+      plan.push("Request host process execution", `Launch ${app} on desktop`);
+    } else if (/terminal|run |exec |cmd|ls |dir /i.test(lower)) {
       actions.push(makeAction("devices.terminal", "Run shell command on host device"));
       plan.push("Request terminal authorization", "Open terminal process", "Execute shell command", "Stream output response");
     } else if (/scan |find file|search .* file/i.test(lower)) {
@@ -304,17 +333,25 @@ Analyze the user's message and generate a structured JSON object representing th
 You MUST choose tools from this strict allowed list:
 - "gmail.summarize": Summarizes the user's Gmail inbox. Use when the user asks to read, check, or summarize emails/inbox.
 - "gmail.send": Sends a fresh email to a specific recipient. Use when the user asks to send an email, write an email, or notify someone.
+- "gmail.search": Searches Gmail messages using specific query filters (e.g. from:sender, is:unread, subject:abc). Use when the user asks to find, filter or search specific emails.
 - "calendar.createEvent": Schedules meetings/events on Google Calendar. Use when the user asks to schedule, book, or block time.
+- "calendar.listEvents": Lists upcoming calendar events. Use when user wants to see what is on their schedule or calendar.
+- "calendar.deleteEvent": Cancels/deletes an event on Google Calendar. Use when the user asks to cancel, remove, or delete a calendar meeting/event.
 - "drive.search": Searches Drive for files. Use when the user asks to locate, search, or find files in Google Drive.
 - "docs.create": Creates a Google Doc. Use when the user asks to create a document, draft a report, or write notes.
 - "sheets.createTracker": Creates a Google Sheet. Use when the user asks to create a tracker sheet or budget spreadsheet.
 - "slides.createDeck": Creates a Google Slides presentation. Use when the user asks to create a slide deck or outline.
+- "devices.openApp": Launches an application (like "chrome", "vs code", "terminal") on the user's host machine. Use when the user asks to open or run an application.
 - "devices.terminal": Executes shell commands on the user's local host machine. Use when the user asks to run commands, CLI scripts, directory listings (ls, dir), or terminal execution.
+- "devices.fileAccess": Indexes/finds local files on the user's desktop directories. Use when the user asks to scan, find, or search local files.
 - "browser.plan": Automates web form fills and submissions. Use when the user asks to automate browser work (e.g. apply to internships, fill out forms).
+- "maps.searchPlaces": Searches Google Places for nearby locations or addresses. Use when the user asks to locate, search, or find a place or address.
+- "maps.getDirections": Calculates travel time and directions between locations. Use when the user asks for directions, travel times, or route distance.
+- "search.google": Performs a web search using Google Search. Use when the user asks to search the web, lookup search results, or search Google.
 - "memory.retain": Saves personal preferences or habits.
 
 Security status guidelines:
-- Sensitive actions ("devices.terminal", "gmail.summarize", "gmail.send", "calendar.createEvent", "docs.create", "sheets.createTracker", "slides.createDeck", "browser.plan") must have "sensitive: true" and "status: 'NEEDS_APPROVAL'".
+- Sensitive actions ("devices.terminal", "gmail.summarize", "gmail.send", "gmail.search", "calendar.createEvent", "calendar.listEvents", "calendar.deleteEvent", "docs.create", "sheets.createTracker", "slides.createDeck", "browser.plan", "devices.openApp") must have "sensitive: true" and "status: 'NEEDS_APPROVAL'".
 - All action objects must have the keys: "id" (format: "action-[random]"), "tool", "label" (detailed description of what will be done), "status", "sensitive", and "createdAt" (ISO string).
 
 CRITICAL CONVERSATIONAL QUERY RULE:

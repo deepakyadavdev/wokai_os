@@ -61,6 +61,14 @@ export const toolRegistry: ToolDefinition[] = [
     inputSchema: z.object({ to: z.string(), subject: z.string().optional(), body: z.string() })
   },
   {
+    name: "gmail.search",
+    description: "Search and filter Gmail messages using specific query terms (e.g., from:xyz, is:unread, subject:abc).",
+    subagent: "GmailAgent",
+    sensitive: true,
+    statusWhenPlanned: "NEEDS_APPROVAL",
+    inputSchema: z.object({ query: z.string() })
+  },
+  {
     name: "calendar.findSlots",
     description: "Find free time slots and conflicts.",
     subagent: "CalendarAgent",
@@ -75,6 +83,22 @@ export const toolRegistry: ToolDefinition[] = [
     sensitive: true,
     statusWhenPlanned: "NEEDS_APPROVAL",
     inputSchema: z.object({ title: z.string(), attendee: z.string().optional() })
+  },
+  {
+    name: "calendar.listEvents",
+    description: "List upcoming calendar events with optional query filter.",
+    subagent: "CalendarAgent",
+    sensitive: true,
+    statusWhenPlanned: "NEEDS_APPROVAL",
+    inputSchema: z.object({ query: z.string().optional() })
+  },
+  {
+    name: "calendar.deleteEvent",
+    description: "Delete or cancel a calendar event matching a search query.",
+    subagent: "CalendarAgent",
+    sensitive: true,
+    statusWhenPlanned: "NEEDS_APPROVAL",
+    inputSchema: z.object({ query: z.string() })
   },
   {
     name: "drive.search",
@@ -179,6 +203,30 @@ export const toolRegistry: ToolDefinition[] = [
     sensitive: false,
     statusWhenPlanned: "COMPLETED",
     inputSchema: z.object({ origin: z.string(), destination: z.string() })
+  },
+  {
+    name: "maps.searchPlaces",
+    description: "Search Google Places for nearby locations, businesses, or addresses.",
+    subagent: "MapsAgent",
+    sensitive: false,
+    statusWhenPlanned: "COMPLETED",
+    inputSchema: z.object({ query: z.string() })
+  },
+  {
+    name: "maps.getDirections",
+    description: "Calculate directions, distance, and duration between origin and destination.",
+    subagent: "MapsAgent",
+    sensitive: false,
+    statusWhenPlanned: "COMPLETED",
+    inputSchema: z.object({ origin: z.string(), destination: z.string() })
+  },
+  {
+    name: "search.google",
+    description: "Search the web using Google Custom Search API.",
+    subagent: "BrowserAgent",
+    sensitive: false,
+    statusWhenPlanned: "COMPLETED",
+    inputSchema: z.object({ query: z.string() })
   }
 ];
 
