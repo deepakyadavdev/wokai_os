@@ -1,0 +1,9 @@
+2026/06/26-15:12:20.527 36d0 Reusing MANIFEST C:\Users\Deepak\Documents\GitHub\wokai os\playwright-profile\Default\Local Storage\leveldb/MANIFEST-000001
+2026/06/26-15:12:20.542 36d0 Recovering log #39
+2026/06/26-15:12:20.544 36d0 Level-0 table #42: started
+2026/06/26-15:12:20.555 36d0 Level-0 table #42: 59841 bytes OK
+2026/06/26-15:12:20.555 36d0 Recovering log #41
+2026/06/26-15:12:20.556 36d0 Level-0 table #43: started
+2026/06/26-15:12:20.567 36d0 Level-0 table #43: 34182 bytes OK
+2026/06/26-15:12:20.617 36d0 Delete type=0 #39
+2026/06/26-15:12:20.617 36d0 Delete type=0 #41

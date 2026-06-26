@@ -457,6 +457,17 @@ function McpPanel() {
 }
 
 function DataPanel() {
+  const { user } = useAuth();
+  const { resetDemo } = useWorkspaceData(user);
+
+  const handleReset = () => {
+    if (window.confirm("Are you sure you want to reset all local workspace and chat data to the initial demo state?")) {
+      resetDemo();
+      window.localStorage.removeItem("wokai-chat-sessions-v2");
+      window.location.reload();
+    }
+  };
+
   return (
     <div>
       <h2 className="text-xl font-semibold mb-2">Data</h2>
@@ -477,6 +488,22 @@ function DataPanel() {
             <Button disabled variant="outline" className="shrink-0 gap-2">
               <Download size={14} />
               Export
+            </Button>
+          </div>
+        </div>
+
+        {/* Reset */}
+        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="font-medium text-foreground">Reset Workspace</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Reset all tasks, actions, memories, and chat sessions to the default demo state.
+              </p>
+            </div>
+            <Button onClick={handleReset} variant="destructive" className="shrink-0 gap-2 bg-red-600 hover:bg-red-500 text-white border-0">
+              <RotateCcw size={14} />
+              Reset Demo
             </Button>
           </div>
         </div>

@@ -21,7 +21,7 @@ const emptySnapshot: WorkspaceSnapshot = {
 };
 
 export function useWorkspaceData(user: UserProfile | null) {
-  const fallback = emptySnapshot;
+  const fallback = demoSnapshot;
 
   const [snapshot, setSnapshot] = React.useState<WorkspaceSnapshot>(() => {
     if (typeof window === "undefined") return fallback;
@@ -37,6 +37,26 @@ export function useWorkspaceData(user: UserProfile | null) {
   React.useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
   }, [snapshot]);
+
+  // Load and poll devices from API
+  React.useEffect(() => {
+    async function loadDevices() {
+      try {
+        const res = await fetch("/api/devices");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.devices) {
+            setSnapshot((current) => ({ ...current, devices: data.devices }));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load devices", err);
+      }
+    }
+    loadDevices();
+    const interval = setInterval(loadDevices, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Real-time Firestore sync
   React.useEffect(() => {
@@ -109,8 +129,8 @@ export function useWorkspaceData(user: UserProfile | null) {
   );
 
   const resetDemo = React.useCallback(() => {
-    setSnapshot(emptySnapshot);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(emptySnapshot));
+    setSnapshot(demoSnapshot);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(demoSnapshot));
   }, []);
 
   return {

@@ -482,13 +482,15 @@ function InboxPage({ snapshot }: { snapshot: WorkspaceSnapshot }) {
       .finally(() => setLoading(false));
   }, []);
 
+  const displayedEmails = tokenExists ? emails : snapshot.emails;
+
   return (
     <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
       <Card>
         <CardHeader>
           <CardTitle>Urgent Emails</CardTitle>
           <CardDescription>
-            {tokenExists ? "Real-time Gmail inbox messages." : "Google Account required."}
+            {tokenExists ? "Real-time Gmail inbox messages." : "Simulated Demo Emails (Sign in with Google to view live inbox)"}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -496,16 +498,12 @@ function InboxPage({ snapshot }: { snapshot: WorkspaceSnapshot }) {
             <div className="flex h-32 items-center justify-center">
               <Loader2 className="size-6 animate-spin text-emerald-500" />
             </div>
-          ) : !tokenExists ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              Please sign in with Google to view and sync your actual emails.
-            </div>
-          ) : emails.length === 0 ? (
+          ) : displayedEmails.length === 0 ? (
             <div className="p-4 text-center text-sm text-muted-foreground">
               No emails found in your Gmail inbox.
             </div>
           ) : (
-            emails.map((email) => (
+            displayedEmails.map((email) => (
               <div key={email.id} className="rounded-lg border border-border bg-background/50 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="font-medium text-sm truncate max-w-[200px]">{email.subject}</div>
@@ -526,8 +524,8 @@ function InboxPage({ snapshot }: { snapshot: WorkspaceSnapshot }) {
           <CardDescription>Generated for your most urgent thread.</CardDescription>
         </CardHeader>
         <CardContent className="rounded-lg border border-border bg-background/50 p-4 text-sm leading-6 text-muted-foreground">
-          {emails.length > 0 ? (
-            `Regarding: "${emails[0].subject}"\n\nHi,\n\nI am reviewing your message and will provide the requested details shortly.\n\nBest regards,\nDeepak`
+          {displayedEmails.length > 0 ? (
+            `Regarding: "${displayedEmails[0].subject}"\n\nHi,\n\nI am reviewing your message and will provide the requested details shortly.\n\nBest regards,\nDeepak`
           ) : (
             "No active threads. When you receive a message, WokAI will automatically prepare proposed drafts here."
           )}
@@ -573,26 +571,22 @@ function CalendarPage({ snapshot }: { snapshot: WorkspaceSnapshot }) {
       .finally(() => setLoading(false));
   }, []);
 
+  const displayedEvents = tokenExists ? events : snapshot.events;
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       {loading ? (
         <div className="col-span-2 flex h-32 items-center justify-center">
           <Loader2 className="size-6 animate-spin text-emerald-500" />
         </div>
-      ) : !tokenExists ? (
+      ) : displayedEvents.length === 0 ? (
         <Card className="col-span-2">
           <CardContent className="p-8 text-center text-sm text-muted-foreground">
-            Please sign in with Google to view your actual calendar events.
-          </CardContent>
-        </Card>
-      ) : events.length === 0 ? (
-        <Card className="col-span-2">
-          <CardContent className="p-8 text-center text-sm text-muted-foreground">
-            No upcoming events found on your primary Google Calendar.
+            No upcoming events found.
           </CardContent>
         </Card>
       ) : (
-        events.map((event) => (
+        displayedEvents.map((event) => (
           <Card key={event.id}>
             <CardHeader>
               <div className="flex items-start justify-between gap-3">
@@ -661,26 +655,29 @@ function DrivePage() {
     return "File";
   };
 
+  const demoFiles = [
+    { id: "file-chemistry", name: "Chemistry Assignment Notes", mimeType: "application/vnd.google-apps.document", webViewLink: "#" },
+    { id: "file-tracker", name: "Q3 Project Planning Tracker", mimeType: "application/vnd.google-apps.spreadsheet", webViewLink: "#" },
+    { id: "file-pitch", name: "Investor Pitch Deck - Final", mimeType: "application/vnd.google-apps.presentation", webViewLink: "#" },
+    { id: "file-invoice", name: "Broadband Invoice - June", mimeType: "application/pdf", webViewLink: "#" }
+  ];
+
+  const displayedFiles = tokenExists ? files : demoFiles;
+
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {loading ? (
         <div className="col-span-full flex h-32 items-center justify-center">
           <Loader2 className="size-6 animate-spin text-emerald-500" />
         </div>
-      ) : !tokenExists ? (
+      ) : displayedFiles.length === 0 ? (
         <Card className="col-span-full">
           <CardContent className="p-8 text-center text-sm text-muted-foreground">
-            Please sign in with Google to search and view your Google Drive files.
-          </CardContent>
-        </Card>
-      ) : files.length === 0 ? (
-        <Card className="col-span-full">
-          <CardContent className="p-8 text-center text-sm text-muted-foreground">
-            No files found in your Google Drive.
+            No files found.
           </CardContent>
         </Card>
       ) : (
-        files.map((file) => {
+        displayedFiles.map((file) => {
           const Icon = getFileIcon(file.mimeType);
           return (
             <Card key={file.id}>
@@ -698,7 +695,7 @@ function DrivePage() {
                   variant="outline"
                   className="w-full text-xs"
                   onClick={() => {
-                    if (file.webViewLink) window.open(file.webViewLink, "_blank");
+                    if (file.webViewLink && file.webViewLink !== "#") window.open(file.webViewLink, "_blank");
                   }}
                 >
                   <Search className="mr-2 size-3" />

@@ -1,0 +1,22 @@
+2026/06/26-15:12:59.206 49a0 Reusing MANIFEST C:\Users\Deepak\Documents\GitHub\wokai os\playwright-profile\Default\Local Storage\leveldb/MANIFEST-000001
+2026/06/26-15:12:59.227 49a0 Recovering log #44
+2026/06/26-15:12:59.227 49a0 Level-0 table #46: started
+2026/06/26-15:12:59.242 49a0 Level-0 table #46: 34423 bytes OK
+2026/06/26-15:12:59.252 49a0 Delete type=0 #44
+2026/06/26-15:12:59.253 3e54 Compacting 4@0 + 1@1 files
+2026/06/26-15:12:59.274 3e54 Generated table #48@0: 57 keys, 63196 bytes
+2026/06/26-15:12:59.274 3e54 Compacted 4@0 + 1@1 files => 63196 bytes
+2026/06/26-15:12:59.276 3e54 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/06/26-15:12:59.278 3e54 Delete type=2 #38
+2026/06/26-15:12:59.278 3e54 Delete type=2 #40
+2026/06/26-15:12:59.278 3e54 Delete type=2 #42
+2026/06/26-15:12:59.278 3e54 Delete type=2 #43
+2026/06/26-15:12:59.279 3e54 Delete type=2 #46
+2026/06/26-15:13:23.981 3e54 Level-0 table #50: started
+2026/06/26-15:13:23.994 3e54 Level-0 table #50: 34363 bytes OK
+2026/06/26-15:13:23.999 3e54 Delete type=0 #47
+2026/06/26-15:15:38.505 3e54 Level-0 table #52: started
+2026/06/26-15:15:38.515 3e54 Level-0 table #52: 63907 bytes OK
+2026/06/26-15:15:38.518 3e54 Delete type=0 #49
+2026/06/26-15:17:26.680 49a0 Level-0 table #54: started
+2026/06/26-15:17:26.708 49a0 Level-0 table #54: 65607 bytes OK

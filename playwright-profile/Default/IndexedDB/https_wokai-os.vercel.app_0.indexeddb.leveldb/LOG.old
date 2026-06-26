@@ -1,0 +1,14 @@
+2026/06/26-15:12:22.004 4818 Reusing MANIFEST C:\Users\Deepak\Documents\GitHub\wokai os\playwright-profile\Default\IndexedDB\https_wokai-os.vercel.app_0.indexeddb.leveldb/MANIFEST-000001
+2026/06/26-15:12:22.005 4818 Recovering log #59
+2026/06/26-15:12:22.006 4818 Reusing old log C:\Users\Deepak\Documents\GitHub\wokai os\playwright-profile\Default\IndexedDB\https_wokai-os.vercel.app_0.indexeddb.leveldb/000059.log 
+2026/06/26-15:12:22.006 4818 Delete type=2 #58
+2026/06/26-15:12:22.060 184c Level-0 table #64: started
+2026/06/26-15:12:22.066 184c Level-0 table #64: 4040 bytes OK
+2026/06/26-15:12:22.069 184c Delete type=0 #59
+2026/06/26-15:12:22.070 1240 Manual compaction at level-0 from '\x00\x15\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x16\x00\x00\x00' @ 0 : 0; will stop at '\x00\x15\x00\x00\x05' @ 991 : 1
+2026/06/26-15:12:22.070 1240 Compacting 1@0 + 1@1 files
+2026/06/26-15:12:22.075 1240 Generated table #65@0: 210 keys, 5631 bytes
+2026/06/26-15:12:22.075 1240 Compacted 1@0 + 1@1 files => 5631 bytes
+2026/06/26-15:12:22.079 1240 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/06/26-15:12:22.080 1240 Delete type=2 #64
+2026/06/26-15:12:22.081 1240 Manual compaction at level-0 from '\x00\x15\x00\x00\x05' @ 991 : 1 .. '\x00\x16\x00\x00\x00' @ 0 : 0; will stop at (end)
