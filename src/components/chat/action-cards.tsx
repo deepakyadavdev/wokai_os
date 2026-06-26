@@ -291,18 +291,37 @@ function RescueCard({ result }: { result: AgentPlan }) {
   const task = result.suggestedTasks[0];
   const [accepted, setAccepted] = React.useState(false);
   if (!task) return null;
+
+  const isUrgent = task.priority === "HIGH" || task.priority === "CRITICAL";
+
   return (
-    <ResultCard className="border-red-500/30 bg-red-500/10">
-      <CardHeader icon={Zap} label="Rescue Plan" iconClass="text-red-400" />
+    <ResultCard
+      className={cn(
+        "border-border/50",
+        isUrgent
+          ? "border-red-500/30 bg-red-500/10"
+          : "border-emerald-500/30 bg-emerald-500/5"
+      )}
+    >
+      <CardHeader
+        icon={isUrgent ? Zap : CheckCircle2}
+        label={isUrgent ? "Rescue Plan" : "Suggested Task"}
+        iconClass={isUrgent ? "text-red-400" : "text-emerald-400"}
+      />
       <div className="mb-2">
-        <RiskBadge level={result.riskLevel} />
+        <RiskBadge level={task.priority} />
       </div>
       <p className="mb-2 text-sm font-medium">{task.title}</p>
       <div className="flex flex-wrap gap-1.5">
         {task.subtasks.slice(0, 5).map((sub) => (
           <span
             key={sub}
-            className="rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-0.5 text-xs text-red-300"
+            className={cn(
+              "rounded-full border px-2.5 py-0.5 text-xs",
+              isUrgent
+                ? "border-red-500/30 bg-red-500/10 text-red-300"
+                : "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+            )}
           >
             {sub}
           </span>
@@ -313,12 +332,18 @@ function RescueCard({ result }: { result: AgentPlan }) {
           size="sm"
           onClick={() => {
             setAccepted(true);
-            toast.success("Rescue plan accepted and initialized!");
+            toast.success(isUrgent ? "Rescue plan accepted!" : "Task accepted!");
           }}
           disabled={accepted}
-          className="bg-red-600 text-white hover:bg-red-500 disabled:bg-emerald-600/50 disabled:text-emerald-300"
+          className={cn(
+            "text-white transition-colors duration-150 font-medium",
+            isUrgent
+              ? "bg-red-600 hover:bg-red-500"
+              : "bg-emerald-600 hover:bg-emerald-500",
+            "disabled:bg-emerald-600/30 disabled:text-emerald-400"
+          )}
         >
-          {accepted ? "Plan Accepted ✓" : "Accept Plan"}
+          {accepted ? (isUrgent ? "Plan Accepted ✓" : "Task Accepted ✓") : (isUrgent ? "Accept Plan" : "Accept Task")}
         </Button>
       </div>
     </ResultCard>
@@ -502,10 +527,19 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             output = "Error: Google access token not found. Please log out and sign in again with Google to authorize.";
             finalStatus = "FAILED";
           } else {
-            console.log("[WokAI OS] [Gmail API] Listing latest messages: GET https://gmail.googleapis.com/gmail/v1/users/me/messages");
+            let queryParam = "";
+            if (/unread|urgent/i.test(label)) {
+              queryParam = "q=is:unread";
+            } else {
+              const fMatch = label.match(/find\s+(\w+)/i) || label.match(/search\s+(\w+)/i) || label.match(/for\s+(\w+)/i) || label.match(/about\s+(\w+)/i);
+              if (fMatch && fMatch[1]) {
+                queryParam = `q=${fMatch[1]}`;
+              }
+            }
+            console.log(`[WokAI OS] [Gmail API] Listing messages with filter: GET https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=8${queryParam ? `&${queryParam}` : ""}`);
             const { signal, clear } = createTimeoutSignal();
             try {
-              const listRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=5", {
+              const listRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=8${queryParam ? `&${queryParam}` : ""}`, {
                 headers: { "Authorization": `Bearer ${token}` },
                 signal
               });
@@ -552,6 +586,65 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             }
           }
 
+        } else if (tool === "gmail.send") {
+          console.log("[WokAI OS] [Gmail API] Checking Google Access Token...");
+          const token = localStorage.getItem("googleAccessToken");
+          if (!token) {
+            console.error("[WokAI OS] [Gmail API] Error: googleAccessToken is missing.");
+            output = "Error: Google access token not found. Please re-authenticate.";
+            finalStatus = "FAILED";
+          } else {
+            const toMatch = label.match(/to\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i) || label.match(/to\s+(\S+)/i);
+            const recipient = toMatch ? toMatch[1] : "recipient@gmail.com";
+            let subject = "Message from WokAI OS";
+            let body = label;
+
+            const aboutMatch = label.match(/about\s+(.+)/i) || label.match(/body\s+(.+)/i);
+            if (aboutMatch && aboutMatch[1]) {
+              subject = aboutMatch[1].slice(0, 40) + "...";
+              body = aboutMatch[1];
+            }
+
+            const emailContent = [
+              `To: ${recipient}`,
+              `Subject: ${subject}`,
+              `MIME-Version: 1.0`,
+              `Content-Type: text/plain; charset=UTF-8`,
+              ``,
+              `Hello,\n\n${body}\n\nSent automatically via WokAI OS.`
+            ].join("\r\n");
+
+            const raw = btoa(unescape(encodeURIComponent(emailContent)))
+              .replace(/\+/g, '-')
+              .replace(/\//g, '_')
+              .replace(/=+$/, '');
+
+            const { signal, clear } = createTimeoutSignal();
+            try {
+              const sendRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${token}`,
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ raw }),
+                signal
+              });
+              if (!sendRes.ok) {
+                const errText = await sendRes.text();
+                throw new Error(`Gmail API send failed: ${errText}`);
+              }
+              const sendData = await sendRes.json();
+              output = `Email sent successfully to ${recipient}!\nMessage ID: ${sendData.id}`;
+            } catch (err: any) {
+              console.error(`[WokAI OS] [Gmail API] Send Error:`, err);
+              finalStatus = "FAILED";
+              output = `Gmail send error: ${err.message || err}`;
+            } finally {
+              clear();
+            }
+          }
+
         } else if (tool === "calendar.createEvent") {
           console.log("[WokAI OS] [Calendar API] Checking Google Access Token...");
           const token = localStorage.getItem("googleAccessToken");
@@ -560,10 +653,60 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             output = "Error: Google access token not found. Please log out and sign in again with Google to authorize.";
             finalStatus = "FAILED";
           } else {
-            const start = new Date(Date.now() + 60 * 60 * 1000);
-            const end = new Date(Date.now() + 120 * 60 * 1000);
+            let summary = "WokAI Task Focus Meeting";
+            let start = new Date(Date.now() + 60 * 60 * 1000);
+            let end = new Date(Date.now() + 120 * 60 * 1000);
+
+            const forMatch = label.match(/for\s+(.+?)(?:\s+at|\s+from|\s+today|\s+tomorrow|$)/i) || label.match(/meeting\s+with\s+(.+?)(?:\s+at|\s+from|\s+today|\s+tomorrow|$)/i);
+            if (forMatch && forMatch[1]) {
+              summary = forMatch[1].trim();
+            } else {
+              const summaryMatch = label.match(/event\s+([a-zA-Z0-9\s]+)/i);
+              if (summaryMatch && summaryMatch[1]) {
+                summary = summaryMatch[1].trim();
+              }
+            }
+
+            const isTomorrow = /tomorrow/i.test(label);
+            const timeMatch = label.match(/at\s+(\d+)(?::(\d+))?\s*(pm|am)?/i) || label.match(/from\s+(\d+)(?::(\d+))?\s*(pm|am)?/i);
+            if (timeMatch) {
+              let hour = parseInt(timeMatch[1], 10);
+              const min = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+              const ampm = timeMatch[3] ? timeMatch[3].toLowerCase() : "";
+
+              if (ampm === "pm" && hour < 12) hour += 12;
+              if (ampm === "am" && hour === 12) hour = 0;
+
+              const targetDate = new Date();
+              if (isTomorrow) targetDate.setDate(targetDate.getDate() + 1);
+              targetDate.setHours(hour, min, 0, 0);
+
+              if (!isNaN(targetDate.getTime())) {
+                start = targetDate;
+                const durMatch = label.match(/to\s+(\d+)(?::(\d+))?\s*(pm|am)?/i);
+                if (durMatch) {
+                  let endHour = parseInt(durMatch[1], 10);
+                  const endMin = durMatch[2] ? parseInt(durMatch[2], 10) : 0;
+                  const endAmpm = durMatch[3] ? durMatch[3].toLowerCase() : ampm;
+
+                  if (endAmpm === "pm" && endHour < 12) endHour += 12;
+                  if (endAmpm === "am" && endHour === 12) endHour = 0;
+
+                  const endTarget = new Date(targetDate);
+                  endTarget.setHours(endHour, endMin, 0, 0);
+                  if (!isNaN(endTarget.getTime()) && endTarget > targetDate) {
+                    end = endTarget;
+                  } else {
+                    end = new Date(targetDate.getTime() + 30 * 60 * 1000);
+                  }
+                } else {
+                  end = new Date(targetDate.getTime() + 30 * 60 * 1000);
+                }
+              }
+            }
+
             const eventBody = {
-              summary: "WokAI Task Focus Meeting",
+              summary,
               description: `Created automatically by WokAI OS: "${label}"`,
               start: {
                 dateTime: start.toISOString(),
@@ -600,6 +743,158 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
               console.error(`[WokAI OS] [Calendar API] Execution Error:`, err);
               finalStatus = "FAILED";
               output = `Calendar execution error: ${err.message || err}`;
+            } finally {
+              clear();
+            }
+          }
+
+        } else if (tool === "drive.search") {
+          console.log("[WokAI OS] [Drive API] Searching files...");
+          const token = localStorage.getItem("googleAccessToken");
+          if (!token) {
+            output = "Error: Google access token not found.";
+            finalStatus = "FAILED";
+          } else {
+            let query = "";
+            const qMatch = label.match(/search\s+(\w+)/i) || label.match(/find\s+(\w+)/i) || label.match(/for\s+(\w+)/i);
+            if (qMatch && qMatch[1]) {
+              query = `name contains '${qMatch[1]}' and `;
+            }
+            const { signal, clear } = createTimeoutSignal();
+            try {
+              const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query + "trashed = false")}&pageSize=5`, {
+                headers: { "Authorization": `Bearer ${token}` },
+                signal
+              });
+              if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`Drive search failed: ${errText}`);
+              }
+              const data = await res.json();
+              const files = data.files || [];
+              if (files.length === 0) {
+                output = "No matching files found in your Google Drive.";
+              } else {
+                output = `Found files in Google Drive:\n` + files.map((f: any) => `• ${f.name} (ID: ${f.id})`).join("\n");
+              }
+            } catch (err: any) {
+              console.error("[WokAI OS] [Drive API] Error:", err);
+              finalStatus = "FAILED";
+              output = `Drive error: ${err.message || err}`;
+            } finally {
+              clear();
+            }
+          }
+
+        } else if (tool === "docs.create") {
+          console.log("[WokAI OS] [Docs API] Creating document...");
+          const token = localStorage.getItem("googleAccessToken");
+          if (!token) {
+            output = "Error: Google access token not found.";
+            finalStatus = "FAILED";
+          } else {
+            let title = label;
+            const titleMatch = label.match(/(?:create|draft)\s+(?:doc|document)?\s*(?:for|named|titled)?\s*['"]?([^'"]+)['"]?/i);
+            if (titleMatch && titleMatch[1]) {
+              title = titleMatch[1];
+            }
+            const { signal, clear } = createTimeoutSignal();
+            try {
+              const res = await fetch("https://docs.googleapis.com/v1/documents", {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${token}`,
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ title }),
+                signal
+              });
+              if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`Docs create failed: ${errText}`);
+              }
+              const data = await res.json();
+              output = `Successfully created Google Doc:\n- Title: ${data.title}\n- Link: https://docs.google.com/document/d/${data.documentId}/edit`;
+            } catch (err: any) {
+              console.error("[WokAI OS] [Docs API] Error:", err);
+              finalStatus = "FAILED";
+              output = `Docs error: ${err.message || err}`;
+            } finally {
+              clear();
+            }
+          }
+
+        } else if (tool === "sheets.createTracker") {
+          console.log("[WokAI OS] [Sheets API] Creating sheet...");
+          const token = localStorage.getItem("googleAccessToken");
+          if (!token) {
+            output = "Error: Google access token not found.";
+            finalStatus = "FAILED";
+          } else {
+            let title = label;
+            const titleMatch = label.match(/(?:create|draft)\s+(?:sheet|tracker|budget)?\s*(?:for|named|titled)?\s*['"]?([^'"]+)['"]?/i);
+            if (titleMatch && titleMatch[1]) {
+              title = titleMatch[1];
+            }
+            const { signal, clear } = createTimeoutSignal();
+            try {
+              const res = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${token}`,
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ properties: { title } }),
+                signal
+              });
+              if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`Sheets create failed: ${errText}`);
+              }
+              const data = await res.json();
+              output = `Successfully created Google Sheet:\n- Title: ${data.properties.title}\n- Link: ${data.spreadsheetUrl}`;
+            } catch (err: any) {
+              console.error("[WokAI OS] [Sheets API] Error:", err);
+              finalStatus = "FAILED";
+              output = `Sheets error: ${err.message || err}`;
+            } finally {
+              clear();
+            }
+          }
+
+        } else if (tool === "slides.createDeck") {
+          console.log("[WokAI OS] [Slides API] Creating presentation...");
+          const token = localStorage.getItem("googleAccessToken");
+          if (!token) {
+            output = "Error: Google access token not found.";
+            finalStatus = "FAILED";
+          } else {
+            let title = label;
+            const titleMatch = label.match(/(?:create|draft)\s+(?:slides|presentation|deck)?\s*(?:for|named|titled)?\s*['"]?([^'"]+)['"]?/i);
+            if (titleMatch && titleMatch[1]) {
+              title = titleMatch[1];
+            }
+            const { signal, clear } = createTimeoutSignal();
+            try {
+              const res = await fetch("https://slides.googleapis.com/v1/presentations", {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${token}`,
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ title }),
+                signal
+              });
+              if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`Slides create failed: ${errText}`);
+              }
+              const data = await res.json();
+              output = `Successfully created Google Slides presentation:\n- Title: ${data.title}\n- Link: https://docs.google.com/presentation/d/${data.presentationId}/edit`;
+            } catch (err: any) {
+              console.error("[WokAI OS] [Slides API] Error:", err);
+              finalStatus = "FAILED";
+              output = `Slides error: ${err.message || err}`;
             } finally {
               clear();
             }
@@ -651,13 +946,6 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
     }
   }
 
-  const gmailAction = actions.find((a) => a.tool.startsWith("gmail"));
-  const calendarAction = actions.find((a) => a.tool.startsWith("calendar"));
-  const callsAction = actions.find((a) => a.tool.startsWith("calls"));
-  const driveAction = actions.find((a) => a.tool.startsWith("drive"));
-  const browserAction = actions.find((a) => a.tool === "browser.plan");
-  const terminalAction = actions.find((a) => a.tool === "devices.terminal");
-
   return (
     <div className="mt-4 border-t border-border/40 pt-4">
       {/* Approval banner */}
@@ -667,39 +955,59 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
       <StepList actions={actions} />
 
       {/* Specialized cards */}
-      {hasGmail && gmailAction && (
-        <EmailCard
-          action={gmailAction}
-          onApprove={() => handleApproveAction(gmailAction.id, gmailAction.tool, gmailAction.label)}
-        />
-      )}
-      {hasCalendar && calendarAction && (
-        <CalendarCard
-          action={calendarAction}
-          onApprove={() => handleApproveAction(calendarAction.id, calendarAction.tool, calendarAction.label)}
-        />
-      )}
-      {hasCalls && callsAction && (
-        <CallCard
-          action={callsAction}
-          onApprove={() => handleApproveAction(callsAction.id, callsAction.tool, callsAction.label)}
-        />
-      )}
-      {hasDrive && driveAction && <DriveCard action={driveAction} />}
-      {hasBrowser && browserAction && (
-        <BrowserCard
-          result={result}
-          action={browserAction}
-          onApprove={() => handleApproveAction(browserAction.id, browserAction.tool, browserAction.label)}
-          onReject={() => handleRejectAction(browserAction.id)}
-        />
-      )}
-      {hasTerminal && terminalAction && (
-        <TerminalCard
-          action={terminalAction}
-          onApprove={() => handleApproveAction(terminalAction.id, terminalAction.tool, terminalAction.label)}
-        />
-      )}
+      {actions.map((action) => {
+        if (action.tool.startsWith("gmail")) {
+          return (
+            <EmailCard
+              key={action.id}
+              action={action}
+              onApprove={() => handleApproveAction(action.id, action.tool, action.label)}
+            />
+          );
+        }
+        if (action.tool.startsWith("calendar")) {
+          return (
+            <CalendarCard
+              key={action.id}
+              action={action}
+              onApprove={() => handleApproveAction(action.id, action.tool, action.label)}
+            />
+          );
+        }
+        if (action.tool.startsWith("calls")) {
+          return (
+            <CallCard
+              key={action.id}
+              action={action}
+              onApprove={() => handleApproveAction(action.id, action.tool, action.label)}
+            />
+          );
+        }
+        if (action.tool.startsWith("drive")) {
+          return <DriveCard key={action.id} action={action} />;
+        }
+        if (action.tool === "browser.plan") {
+          return (
+            <BrowserCard
+              key={action.id}
+              result={result}
+              action={action}
+              onApprove={() => handleApproveAction(action.id, action.tool, action.label)}
+              onReject={() => handleRejectAction(action.id)}
+            />
+          );
+        }
+        if (action.tool === "devices.terminal") {
+          return (
+            <TerminalCard
+              key={action.id}
+              action={action}
+              onApprove={() => handleApproveAction(action.id, action.tool, action.label)}
+            />
+          );
+        }
+        return null;
+      })}
       {hasTasks && <RescueCard result={result} />}
       {hasMemory && <MemoryCard result={result} />}
     </div>

@@ -10,16 +10,59 @@ import type { AgentPlan, UserProfile, WorkspaceSnapshot, ActionStatus } from "@/
 
 const STORAGE_KEY = "wokai-workspace-v1";
 
+const emptySnapshot: WorkspaceSnapshot = {
+  tasks: [],
+  memories: [],
+  actions: [],
+  devices: [],
+  emails: [],
+  events: [],
+  browserJobs: []
+};
+
 export function useWorkspaceData(user: UserProfile | null) {
+  const fallback = emptySnapshot;
+
   const [snapshot, setSnapshot] = React.useState<WorkspaceSnapshot>(() => {
-    if (typeof window === "undefined") return demoSnapshot;
-    return safeJsonParse<WorkspaceSnapshot>(window.localStorage.getItem(STORAGE_KEY), demoSnapshot);
+    if (typeof window === "undefined") return fallback;
+    return safeJsonParse<WorkspaceSnapshot>(window.localStorage.getItem(STORAGE_KEY), fallback);
   });
+  const [hydrated, setHydrated] = React.useState(false);
   const firebaseReady = Boolean(getFirebaseDb() && user?.uid);
+
+  React.useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   React.useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
   }, [snapshot]);
+
+  // Real-time Firestore sync
+  React.useEffect(() => {
+    if (!firebaseReady || !user?.uid) return undefined;
+
+    const { subscribeToUserCollection } = require("@/lib/firebase/workspace-store");
+
+    const unsubTasks = subscribeToUserCollection(user.uid, "tasks", (tasks: any[]) => {
+      // Sort tasks by priority / deadline
+      setSnapshot((current) => ({ ...current, tasks: [...tasks].sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()) }));
+    });
+
+    const unsubMemories = subscribeToUserCollection(user.uid, "memories", (memories: any[]) => {
+      setSnapshot((current) => ({ ...current, memories }));
+    });
+
+    const unsubActions = subscribeToUserCollection(user.uid, "actions", (actions: any[]) => {
+      setSnapshot((current) => ({ ...current, actions }));
+    });
+
+    return () => {
+      unsubTasks();
+      unsubMemories();
+      unsubActions();
+    };
+  }, [firebaseReady, user?.uid]);
 
   const mergeAgentResult = React.useCallback(
     async (result: AgentPlan) => {
@@ -66,8 +109,8 @@ export function useWorkspaceData(user: UserProfile | null) {
   );
 
   const resetDemo = React.useCallback(() => {
-    setSnapshot(demoSnapshot);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(demoSnapshot));
+    setSnapshot(emptySnapshot);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(emptySnapshot));
   }, []);
 
   return {
@@ -76,6 +119,6 @@ export function useWorkspaceData(user: UserProfile | null) {
     updateActionStatus,
     resetDemo,
     firebaseReady,
-    hydrated: true
+    hydrated
   };
 }

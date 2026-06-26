@@ -16,6 +16,7 @@ export type WokaiToolName =
   | "task.create"
   | "task.rescuePlan"
   | "gmail.summarize"
+  | "gmail.send"
   | "calendar.findSlots"
   | "calendar.createEvent"
   | "drive.search"

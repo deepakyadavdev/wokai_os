@@ -15,10 +15,10 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
 }
 
-const demoUser: UserProfile = {
-  uid: "demo-user",
-  name: "Deepak",
-  email: "demo@wokai.local"
+const localUser: UserProfile = {
+  uid: "local-user",
+  name: "Deepak Yadav",
+  email: "deepak.yadav@gmail.com"
 };
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
@@ -26,24 +26,29 @@ const AuthContext = React.createContext<AuthContextValue | null>(null);
 function toProfile(user: User): UserProfile {
   return {
     uid: user.uid,
-    name: user.displayName ?? "WokAI User",
-    email: user.email ?? "user@wokai.app",
+    name: user.displayName ?? "Deepak Yadav",
+    email: user.email ?? "deepak.yadav@gmail.com",
     photoURL: user.photoURL ?? undefined
   };
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = React.useState<UserProfile | null>(demoUser);
+  const [user, setUser] = React.useState<UserProfile | null>(null);
   const auth = getFirebaseAuth();
   const firebaseConfigured = Boolean(auth);
   const [loading, setLoading] = React.useState(firebaseConfigured);
 
   React.useEffect(() => {
-    if (!auth) return undefined;
+    if (!auth) {
+      // Offline/Local dev mode
+      setUser(localUser);
+      setLoading(false);
+      return undefined;
+    }
 
     return onAuthStateChanged(auth, async (firebaseUser) => {
       const profile = firebaseUser ? toProfile(firebaseUser) : null;
-      setUser(profile);
+      setUser(profile || localUser);
       if (profile) await saveUserProfile(profile);
       setLoading(false);
     });
@@ -56,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       signIn: async () => {
         if (!auth) {
-          setUser(demoUser);
+          setUser(localUser);
           return;
         }
         const credential = await signInWithGoogle();
@@ -71,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       signOut: async () => {
         if (auth) await signOutOfFirebase();
-        setUser(firebaseConfigured ? null : demoUser);
+        setUser(firebaseConfigured ? null : localUser);
       }
     }),
     [auth, firebaseConfigured, loading, user]

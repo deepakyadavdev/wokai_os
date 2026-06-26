@@ -114,8 +114,15 @@ export function deterministicAgentPlan(message: string): AgentPlan {
   const memoryWrites: WokaiMemory[] = [];
 
   if (/email|inbox|gmail|reply/.test(lower)) {
-    actions.push(makeAction("gmail.summarize", "Prepare inbox summary and draft replies"));
-    plan.push("Scan urgent threads", "Extract deadlines and commitments", "Draft replies for approval");
+    if (/send|write|mail to/i.test(lower)) {
+      const toMatch = lower.match(/to\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i) || lower.match(/to\s+(\S+)/i);
+      const recipient = toMatch ? toMatch[1] : "recipient@gmail.com";
+      actions.push(makeAction("gmail.send", `Send email to ${recipient} about the task`));
+      plan.push("Construct email draft", "Verify recipient details", "Send email after approval");
+    } else {
+      actions.push(makeAction("gmail.summarize", "Prepare inbox summary and draft replies"));
+      plan.push("Scan urgent threads", "Extract deadlines and commitments", "Draft replies for approval");
+    }
   }
 
   if (/meeting|schedule|calendar|rahul/.test(lower)) {
@@ -234,9 +241,9 @@ export async function generateAgentPlan(
   let conversationReply = baseline.response;
   let parsedPlan: Partial<AgentPlan> = {};
 
-  onProgress?.("agent1");
   // 2. OpenRouter Integration
   if (process.env.OPENROUTER_API_KEY) {
+    onProgress?.("agent1");
     // Model 1: Conversational Reply Generation (Lightweight)
     const replyModels = [
       "meta-llama/llama-3.2-3b-instruct:free",
@@ -296,18 +303,26 @@ Analyze the user's message and generate a structured JSON object representing th
 
 You MUST choose tools from this strict allowed list:
 - "gmail.summarize": Summarizes the user's Gmail inbox. Use when the user asks to read, check, or summarize emails/inbox.
+- "gmail.send": Sends a fresh email to a specific recipient. Use when the user asks to send an email, write an email, or notify someone.
 - "calendar.createEvent": Schedules meetings/events on Google Calendar. Use when the user asks to schedule, book, or block time.
+- "drive.search": Searches Drive for files. Use when the user asks to locate, search, or find files in Google Drive.
+- "docs.create": Creates a Google Doc. Use when the user asks to create a document, draft a report, or write notes.
+- "sheets.createTracker": Creates a Google Sheet. Use when the user asks to create a tracker sheet or budget spreadsheet.
+- "slides.createDeck": Creates a Google Slides presentation. Use when the user asks to create a slide deck or outline.
 - "devices.terminal": Executes shell commands on the user's local host machine. Use when the user asks to run commands, CLI scripts, directory listings (ls, dir), or terminal execution.
 - "browser.plan": Automates web form fills and submissions. Use when the user asks to automate browser work (e.g. apply to internships, fill out forms).
 - "memory.retain": Saves personal preferences or habits.
 
 Security status guidelines:
-- Sensitive actions ("devices.terminal", "gmail.summarize", "calendar.createEvent", "browser.plan") must have "sensitive: true" and "status: 'NEEDS_APPROVAL'".
+- Sensitive actions ("devices.terminal", "gmail.summarize", "gmail.send", "calendar.createEvent", "docs.create", "sheets.createTracker", "slides.createDeck", "browser.plan") must have "sensitive: true" and "status: 'NEEDS_APPROVAL'".
 - All action objects must have the keys: "id" (format: "action-[random]"), "tool", "label" (detailed description of what will be done), "status", "sensitive", and "createdAt" (ISO string).
+
+CRITICAL CONVERSATIONAL QUERY RULE:
+If the user message is just a simple greeting ("hello", "hey", "hi"), a conversational check ("are you there?", "how are you"), or a general question about your capabilities without requesting an action, you MUST return empty arrays for "actions" and "suggestedTasks" (e.g. "actions": [], "suggestedTasks": []), set "intent" to "greeting", and set "response" to a friendly conversational reply. DO NOT return placeholder actions or tasks under any circumstances.
 
 Return ONLY a raw JSON block matching this format (do NOT wrap it in markdown codeblocks):
 {
-  "intent": "work_completion" | "daily_planning",
+  "intent": "work_completion" | "daily_planning" | "greeting",
   "riskLevel": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
   "reasoning": ["step-by-step logic detailing why these actions were chosen"],
   "plan": ["friendly summary of the steps to execute"],
@@ -315,7 +330,7 @@ Return ONLY a raw JSON block matching this format (do NOT wrap it in markdown co
     {
       "id": "action-12345",
       "tool": "gmail.summarize",
-      "label": "Summarize inbox and find chemistry lab info",
+      "label": "Summarize inbox to extract key deadlines",
       "status": "NEEDS_APPROVAL",
       "sensitive": true,
       "createdAt": "2026-06-25T10:00:00.000Z"
@@ -324,13 +339,13 @@ Return ONLY a raw JSON block matching this format (do NOT wrap it in markdown co
   "suggestedTasks": [
     {
       "id": "task-12345",
-      "title": "Chemistry lab rescue preparation",
-      "description": "Created from user prompt to handle chemistry sprint",
+      "title": "Inbox review",
+      "description": "Created from user prompt to handle email backlog",
       "deadline": "2026-06-26T10:00:00.000Z",
       "priority": "HIGH",
       "status": "todo",
       "progress": 0,
-      "subtasks": ["Check chemistry emails", "Schedule slot", "Execute lab report outline"],
+      "subtasks": ["Check messages", "List followups"],
       "source": "chat"
     }
   ]
@@ -380,9 +395,9 @@ User Message: "${message}"
     }
   }
 
-  onProgress?.("agent3");
   // 3. Gemini Fallback (if OpenRouter fails or is unconfigured)
   if (Object.keys(parsedPlan).length === 0 && process.env.GEMINI_API_KEY) {
+    onProgress?.("agent3");
     try {
       console.log("WokAI Conductor: Falling back to Gemini for plan generation.");
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -394,7 +409,18 @@ User Message: "${message}"
 You are the WokAI Conductor. Return strict JSON ONLY for:
 ${message}
 Choose from tools: "gmail.summarize", "calendar.createEvent", "devices.terminal", "browser.plan".
-Schema:
+
+If this is a simple greeting or conversation check, return:
+{
+  "intent": "greeting",
+  "riskLevel": "LOW",
+  "reasoning": [],
+  "plan": [],
+  "actions": [],
+  "suggestedTasks": []
+}
+
+Otherwise, follow schema:
 {
   "intent": "work_completion",
   "riskLevel": "LOW",
@@ -412,7 +438,6 @@ Schema:
     }
   }
 
-  onProgress?.("api");
   // 4. Merge Logic (use LLM outputs directly if successful, fallback to baseline only on full failure)
   const llmSucceeded = Object.keys(parsedPlan).length > 0;
 
@@ -427,6 +452,10 @@ Schema:
   const mergedMemories = llmSucceeded
     ? (parsedPlan.memoryWrites || [])
     : baseline.memoryWrites;
+
+  if (mergedActions.length > 0) {
+    onProgress?.("api");
+  }
 
   return {
     ...baseline,

@@ -53,6 +53,14 @@ export const toolRegistry: ToolDefinition[] = [
     inputSchema: z.object({ scope: z.string() })
   },
   {
+    name: "gmail.send",
+    description: "Send a fresh email to a specific recipient.",
+    subagent: "GmailAgent",
+    sensitive: true,
+    statusWhenPlanned: "NEEDS_APPROVAL",
+    inputSchema: z.object({ to: z.string(), subject: z.string().optional(), body: z.string() })
+  },
+  {
     name: "calendar.findSlots",
     description: "Find free time slots and conflicts.",
     subagent: "CalendarAgent",

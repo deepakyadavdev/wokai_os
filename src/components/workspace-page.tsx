@@ -128,6 +128,20 @@ const pageMeta = {
 export function WorkspacePage({ page }: { page: PageKind }) {
   const { user, firebaseConfigured } = useAuth();
   const workspace = useWorkspaceData(user);
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || !workspace.hydrated) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-emerald-500" />
+      </div>
+    );
+  }
+
   const meta = pageMeta[page];
   const risk = highestRisk(workspace.snapshot.tasks);
 
@@ -413,36 +427,110 @@ function MemoryPage({ snapshot }: { snapshot: WorkspaceSnapshot }) {
 }
 
 function InboxPage({ snapshot }: { snapshot: WorkspaceSnapshot }) {
+  const [emails, setEmails] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [tokenExists, setTokenExists] = React.useState(false);
+
+  React.useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("googleAccessToken") : null;
+    if (!token) {
+      setTokenExists(false);
+      return;
+    }
+    setTokenExists(true);
+    setLoading(true);
+    fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=8", {
+      headers: { "Authorization": `Bearer ${token}` }
+    })
+      .then(r => {
+        if (!r.ok) throw new Error("Failed to fetch Gmail list");
+        return r.json();
+      })
+      .then(async (data) => {
+        const msgs = data.messages || [];
+        const details = await Promise.all(
+          msgs.map(async (m: any) => {
+            try {
+              const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}`, {
+                headers: { "Authorization": `Bearer ${token}` }
+              });
+              if (res.ok) return res.json();
+            } catch (e) {
+              console.error(e);
+            }
+            return null;
+          })
+        );
+        const validDetails = details.filter(Boolean);
+        setEmails(validDetails.map((d: any) => {
+          const headers = d.payload?.headers || [];
+          const subject = headers.find((h: any) => h.name.toLowerCase() === "subject")?.value || "(No Subject)";
+          const from = headers.find((h: any) => h.name.toLowerCase() === "from")?.value || "(Unknown Sender)";
+          return {
+            id: d.id,
+            from,
+            subject,
+            summary: d.snippet || "",
+            urgency: /urgent|important/i.test(d.snippet + subject) ? "HIGH" : "LOW",
+            receivedAt: d.internalDate ? new Date(parseInt(d.internalDate)).toISOString() : new Date().toISOString()
+          };
+        }));
+      })
+      .catch(e => {
+        console.error("Error fetching live emails:", e);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
       <Card>
         <CardHeader>
           <CardTitle>Urgent Emails</CardTitle>
-          <CardDescription>Gmail API scaffold reads metadata, summarizes, and waits before sending.</CardDescription>
+          <CardDescription>
+            {tokenExists ? "Real-time Gmail inbox messages." : "Google Account required."}
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          {snapshot.emails.map((email) => (
-            <div key={email.id} className="rounded-lg border border-border bg-background/50 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="font-medium">{email.subject}</div>
-                <RiskBadge level={email.urgency} />
-              </div>
-              <p className="mt-2 text-sm text-muted-foreground">{email.summary}</p>
-              <div className="mt-3 text-xs text-muted-foreground">
-                From {email.from} - {formatRelativeTime(email.receivedAt)}
-              </div>
+          {loading ? (
+            <div className="flex h-32 items-center justify-center">
+              <Loader2 className="size-6 animate-spin text-emerald-500" />
             </div>
-          ))}
+          ) : !tokenExists ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              Please sign in with Google to view and sync your actual emails.
+            </div>
+          ) : emails.length === 0 ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              No emails found in your Gmail inbox.
+            </div>
+          ) : (
+            emails.map((email) => (
+              <div key={email.id} className="rounded-lg border border-border bg-background/50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-medium text-sm truncate max-w-[200px]">{email.subject}</div>
+                  <RiskBadge level={email.urgency} />
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground line-clamp-2">{email.summary}</p>
+                <div className="mt-3 text-[10px] text-muted-foreground/80">
+                  From: {email.from} · {formatRelativeTime(email.receivedAt)}
+                </div>
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Suggested Reply</CardTitle>
-          <CardDescription>Approval-first draft; no email is sent automatically.</CardDescription>
+          <CardTitle>Suggested Draft Reply</CardTitle>
+          <CardDescription>Generated for your most urgent thread.</CardDescription>
         </CardHeader>
         <CardContent className="rounded-lg border border-border bg-background/50 p-4 text-sm leading-6 text-muted-foreground">
-          Thanks for the reminder. I am finishing the review package and will share the final deck before the Friday
-          standup. I will include the one-page summary and highlight the open decisions clearly.
+          {emails.length > 0 ? (
+            `Regarding: "${emails[0].subject}"\n\nHi,\n\nI am reviewing your message and will provide the requested details shortly.\n\nBest regards,\nDeepak`
+          ) : (
+            "No active threads. When you receive a message, WokAI will automatically prepare proposed drafts here."
+          )}
         </CardContent>
       </Card>
     </div>
@@ -450,71 +538,177 @@ function InboxPage({ snapshot }: { snapshot: WorkspaceSnapshot }) {
 }
 
 function CalendarPage({ snapshot }: { snapshot: WorkspaceSnapshot }) {
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [events, setEvents] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [tokenExists, setTokenExists] = React.useState(false);
 
-  if (!mounted) {
-    return (
-      <div className="flex h-32 items-center justify-center">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  React.useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("googleAccessToken") : null;
+    if (!token) {
+      setTokenExists(false);
+      return;
+    }
+    setTokenExists(true);
+    setLoading(true);
+    fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?maxResults=10&timeMin=${new Date().toISOString()}&singleEvents=true&orderBy=startTime`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    })
+      .then(r => {
+        if (!r.ok) throw new Error("Failed to fetch Calendar events");
+        return r.json();
+      })
+      .then(data => {
+        const items = data.items || [];
+        setEvents(items.map((evt: any) => ({
+          id: evt.id,
+          title: evt.summary || "(No Title)",
+          start: evt.start?.dateTime || evt.start?.date || new Date().toISOString(),
+          end: evt.end?.dateTime || evt.end?.date || new Date().toISOString(),
+          risk: /deadline|critical|due|exam/i.test(evt.summary + (evt.description || "")) ? "HIGH" : "LOW"
+        })));
+      })
+      .catch(e => {
+        console.error("Error fetching live calendar:", e);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      {snapshot.events.map((event) => (
-        <Card key={event.id}>
-          <CardHeader>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <CardTitle>{event.title}</CardTitle>
-                <CardDescription>
-                  {new Date(event.start).toLocaleString()} - {new Date(event.end).toLocaleTimeString()}
-                </CardDescription>
-              </div>
-              {event.risk ? <RiskBadge level={event.risk} /> : null}
-            </div>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            <Badge variant="outline">Conflict check ready</Badge>
-            <Badge variant="outline">Travel buffer optional</Badge>
-            <Badge variant="outline">Prep plan available</Badge>
+      {loading ? (
+        <div className="col-span-2 flex h-32 items-center justify-center">
+          <Loader2 className="size-6 animate-spin text-emerald-500" />
+        </div>
+      ) : !tokenExists ? (
+        <Card className="col-span-2">
+          <CardContent className="p-8 text-center text-sm text-muted-foreground">
+            Please sign in with Google to view your actual calendar events.
           </CardContent>
         </Card>
-      ))}
+      ) : events.length === 0 ? (
+        <Card className="col-span-2">
+          <CardContent className="p-8 text-center text-sm text-muted-foreground">
+            No upcoming events found on your primary Google Calendar.
+          </CardContent>
+        </Card>
+      ) : (
+        events.map((event) => (
+          <Card key={event.id}>
+            <CardHeader>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base">{event.title}</CardTitle>
+                  <CardDescription className="text-xs mt-1">
+                    {new Date(event.start).toLocaleString()} - {new Date(event.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </CardDescription>
+                </div>
+                {event.risk ? <RiskBadge level={event.risk} /> : null}
+              </div>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2 text-xs">
+              <Badge variant="outline">Conflict check ready</Badge>
+              <Badge variant="outline">Travel buffer optional</Badge>
+              <Badge variant="outline">Prep plan available</Badge>
+            </CardContent>
+          </Card>
+        ))
+      )}
     </div>
   );
 }
 
 function DrivePage() {
-  const files = [
-    { title: "Chemistry Notes.pdf", type: "PDF", icon: FileText },
-    { title: "Investor Pitch Outline", type: "Docs", icon: FileText },
-    { title: "Deadline Tracker", type: "Sheets", icon: Sheet },
-    { title: "Founder Update Deck", type: "Slides", icon: Presentation }
-  ];
+  const [files, setFiles] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [tokenExists, setTokenExists] = React.useState(false);
+
+  React.useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("googleAccessToken") : null;
+    if (!token) {
+      setTokenExists(false);
+      return;
+    }
+    setTokenExists(true);
+    setLoading(true);
+    fetch("https://www.googleapis.com/drive/v3/files?pageSize=12&fields=files(id,name,mimeType,webViewLink)&q=trashed=false", {
+      headers: { "Authorization": `Bearer ${token}` }
+    })
+      .then(r => {
+        if (!r.ok) throw new Error("Failed to fetch Drive files");
+        return r.json();
+      })
+      .then(data => {
+        setFiles(data.files || []);
+      })
+      .catch(e => {
+        console.error("Error fetching live Drive files:", e);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const getFileIcon = (mimeType: string) => {
+    if (mimeType.includes("document")) return FileText;
+    if (mimeType.includes("spreadsheet")) return Sheet;
+    if (mimeType.includes("presentation")) return Presentation;
+    return FileText;
+  };
+
+  const getFileTypeName = (mimeType: string) => {
+    if (mimeType.includes("document")) return "Docs";
+    if (mimeType.includes("spreadsheet")) return "Sheets";
+    if (mimeType.includes("presentation")) return "Slides";
+    if (mimeType.includes("pdf")) return "PDF";
+    return "File";
+  };
+
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      {files.map((file) => (
-        <Card key={file.title}>
-          <CardHeader>
-            <div className="flex size-11 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
-              <file.icon />
-            </div>
-            <CardTitle>{file.title}</CardTitle>
-            <CardDescription>{file.type} integration scaffold</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" className="w-full">
-              <Search data-icon="inline-start" />
-              Find related work
-            </Button>
+      {loading ? (
+        <div className="col-span-full flex h-32 items-center justify-center">
+          <Loader2 className="size-6 animate-spin text-emerald-500" />
+        </div>
+      ) : !tokenExists ? (
+        <Card className="col-span-full">
+          <CardContent className="p-8 text-center text-sm text-muted-foreground">
+            Please sign in with Google to search and view your Google Drive files.
           </CardContent>
         </Card>
-      ))}
+      ) : files.length === 0 ? (
+        <Card className="col-span-full">
+          <CardContent className="p-8 text-center text-sm text-muted-foreground">
+            No files found in your Google Drive.
+          </CardContent>
+        </Card>
+      ) : (
+        files.map((file) => {
+          const Icon = getFileIcon(file.mimeType);
+          return (
+            <Card key={file.id}>
+              <CardHeader className="pb-3">
+                <div className="flex size-11 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+                  <Icon className="size-5" />
+                </div>
+                <CardTitle className="text-sm truncate mt-2 max-w-[200px]" title={file.name}>
+                  {file.name}
+                </CardTitle>
+                <CardDescription className="text-xs">{getFileTypeName(file.mimeType)}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  variant="outline"
+                  className="w-full text-xs"
+                  onClick={() => {
+                    if (file.webViewLink) window.open(file.webViewLink, "_blank");
+                  }}
+                >
+                  <Search className="mr-2 size-3" />
+                  View File
+                </Button>
+              </CardContent>
+            </Card>
+          );
+        })
+      )}
     </div>
   );
 }
