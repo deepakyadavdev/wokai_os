@@ -275,34 +275,27 @@ async function generateAgent4Content(
   actions: WokaiAction[],
   geminiKey?: string,
   googleToken?: string
-): Promise<Array<{ id: string; content: string }>> {
+): Promise<Array<{ id: string; title: string; content: string }>> {
   const promptText = `
-You are WokAI Agent 4 (Content Generator). Your job is to generate the precise content/payload that should be added or used when executing each tool in the action plan.
-For each action, you must generate the detailed content based on the user's request:
-- For "docs.create": Write the actual full text content of the document (use proper markdown headings like "# Heading", introduction, sections, bullet points, etc. to make it a complete draft).
-- For "gmail.send": Write the actual full email body to be sent.
-- For "gmail.search": Write the raw search query string.
-- For "gmail.summarize": Write specific instructions on what to summarize.
-- For "calendar.createEvent": Write a descriptive explanation/agenda for the event.
-- For "calendar.listEvents": Write the search/filter query.
-- For "calendar.deleteEvent": Write the details of the event to target.
-- For "sheets.createTracker": Write a CSV-like representation of the initial rows and columns (e.g. Header1,Header2\\nValue1,Value2).
-- For "slides.createDeck": Write a detailed slide-by-slide outline structure.
-- For "devices.terminal": Write the exact terminal command(s) to run.
-- For "devices.openApp": Write the target application or details.
-- For "devices.fileAccess": Write the search pattern or directory path.
-- For "calls.prepare": Write the exact phone script.
-- For "browser.plan": Write the specific automation steps.
-- For "search.google": Write the query to search.
-- For "maps.getDirections": Write the origin and destination details.
-- For any other tool: Write appropriate content.
+You are WokAI Agent 4 (Content Generator). Your job is to generate BOTH:
+1. A precise, dynamic "title" (the name/title of the document, sheet, presentation, email subject, calendar event, or terminal command description).
+2. The detailed "content" (payload/body/script) to be used when executing the action.
+
+You MUST suggest appropriate titles and contents depending on the tool:
+- For "docs.create": "title" is the name of the document, and "content" is the full document text draft in markdown (with proper headings).
+- For "sheets.createTracker": "title" is the name of the tracker sheet, and "content" is the CSV-like rows/columns text.
+- For "slides.createDeck": "title" is the topic/presentation title, and "content" is the slide-by-slide outline.
+- For "gmail.send": "title" is the email subject, and "content" is the full email body.
+- For "calendar.createEvent": "title" is the event title/summary, and "content" is the detailed description/agenda.
+- For "devices.terminal": "title" is a short description of the command, and "content" is the exact terminal command line.
+- For all other tools: "title" is a descriptive name, and "content" is the instruction details.
 
 User Request: "${message}"
 Current Action Plan: ${JSON.stringify(actions)}
 
-Return strict JSON ONLY. Do NOT wrap it in markdown codeblocks. The output must be a JSON array of objects, where each object has "id" and "content" fields:
+Return strict JSON ONLY. Do NOT wrap it in markdown codeblocks. The output must be a JSON array of objects, where each object has "id", "title", and "content" fields:
 [
-  { "id": "action-xxx", "content": "..." }
+  { "id": "action-xxx", "title": "...", "content": "..." }
 ]
 `;
 
@@ -374,7 +367,7 @@ Return strict JSON ONLY. Do NOT wrap it in markdown codeblocks. The output must 
   if (responseText) {
     try {
       const cleanJson = responseText.replace(/```json|```/g, "").trim();
-      return JSON.parse(cleanJson) as Array<{ id: string; content: string }>;
+      return JSON.parse(cleanJson) as Array<{ id: string; title: string; content: string }>;
     } catch (err) {
       console.error("Agent 4: Failed to parse generated content JSON:", err);
     }
@@ -691,7 +684,7 @@ User Message: "${message}"
       const actionContents = await generateAgent4Content(message, mergedActions, geminiKey, googleToken);
       mergedActions = mergedActions.map(action => {
         const found = actionContents.find((ac) => ac.id === action.id);
-        return found ? { ...action, content: found.content } : action;
+        return found ? { ...action, content: found.content, title: found.title } : action;
       });
     } catch (err) {
       console.error("WokAI Conductor: Agent 4 content generation failed:", err);

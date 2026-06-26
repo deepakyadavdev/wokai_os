@@ -826,17 +826,19 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
           } else {
             const toMatch = label.match(/to\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i) || label.match(/to\s+(\S+)/i);
             const recipient = toMatch ? toMatch[1] : "recipient@gmail.com";
-            let subject = "Message from WokAI OS";
+            let subject = action?.title || "Message from WokAI OS";
             let body = action?.content || label;
 
-            if (action?.content) {
-              const firstLine = action.content.split("\n")[0].replace(/[#*_\r]/g, "").trim();
-              subject = firstLine.slice(0, 50) || "Message from WokAI OS";
-            } else {
-              const aboutMatch = label.match(/about\s+(.+)/i) || label.match(/body\s+(.+)/i);
-              if (aboutMatch && aboutMatch[1]) {
-                subject = aboutMatch[1].slice(0, 40) + "...";
-                body = aboutMatch[1];
+            if (!action?.title) {
+              if (action?.content) {
+                const firstLine = action.content.split("\n")[0].replace(/[#*_\r]/g, "").trim();
+                subject = firstLine.slice(0, 50) || "Message from WokAI OS";
+              } else {
+                const aboutMatch = label.match(/about\s+(.+)/i) || label.match(/body\s+(.+)/i);
+                if (aboutMatch && aboutMatch[1]) {
+                  subject = aboutMatch[1].slice(0, 40) + "...";
+                  body = aboutMatch[1];
+                }
               }
             }
 
@@ -888,17 +890,19 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             output = "Error: Google access token not found. Please log out and sign in again with Google to authorize.";
             finalStatus = "FAILED";
           } else {
-            let summary = "WokAI Task Focus Meeting";
+            let summary = action?.title || "WokAI Task Focus Meeting";
             let start = new Date(Date.now() + 60 * 60 * 1000);
             let end = new Date(Date.now() + 120 * 60 * 1000);
 
-            const forMatch = label.match(/for\s+(.+?)(?:\s+at|\s+from|\s+today|\s+tomorrow|$)/i) || label.match(/meeting\s+with\s+(.+?)(?:\s+at|\s+from|\s+today|\s+tomorrow|$)/i);
-            if (forMatch && forMatch[1]) {
-              summary = forMatch[1].trim();
-            } else {
-              const summaryMatch = label.match(/event\s+([a-zA-Z0-9\s]+)/i);
-              if (summaryMatch && summaryMatch[1]) {
-                summary = summaryMatch[1].trim();
+            if (!action?.title) {
+              const forMatch = label.match(/for\s+(.+?)(?:\s+at|\s+from|\s+today|\s+tomorrow|$)/i) || label.match(/meeting\s+with\s+(.+?)(?:\s+at|\s+from|\s+today|\s+tomorrow|$)/i);
+              if (forMatch && forMatch[1]) {
+                summary = forMatch[1].trim();
+              } else {
+                const summaryMatch = label.match(/event\s+([a-zA-Z0-9\s]+)/i);
+                if (summaryMatch && summaryMatch[1]) {
+                  summary = summaryMatch[1].trim();
+                }
               }
             }
 
@@ -1028,10 +1032,12 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             output = "Error: Google access token not found.";
             finalStatus = "FAILED";
           } else {
-            let title = label;
-            const titleMatch = label.match(/(?:create|draft)\s+(?:doc|document)?\s*(?:for|named|titled)?\s*['"]?([^'"]+)['"]?/i);
-            if (titleMatch && titleMatch[1]) {
-              title = titleMatch[1];
+            let title = action?.title || label;
+            if (!action?.title) {
+              const titleMatch = label.match(/(?:create|draft)\s+(?:doc|document)?\s*(?:for|named|titled)?\s*['"]?([^'"]+)['"]?/i);
+              if (titleMatch && titleMatch[1]) {
+                title = titleMatch[1];
+              }
             }
             const { signal, clear } = createTimeoutSignal();
             try {
@@ -1098,10 +1104,12 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             output = "Error: Google access token not found.";
             finalStatus = "FAILED";
           } else {
-            let title = label;
-            const titleMatch = label.match(/(?:create|draft)\s+(?:sheet|tracker|budget)?\s*(?:for|named|titled)?\s*['"]?([^'"]+)['"]?/i);
-            if (titleMatch && titleMatch[1]) {
-              title = titleMatch[1];
+            let title = action?.title || label;
+            if (!action?.title) {
+              const titleMatch = label.match(/(?:create|draft)\s+(?:sheet|tracker|budget)?\s*(?:for|named|titled)?\s*['"]?([^'"]+)['"]?/i);
+              if (titleMatch && titleMatch[1]) {
+                title = titleMatch[1];
+              }
             }
             const { signal, clear } = createTimeoutSignal();
             try {
@@ -1170,10 +1178,12 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             output = "Error: Google access token not found.";
             finalStatus = "FAILED";
           } else {
-            let title = label;
-            const titleMatch = label.match(/(?:create|draft)\s+(?:slides|presentation|deck)?\s*(?:for|named|titled)?\s*['"]?([^'"]+)['"]?/i);
-            if (titleMatch && titleMatch[1]) {
-              title = titleMatch[1];
+            let title = action?.title || label;
+            if (!action?.title) {
+              const titleMatch = label.match(/(?:create|draft)\s+(?:slides|presentation|deck)?\s*(?:for|named|titled)?\s*['"]?([^'"]+)['"]?/i);
+              if (titleMatch && titleMatch[1]) {
+                title = titleMatch[1];
+              }
             }
             const { signal, clear } = createTimeoutSignal();
             try {

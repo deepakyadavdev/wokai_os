@@ -76,6 +76,7 @@ export interface WokaiAction {
   createdAt: string;
   output?: string;
   content?: string;
+  title?: string;
 }
 
 export interface WokaiDevice {
