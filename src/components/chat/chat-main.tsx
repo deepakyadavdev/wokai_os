@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/components/auth/auth-provider";
 import { ActionCards } from "@/components/chat/action-cards";
 import { WelcomeScreen } from "@/components/chat/welcome-screen";
+import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceData } from "@/hooks/use-workspace-data";
 import { useChatSessions } from "@/hooks/use-chat-sessions";
@@ -317,7 +318,11 @@ export function ChatMain() {
                         : "mr-auto max-w-[85%] rounded-2xl rounded-bl-sm border border-border/50 bg-card/90"
                     )}
                   >
-                    <p className="whitespace-pre-wrap">{message.content}</p>
+                    {message.role === "user" ? (
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                    ) : (
+                      <MarkdownRenderer content={message.content} />
+                    )}
 
                     {/* Rich action cards beneath assistant messages */}
                     {message.result && (

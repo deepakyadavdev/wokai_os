@@ -748,8 +748,8 @@ User Message: "${message}"
     onProgress?.("agent4");
     try {
       const actionContents = await generateAgent4Content(message, mergedActions, geminiKey, googleToken);
-      mergedActions = mergedActions.map(action => {
-        const found = actionContents.find((ac) => ac.id === action.id);
+      mergedActions = mergedActions.map((action, idx) => {
+        const found = actionContents.find((ac) => ac.id === action.id) || actionContents[idx];
         return found ? { ...action, content: found.content, title: found.title } : action;
       });
     } catch (err) {

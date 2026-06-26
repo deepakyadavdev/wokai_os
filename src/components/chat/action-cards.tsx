@@ -1058,6 +1058,10 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
               const documentId = data.documentId;
 
               if (action?.content) {
+                let docContent = action.content.trim();
+                // Strip markdown code fences if present
+                docContent = docContent.replace(/^```[a-zA-Z]*\n?|```$/g, "").trim();
+
                 console.log(`[WokAI OS] [Docs API] Writing content to document ${documentId}...`);
                 const updateRes = await fetch(`https://docs.googleapis.com/v1/documents/${documentId}:batchUpdate`, {
                   method: "POST",
@@ -1069,7 +1073,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
                     requests: [
                       {
                         insertText: {
-                          text: action.content,
+                          text: docContent,
                           location: { index: 1 }
                         }
                       }
@@ -1131,16 +1135,28 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
 
               if (action?.content) {
                 console.log(`[WokAI OS] [Sheets API] Populating spreadsheet ${spreadsheetId} data...`);
+                let contentText = action.content.trim();
+                // Strip markdown code fences if present (e.g. ```csv or ```)
+                contentText = contentText.replace(/^```[a-zA-Z]*\n?|```$/g, "").trim();
+
                 let rows: string[][] = [];
-                if (action.content.includes("\n") || action.content.includes(",")) {
-                  rows = action.content.split("\n").map(row => 
+                if (contentText.includes("|")) {
+                  const lines = contentText.split("\n").map(line => line.trim()).filter(line => line.length > 0);
+                  const tableLines = lines.filter(line => !/^\|?[\s-|\s:]+$/g.test(line));
+                  rows = tableLines.map(line => {
+                    const parts = line.split("|").map(cell => cell.trim());
+                    if (parts[0] === "" && line.startsWith("|")) parts.shift();
+                    if (parts[parts.length - 1] === "" && line.endsWith("|")) parts.pop();
+                    return parts;
+                  });
+                } else {
+                  rows = contentText.split("\n").map(row => 
                     row.split(",").map(cell => cell.trim().replace(/^"(.*)"$/, '$1'))
                   );
-                } else {
-                  rows = [[action.content]];
                 }
 
-                const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1?valueInputOption=USER_ENTERED`, {
+                const sheetTitle = data.sheets?.[0]?.properties?.title || "Sheet1";
+                const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetTitle)}!A1?valueInputOption=USER_ENTERED`, {
                   method: "PUT",
                   headers: {
                     "Authorization": `Bearer ${token}`,

@@ -6,6 +6,7 @@ import { ArrowUp, CheckCircle2, Clock, Loader2, ShieldAlert, Sparkles } from "lu
 import { toast } from "sonner";
 
 import { RiskBadge } from "@/components/risk-badge";
+import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -167,7 +168,11 @@ export function ChatConsole({
                       : "max-w-[94%] rounded-lg border border-border bg-background/70 px-4 py-3 text-sm"
                   }
                 >
-                  <p className="leading-6">{message.content}</p>
+                  {message.role === "user" ? (
+                    <p className="leading-6">{message.content}</p>
+                  ) : (
+                    <MarkdownRenderer content={message.content} />
+                  )}
                   {message.result ? <AgentResult result={message.result} /> : null}
                 </motion.div>
               ))}
