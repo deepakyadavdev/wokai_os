@@ -655,8 +655,18 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
       let output = "Action completed successfully.";
       let finalStatus: ActionStatus = "COMPLETED";
 
-      // 10 second timeout controller helper
-      const createTimeoutSignal = (timeoutMs = 10000) => {
+      // Dynamically detect WokAI Local Companion daemon on port 4317
+      let localHost = "";
+      try {
+        const checkRes = await fetch("http://localhost:4317/health").catch(() => null);
+        if (checkRes && checkRes.ok) {
+          localHost = "http://localhost:4317";
+          console.log("[WokAI OS] Local Companion daemon detected at http://localhost:4317. Routing actions locally!");
+        }
+      } catch (e) {}
+
+      // 15 second timeout controller helper
+      const createTimeoutSignal = (timeoutMs = 15000) => {
         const controller = new AbortController();
         const id = setTimeout(() => {
           console.warn(`[WokAI OS] Request to ${tool} timed out after ${timeoutMs}ms. Aborting...`);
@@ -669,9 +679,10 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
         if (tool === "browser.plan") {
           const goal = action?.content || label;
           console.log(`[WokAI OS] [Browser Agent] Triggering local browser agent for goal: "${goal}"`);
-          const { signal, clear } = createTimeoutSignal(15000); // Browser task can take slightly longer
+          const { signal, clear } = createTimeoutSignal(30000); // Browser task can take longer
           try {
-            const res = await fetch("/api/browser-agent", {
+            const endpoint = localHost ? `${localHost}/browser/run` : "/api/browser-agent";
+            const res = await fetch(endpoint, {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ goal }),
@@ -680,7 +691,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             console.log(`[WokAI OS] [Browser Agent] Response Status: ${res.status}`);
             const data = await res.json();
             console.log(`[WokAI OS] [Browser Agent] Response Data:`, data);
-            output = data.currentStep || "Successfully completed form fill and submission on Playwright agent.";
+            output = data.message || data.currentStep || "Successfully completed form fill and submission on Playwright agent.";
           } catch (err: any) {
             console.error(`[WokAI OS] [Browser Agent] Fetch Error:`, err);
             throw err;
@@ -724,10 +735,11 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             }
           }
 
-          console.log(`[WokAI OS] [Terminal Exec] Posting local shell command: "${command}" to /api/devices/exec`);
+          console.log(`[WokAI OS] [Terminal Exec] Posting local shell command: "${command}"`);
           const { signal, clear } = createTimeoutSignal();
           try {
-            const res = await fetch("/api/devices/exec", {
+            const endpoint = localHost ? `${localHost}/exec` : "/api/devices/exec";
+            const res = await fetch(endpoint, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ command }),
@@ -1479,7 +1491,8 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
               }
             }
 
-            const res = await fetch("/api/devices/exec", {
+            const endpoint = localHost ? `${localHost}/exec` : "/api/devices/exec";
+            const res = await fetch(endpoint, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ command }),
