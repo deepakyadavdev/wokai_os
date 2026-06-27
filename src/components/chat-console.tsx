@@ -21,6 +21,32 @@ interface Message {
   result?: AgentPlan;
 }
 
+const PHASE_ORDER = [
+  "routing",
+  "agentA",
+  "agent1",
+  "agentB",
+  "agent2",
+  "agent4",
+  "agent3",
+  "agent#",
+  "agent5",
+  "api"
+];
+
+const PHASE_DETAILS: Record<string, string> = {
+  routing: "Routing request & preparing workspace",
+  agentA: "Agent A: Human worker thinking",
+  agent1: "Agent 1: Structuring reply",
+  agentB: "Agent B: Comparing steps with tools",
+  agent2: "Agent 2: Finalizing action plan",
+  agent4: "Agent 4: Generating content drafts",
+  agent3: "Agent 3: Preparing API execution layers",
+  "agent#": "Agent #: Matching reply with actions",
+  agent5: "Agent 5: Quality assurance review",
+  api: "Conductor: Preparing API layers"
+};
+
 const examples = [
   "My project presentation is due tomorrow.",
   "Schedule a team sync meeting tomorrow at 4 PM.",
@@ -183,29 +209,31 @@ export function ChatConsole({
               ))}
             </AnimatePresence>
             {pending ? (
-              <div className="flex items-center gap-2 rounded-lg border border-border bg-background/60 px-4 py-3 text-sm text-muted-foreground">
-                <Loader2 className="animate-spin" />
-                {progressStatus === "routing"
-                  ? "Routing request..."
-                  : progressStatus === "agentA"
-                  ? "Agent A: Human worker thinking..."
-                  : progressStatus === "agentB"
-                  ? "Agent B: Comparing steps with tools..."
-                  : progressStatus === "agent1"
-                  ? "Agent 1: Structuring reply..."
-                  : progressStatus === "agent2"
-                  ? "Agent 2: Finalizing action plan..."
-                  : progressStatus === "agent3"
-                  ? "Agent 3: Preparing API execution layers..."
-                  : progressStatus === "agent4"
-                  ? "Agent 4: Generating content drafts..."
-                  : progressStatus === "agent#"
-                  ? "Agent #: Matching reply with actions..."
-                  : progressStatus === "agent5"
-                  ? "Agent 5: Quality assurance review..."
-                  : progressStatus === "api"
-                  ? "Conductor: Preparing API layers..."
-                  : "WokAI is thinking..."}
+              <div className="flex flex-col gap-2 rounded-lg border border-border bg-background/60 px-4 py-3.5 text-xs font-mono text-muted-foreground w-full">
+                <div className="flex items-center justify-between border-b border-border/40 pb-1.5 mb-1 text-sm font-medium text-foreground/80 font-sans">
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    Agent Planning Pipeline
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {PHASE_ORDER.slice(0, PHASE_ORDER.indexOf(progressStatus || "routing") + 1).map((phaseId, index, arr) => {
+                    const isDone = index < arr.length - 1;
+                    const label = PHASE_DETAILS[phaseId] || phaseId;
+                    return (
+                      <div key={phaseId} className="flex items-center gap-2">
+                        {isDone ? (
+                          <span className="text-emerald-400 font-bold">✓</span>
+                        ) : (
+                          <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
+                        )}
+                        <span className={isDone ? "text-muted-foreground/75" : "text-amber-400 font-medium animate-pulse"}>
+                          {label}... {isDone ? "Done" : "Thinking"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             ) : null}
           </div>

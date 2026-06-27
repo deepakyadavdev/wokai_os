@@ -28,48 +28,75 @@ import { getGoogleToken } from "@/lib/google/token";
 
 /* ─────────────────────────── Loading dots ─────────────────────────── */
 
+const PHASE_ORDER = [
+  "routing",
+  "agentA",
+  "agent1",
+  "agentB",
+  "agent2",
+  "agent4",
+  "agent3",
+  "agent#",
+  "agent5",
+  "api"
+];
+
+const PHASE_DETAILS: Record<string, string> = {
+  routing: "Routing request & preparing workspace",
+  agentA: "Agent A: Human worker thinking",
+  agent1: "Agent 1: Structuring reply",
+  agentB: "Agent B: Comparing steps with tools",
+  agent2: "Agent 2: Finalizing action plan",
+  agent4: "Agent 4: Generating content drafts",
+  agent3: "Agent 3: Preparing API execution layers",
+  "agent#": "Agent #: Matching reply with actions",
+  agent5: "Agent 5: Quality assurance review",
+  api: "Conductor: Preparing API layers"
+};
+
 function ThinkingIndicator({ status }: { status: string }) {
-  const getStatusText = () => {
-    switch (status) {
-      case "routing":
-        return "Routing request...";
-      case "agent1":
-        return "Agent 1: Generating response...";
-      case "agent2":
-        return "Agent 2: Structuring plan...";
-      case "agent3":
-        return "Agent 3: Analyzing context...";
-      case "agent4":
-        return "Agent 4: Generating tool content...";
-      case "agent#":
-        return "Agent #: Summarizing plan details...";
-      case "agent5":
-        return "Agent 5: Reviewing quality & approving...";
-      case "api":
-        return "Conductor: Preparing API layers...";
-      default:
-        return "WokAI is thinking...";
-    }
-  };
+  const currentIndex = PHASE_ORDER.indexOf(status);
+  const activeIndex = currentIndex === -1 ? 0 : currentIndex;
+  const visiblePhases = PHASE_ORDER.slice(0, activeIndex + 1);
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
-      className="mr-auto flex max-w-[85%] items-center gap-3 rounded-2xl rounded-bl-sm border border-border/50 bg-card/90 px-4 py-3"
+      className="mr-auto flex flex-col gap-2.5 max-w-[85%] rounded-2xl rounded-bl-sm border border-border/50 bg-card/90 px-4 py-3 shadow-md"
     >
-      <span className="text-sm text-muted-foreground">{getStatusText()}</span>
-      <span className="flex items-center gap-1">
-        {[0, 1, 2].map((i) => (
-          <motion.span
-            key={i}
-            className="block h-1.5 w-1.5 rounded-full bg-emerald-400"
-            animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.1, 0.8] }}
-            transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
-          />
-        ))}
-      </span>
+      <div className="flex items-center justify-between border-b border-border/40 pb-1.5 mb-1 w-full gap-8">
+        <span className="text-xs font-semibold text-foreground/80 tracking-wide">Work Conductor Execution Log</span>
+        <span className="flex items-center gap-1">
+          {[0, 1, 2].map((i) => (
+            <motion.span
+              key={i}
+              className="block h-1.5 w-1.5 rounded-full bg-emerald-400"
+              animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.1, 0.8] }}
+              transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
+            />
+          ))}
+        </span>
+      </div>
+      <div className="flex flex-col gap-1.5 text-xs font-mono text-muted-foreground min-w-[280px]">
+        {visiblePhases.map((phaseId, index) => {
+          const isDone = index < activeIndex;
+          const label = PHASE_DETAILS[phaseId] || phaseId;
+          return (
+            <div key={phaseId} className="flex items-center gap-2">
+              {isDone ? (
+                <span className="text-emerald-400 font-bold">✓</span>
+              ) : (
+                <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
+              )}
+              <span className={isDone ? "text-muted-foreground/75" : "text-amber-400 font-medium animate-pulse"}>
+                {label}... {isDone ? "Done" : "Thinking"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </motion.div>
   );
 }
