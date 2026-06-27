@@ -45,6 +45,16 @@ const BLOCKED_PATTERNS = [
 
 function isCommandAllowed(command: string): boolean {
   const trimmed = command.trim().toLowerCase();
+
+  // Exemption for safe base64 powershell files writing template
+  if (trimmed.startsWith("powershell -command \"[system.text.encoding]::utf8.getstring([system.convert]::frombase64string(")) {
+    return true;
+  }
+  // Exemption for safe powershell files reading template
+  if (trimmed.startsWith("powershell -command \"get-content -path '")) {
+    return true;
+  }
+
   const prefixAllowed = ALLOWED_PREFIXES.some((prefix) =>
     trimmed.startsWith(prefix.toLowerCase())
   );
