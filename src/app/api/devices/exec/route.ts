@@ -67,7 +67,13 @@ export async function POST(request: NextRequest) {
   // Verify authentication
   const authHeader = request.headers.get("authorization");
   const token = authHeader?.replace(/^Bearer\s+/i, "") || null;
-  const user = await verifyFirebaseToken(token);
+  let user = await verifyFirebaseToken(token);
+
+  // Allow bypass in local development mode for testing
+  if (!user && process.env.NODE_ENV === "development") {
+    console.log("[WokAI OS] Bypassing Firebase auth check in local development mode");
+    user = { uid: "local-dev-user" } as any;
+  }
 
   if (!user) {
     return NextResponse.json(
