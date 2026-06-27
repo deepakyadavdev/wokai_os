@@ -52,6 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const session = await res.json().catch(() => null);
           if (session && session.token && session.profile) {
             localStorage.setItem("googleAccessToken", session.token);
+            localStorage.setItem("googleTokenExpiry", String(Date.now() + 3600 * 1000));
             if (session.firebaseToken) {
               localStorage.setItem("firebaseToken", session.firebaseToken);
             }
@@ -157,7 +158,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const raw = decodeURIComponent(escape(atob(key.trim())));
           const data = JSON.parse(raw);
           if (data && data.profile) {
-            if (data.googleToken) localStorage.setItem("googleAccessToken", data.googleToken);
+            if (data.googleToken) {
+              localStorage.setItem("googleAccessToken", data.googleToken);
+              localStorage.setItem("googleTokenExpiry", String(Date.now() + 3600 * 1000));
+            }
             if (data.firebaseToken) localStorage.setItem("firebaseToken", data.firebaseToken);
             setUser(data.profile);
             return true;
