@@ -275,16 +275,32 @@ function CallCard({ action, onApprove }: { action: WokaiAction; onApprove: () =>
 
 /* ─────────────────────────── DRIVE card ─────────────────────────── */
 
-function DriveCard({ action }: { action: WokaiAction }) {
+function DriveCard({ action, onApprove }: { action: WokaiAction; onApprove: () => void }) {
+  const isDone = action.status === "COMPLETED";
+  const isFailed = action.status === "FAILED";
+  const isRunning = action.status === "RUNNING";
+  const needsApprove = action.status === "NEEDS_APPROVAL" || isRunning;
   return (
-    <ResultCard className="border-orange-500/30 bg-orange-500/10">
-      <CardHeader icon={HardDrive} label="File Located" iconClass="text-orange-400" />
+    <ResultCard className={isFailed ? "border-red-500/30 bg-red-500/10" : "border-orange-500/30 bg-orange-500/10"}>
+      <CardHeader
+        icon={HardDrive}
+        label={isDone ? "Drive Search Complete" : isFailed ? "Drive Search Failed" : "Drive Search Ready"}
+        iconClass={isFailed ? "text-red-400" : "text-orange-400"}
+      />
       <div className="space-y-1.5 text-sm">
-        <div>
-          <span className="text-muted-foreground">Action: </span>{action.label}
+        <div className="flex items-center gap-2 text-xs">
+          <StatusDot status={action.status} />
+          <span className="flex-1">{action.label}</span>
         </div>
         <ActionOutputView action={action} borderColor="border-orange-500/20" />
       </div>
+      {needsApprove && (
+        <div className="mt-3">
+          <Button size="sm" onClick={onApprove} className="bg-orange-600 text-white hover:bg-orange-500" disabled={isRunning}>
+            {isRunning ? <Loader2 className="size-3 animate-spin" /> : "Approve & Search"}
+          </Button>
+        </div>
+      )}
     </ResultCard>
   );
 }
@@ -1049,14 +1065,22 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             output = "Error: Google access token not found.";
             finalStatus = "FAILED";
           } else {
-            let query = "";
-            const qMatch = label.match(/search\s+['"]?([^'"]+)['"]?/i) || label.match(/find\s+['"]?([^'"]+)['"]?/i) || label.match(/for\s+['"]?([^'"]+)['"]?/i);
-            if (qMatch && qMatch[1]) {
-              query = `name contains '${qMatch[1]}' and `;
+            // Extract search term from action.content first, then fall back to label regex
+            let searchTerm = "";
+            if (action?.content && action.content.trim().length > 0) {
+              searchTerm = action.content.trim();
+            } else {
+              const qMatch = label.match(/search\s+(?:files\s+)?(?:for\s+)?['"]?([^'"]+)['"]?/i) || label.match(/find\s+['"]?([^'"]+)['"]?/i) || label.match(/for\s+['"]?([^'"]+)['"]?/i);
+              if (qMatch && qMatch[1]) {
+                searchTerm = qMatch[1].trim();
+              }
             }
+
+            const driveQuery = searchTerm ? `name contains '${searchTerm}' and trashed = false` : "trashed = false";
+            const driveFields = "files(id,name,mimeType,webViewLink,modifiedTime)";
             const { signal, clear } = createTimeoutSignal();
             try {
-              const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query + "trashed = false")}&pageSize=5`, {
+              const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(driveQuery)}&pageSize=10&fields=${encodeURIComponent(driveFields)}`, {
                 headers: { "Authorization": `Bearer ${token}` },
                 signal
               });
@@ -1065,11 +1089,17 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
                 throw new Error(`Drive search failed: ${errText}`);
               }
               const data = await res.json();
-              const files = data.files || [];
-              if (files.length === 0) {
-                output = "No matching files found in your Google Drive.";
+              const driveFiles = data.files || [];
+              if (driveFiles.length === 0) {
+                output = searchTerm
+                  ? `No files matching "${searchTerm}" found in your Google Drive.`
+                  : "No files found in your Google Drive.";
               } else {
-                output = `Found files in Google Drive:\n` + files.map((f: any) => `• ${f.name} (ID: ${f.id})`).join("\n");
+                output = `Found ${driveFiles.length} file(s) in Google Drive:\n` + driveFiles.map((f: any) => {
+                  const link = f.webViewLink ? ` — ${f.webViewLink}` : "";
+                  const modified = f.modifiedTime ? ` (modified: ${new Date(f.modifiedTime).toLocaleDateString()})` : "";
+                  return `• ${f.name}${modified}${link}`;
+                }).join("\n");
               }
             } catch (err: any) {
               console.error("[WokAI OS] [Drive API] Error:", err);
@@ -1947,7 +1977,13 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
           );
         }
         if (action.tool.startsWith("drive")) {
-          return <DriveCard key={action.id} action={action} />;
+          return (
+            <DriveCard
+              key={action.id}
+              action={action}
+              onApprove={() => handleApproveAction(action.id, action.tool, action.label)}
+            />
+          );
         }
         if (action.tool.startsWith("contacts")) {
           return (
