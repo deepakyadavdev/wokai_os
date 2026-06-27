@@ -273,19 +273,26 @@ async function callLLM(
   systemPrompt?: string,
   preferredModel?: string
 ): Promise<string> {
-  const apiKey = process.env.LLM_API_KEY || process.env.OPENROUTER_API_KEY;
+  let apiKey = (process.env.LLM_API_KEY || process.env.OPENROUTER_API_KEY || "").trim();
+  apiKey = apiKey.replace(/^["']|["']$/g, "").trim();
+
   let baseUrl = (process.env.LLM_BASE_URL || "https://openrouter.ai/api/v1/chat/completions").trim();
+  baseUrl = baseUrl.replace(/^["']|["']$/g, "").trim();
   
-  if (baseUrl && !/^https?:\/\//i.test(baseUrl)) {
-    baseUrl = `https://${baseUrl}`;
+  if (baseUrl) {
+    baseUrl = baseUrl.replace(/\/$/, "");
+    if (!/^https?:\/\//i.test(baseUrl)) {
+      baseUrl = `https://${baseUrl}`;
+    }
+    if (!baseUrl.endsWith("/chat/completions")) {
+      baseUrl = `${baseUrl}/chat/completions`;
+    }
   }
 
-  if (baseUrl && !baseUrl.endsWith("/chat/completions")) {
-    const normalized = baseUrl.replace(/\/$/, "");
-    baseUrl = `${normalized}/chat/completions`;
+  let model = (process.env.LLM_MODEL || "").trim().replace(/^["']|["']$/g, "");
+  if (!model) {
+    model = preferredModel || "meta-llama/llama-3.3-70b-instruct:free";
   }
-
-  const model = process.env.LLM_MODEL || preferredModel || "meta-llama/llama-3.3-70b-instruct:free";
 
   if (!apiKey) {
     console.warn("[WokAI Conductor] LLM API key missing. Returning mock response.");
