@@ -1329,7 +1329,7 @@ function SettingsPage({
 }) {
   const settings = [
     ["Firebase Auth", "Configured"],
-    ["Gemini API", "Server route uses GEMINI_API_KEY when present"],
+    ["LLM API / Gateway", "Server route uses LLM_API_KEY or OPENROUTER_API_KEY when present"],
     ["Google APIs", "OAuth scaffold ready for Gmail, Calendar, Drive, Docs, Sheets, Slides, People"],
     ["Twilio", "Optional outbound call adapter"],
     ["OMP", "Installed as dev dependency and documented in docs/omp-setup.md"]

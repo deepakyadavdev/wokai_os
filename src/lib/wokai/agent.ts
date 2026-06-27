@@ -1,5 +1,3 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
 import { demoSnapshot } from "@/lib/data/demo";
 import type { AgentPlan, RiskLevel, WokaiAction, WokaiMemory, WokaiTask } from "@/lib/types";
 import { getTool } from "@/lib/wokai/tools";
@@ -270,29 +268,23 @@ const OPENROUTER_MODELS_POOL = [
   "nvidia/nemotron-embed-vl-1b-v2:free"
 ];
 
-async function callOpenRouter(
+async function callLLM(
   prompt: string,
   systemPrompt?: string,
   preferredModel?: string
 ): Promise<string> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.LLM_API_KEY || process.env.OPENROUTER_API_KEY;
+  let baseUrl = process.env.LLM_BASE_URL || "https://openrouter.ai/api/v1/chat/completions";
+  
+  if (baseUrl && !baseUrl.endsWith("/chat/completions")) {
+    const normalized = baseUrl.replace(/\/$/, "");
+    baseUrl = `${normalized}/chat/completions`;
+  }
+
+  const model = process.env.LLM_MODEL || preferredModel || "meta-llama/llama-3.3-70b-instruct:free";
+
   if (!apiKey) {
-    const geminiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    if (geminiKey) {
-      try {
-        console.log("[WokAI Conductor] OpenRouter API key missing. Falling back to Gemini API.");
-        const genAI = new GoogleGenerativeAI(geminiKey);
-        const model = genAI.getGenerativeModel({
-          model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
-        });
-        const promptText = systemPrompt ? `${systemPrompt}\n\nUser Message:\n${prompt}` : prompt;
-        const result = await model.generateContent(promptText);
-        return result.response.text().trim();
-      } catch (err) {
-        console.error("[WokAI Conductor] Gemini fallback failed:", err);
-      }
-    }
-    console.warn("[WokAI Conductor] No API keys found. Returning mock response.");
+    console.warn("[WokAI Conductor] LLM API key missing. Returning mock response.");
     if (prompt.includes("approved")) {
       return JSON.stringify({ approved: true, feedback: "", refinedPrompt: "" });
     }
@@ -308,76 +300,47 @@ async function callOpenRouter(
     return "No API key configured. I will outline the required steps and run them locally.";
   }
 
-  const modelsToTry = [
-    preferredModel,
-    process.env.OPENROUTER_MODEL,
-    "qwen/qwen3-coder:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "meta-llama/llama-3.2-3b-instruct:free",
-    "openrouter/free"
-  ].filter(Boolean) as string[];
-
-  const uniqueModels = Array.from(new Set(modelsToTry));
-  let lastErrorMsg = "";
-
-  for (const model of uniqueModels) {
-    try {
-      console.log(`[WokAI Conductor] Calling OpenRouter model: ${model}`);
-      const messages = [];
-      if (systemPrompt) {
-        messages.push({ role: "system", content: systemPrompt });
-      }
-      messages.push({ role: "user", content: prompt });
-
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://wokai.app",
-          "X-Title": "WokAI OS"
-        },
-        body: JSON.stringify({
-          model,
-          messages
-        })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (content) {
-          return content.trim();
-        }
-      } else {
-        const errText = await res.text().catch(() => "");
-        lastErrorMsg = `Status ${res.status}: ${errText}`;
-        console.warn(`[WokAI Conductor] OpenRouter failed for model ${model} with status ${res.status}: ${errText}`);
-      }
-    } catch (err: any) {
-      lastErrorMsg = err instanceof Error ? err.message : String(err);
-      console.error(`[WokAI Conductor] OpenRouter exception for model ${model}:`, err);
+  try {
+    console.log(`[WokAI Conductor] Calling LLM API: ${baseUrl} with model: ${model}`);
+    const messages = [];
+    if (systemPrompt) {
+      messages.push({ role: "system", content: systemPrompt });
     }
-  }
+    messages.push({ role: "user", content: prompt });
 
-  // Attempt Gemini fallback as a last resort before giving up
-  const geminiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  if (geminiKey) {
-    try {
-      console.log("[WokAI Conductor] All OpenRouter models failed. Falling back to Gemini API.");
-      const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({
-        model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
-      });
-      const promptText = systemPrompt ? `${systemPrompt}\n\nUser Message:\n${prompt}` : prompt;
-      const result = await model.generateContent(promptText);
-      return result.response.text().trim();
-    } catch (err) {
-      console.error("[WokAI Conductor] Gemini fallback after OpenRouter failure failed:", err);
+    const headers: Record<string, string> = {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    };
+
+    if (baseUrl.includes("openrouter.ai")) {
+      headers["HTTP-Referer"] = "https://wokai.app";
+      headers["X-Title"] = "WokAI OS";
     }
-  }
 
-  throw new Error(`All OpenRouter models failed to respond. Last error: ${lastErrorMsg || "Unknown error"}`);
+    const res = await fetch(baseUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model,
+        messages
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (content) {
+        return content.trim();
+      }
+    }
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Status ${res.status}: ${errText}`);
+  } catch (err: any) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[WokAI Conductor] LLM API exception for model ${model}:`, err);
+    throw new Error(`LLM API failed to respond: ${errorMsg}`);
+  }
 }
 
 async function runAgentA(userPrompt: string): Promise<string> {
@@ -385,7 +348,7 @@ async function runAgentA(userPrompt: string): Promise<string> {
 Your job is to think like a human worker hired by the user. When the user gives you a request or tells you to do something, think of all the things a real human could do to accomplish it, without any tool limitations.
 Create a detailed, step-by-step list of all the tasks you will perform, explaining line by line how you will complete each task. Speak in the first person ("I will...") and sound extremely proactive, competent, and thorough. Make it realistic and actionable.`;
 
-  return await callOpenRouter(userPrompt, systemPrompt, "meta-llama/llama-3.3-70b-instruct:free");
+  return await callLLM(userPrompt, systemPrompt, "meta-llama/llama-3.3-70b-instruct:free");
 }
 
 async function runAgentB(agentAOutput: string): Promise<string> {
@@ -421,7 +384,7 @@ For each step in Agent A's output:
 2. If there is no exact matching tool, replace that step with the best solution and tool we have (for example, if Agent A says "I will draw a logo", replace it with using search.google or a browser.plan to find a generator, or devices.terminal to run an image generation script).
 Provide the matching and adaptation as a clear list of matched/adapted steps with their assigned tools.`;
 
-  return await callOpenRouter(agentAOutput, systemPrompt, "qwen/qwen3-coder:free");
+  return await callLLM(agentAOutput, systemPrompt, "qwen/qwen3-coder:free");
 }
 
 async function runAgent1(agentAOutput: string, userPrompt: string): Promise<string> {
@@ -432,7 +395,7 @@ Avoid mentioning internal variables, technical JSON formats, or backend tool nam
 Keep it to 2-3 engaging, professional, and reassuring sentences.`;
 
   const prompt = `User's prompt: "${userPrompt}"\n\nAgent A's thinking/tasks:\n${agentAOutput}`;
-  return await callOpenRouter(prompt, systemPrompt, "meta-llama/llama-3.2-3b-instruct:free");
+  return await callLLM(prompt, systemPrompt, "meta-llama/llama-3.2-3b-instruct:free");
 }
 
 async function runAgent2(agentBOutput: string, userPrompt: string): Promise<Partial<AgentPlan>> {
@@ -499,7 +462,7 @@ Return ONLY a strict raw JSON block matching this format (no markdown formatting
 
   const prompt = `User prompt: "${userPrompt}"\n\nAgent B's tool mapping:\n${agentBOutput}`;
   try {
-    const response = await callOpenRouter(prompt, systemPrompt, "qwen/qwen3-coder:free");
+    const response = await callLLM(prompt, systemPrompt, "qwen/qwen3-coder:free");
     const cleanJson = response.replace(/```json|```/g, "").trim();
     return JSON.parse(cleanJson) as Partial<AgentPlan>;
   } catch (err) {
@@ -536,7 +499,7 @@ Return strict JSON ONLY. Do NOT wrap it in markdown codeblocks. The output must 
 
   const prompt = `User prompt: "${userPrompt}"\n\nAgent 1's conversational response:\n"${agent1Output}"\n\nActions plan:\n${JSON.stringify(actions)}`;
   try {
-    const response = await callOpenRouter(prompt, systemPrompt, "qwen/qwen3-coder:free");
+    const response = await callLLM(prompt, systemPrompt, "qwen/qwen3-coder:free");
     const cleanJson = response.replace(/```json|```/g, "").trim();
     return JSON.parse(cleanJson) as Array<{ id: string; title: string; content: string }>;
   } catch (err) {
@@ -556,7 +519,7 @@ Return the final array of WokaiAction objects as strict JSON. Do NOT wrap it in 
 
   const prompt = `Actions from Agent 2:\n${JSON.stringify(actionsFromAgent2)}\n\nContent from Agent 4:\n${JSON.stringify(contentFromAgent4)}`;
   try {
-    const response = await callOpenRouter(prompt, systemPrompt, "qwen/qwen3-coder:free");
+    const response = await callLLM(prompt, systemPrompt, "qwen/qwen3-coder:free");
     const cleanJson = response.replace(/```json|```/g, "").trim();
     return JSON.parse(cleanJson) as WokaiAction[];
   } catch (err) {
@@ -579,7 +542,7 @@ Write ONLY the final response. Max 2-3 sentences. Do not mention technical terms
 
   const prompt = `Agent 1's reply: "${agent1Output}"\n\nPlanned Actions: ${JSON.stringify(actions)}`;
   try {
-    return await callOpenRouter(prompt, systemPrompt, "meta-llama/llama-3.2-3b-instruct:free");
+    return await callLLM(prompt, systemPrompt, "meta-llama/llama-3.2-3b-instruct:free");
   } catch (err) {
     console.error("[WokAI Conductor] Agent # plan summary error:", err);
     return `I have prepared a plan to execute your request. I will run the required tools like ${actions.map(a => a.tool).join(", ")}.`;
@@ -607,7 +570,7 @@ Write ONLY the final user-facing summary of what was done and what the results a
 `;
 
   try {
-    return await callOpenRouter(promptText, undefined, "meta-llama/llama-3.2-3b-instruct:free");
+    return await callLLM(promptText, undefined, "meta-llama/llama-3.2-3b-instruct:free");
   } catch (err) {
     console.error("[WokAI Conductor] Agent # execution summary error:", err);
     return `Action completed. Results: ${output.slice(0, 200)}`;
@@ -640,7 +603,7 @@ Return a strict JSON object ONLY. Do NOT wrap it in markdown codeblocks. The out
 `;
 
   try {
-    const text = await callOpenRouter(promptText, undefined, "meta-llama/llama-3.3-70b-instruct:free");
+    const text = await callLLM(promptText, undefined, "meta-llama/llama-3.3-70b-instruct:free");
     const cleanJson = text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(cleanJson);
     return {

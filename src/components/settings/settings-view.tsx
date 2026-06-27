@@ -354,7 +354,7 @@ function IntegrationsPanel({ firebaseConfigured }: { firebaseConfigured: boolean
     {
       icon: Cpu,
       iconColor: 'border-blue-500/30 bg-blue-500/10 text-blue-400',
-      name: 'Gemini API',
+      name: 'LLM Gateway / API',
       description: 'Powers the WokAI reasoning and planning engine',
       status: 'connected',
     },
