@@ -1886,7 +1886,8 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
               tool,
               label,
               output,
-              googleToken: token || undefined
+              googleToken: token || undefined,
+              agent1Output: result.response
             })
           });
           if (sumRes.ok) {

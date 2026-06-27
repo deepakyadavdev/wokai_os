@@ -270,14 +270,231 @@ const OPENROUTER_MODELS_POOL = [
   "nvidia/nemotron-embed-vl-1b-v2:free"
 ];
 
-async function generateAgent4Content(
-  message: string,
-  actions: WokaiAction[],
-  geminiKey?: string,
-  googleToken?: string
+async function callOpenRouter(
+  prompt: string,
+  systemPrompt?: string,
+  preferredModel?: string
+): Promise<string> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+    if (geminiKey) {
+      try {
+        console.log("[WokAI Conductor] OpenRouter API key missing. Falling back to Gemini API.");
+        const genAI = new GoogleGenerativeAI(geminiKey);
+        const model = genAI.getGenerativeModel({
+          model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
+        });
+        const promptText = systemPrompt ? `${systemPrompt}\n\nUser Message:\n${prompt}` : prompt;
+        const result = await model.generateContent(promptText);
+        return result.response.text().trim();
+      } catch (err) {
+        console.error("[WokAI Conductor] Gemini fallback failed:", err);
+      }
+    }
+    console.warn("[WokAI Conductor] No API keys found. Returning mock response.");
+    if (prompt.includes("approved")) {
+      return JSON.stringify({ approved: true, feedback: "", refinedPrompt: "" });
+    }
+    if (prompt.includes("actions")) {
+      return JSON.stringify({
+        riskLevel: "LOW",
+        reasoning: ["No API key available, using safe deterministic fallback"],
+        plan: ["Execute default local task rescue"],
+        actions: [],
+        suggestedTasks: []
+      });
+    }
+    return "No API key configured. I will outline the required steps and run them locally.";
+  }
+
+  const modelsToTry = [
+    preferredModel,
+    process.env.OPENROUTER_MODEL,
+    "qwen/qwen3-coder:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "openrouter/free"
+  ].filter(Boolean) as string[];
+
+  const uniqueModels = Array.from(new Set(modelsToTry));
+
+  for (const model of uniqueModels) {
+    try {
+      console.log(`[WokAI Conductor] Calling OpenRouter model: ${model}`);
+      const messages = [];
+      if (systemPrompt) {
+        messages.push({ role: "system", content: systemPrompt });
+      }
+      messages.push({ role: "user", content: prompt });
+
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://wokai.app",
+          "X-Title": "WokAI OS"
+        },
+        body: JSON.stringify({
+          model,
+          messages
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content) {
+          return content.trim();
+        }
+      } else {
+        const errText = await res.text().catch(() => "");
+        console.warn(`[WokAI Conductor] OpenRouter failed for model ${model} with status ${res.status}: ${errText}`);
+      }
+    } catch (err) {
+      console.error(`[WokAI Conductor] OpenRouter exception for model ${model}:`, err);
+    }
+  }
+
+  throw new Error("All OpenRouter models failed to respond.");
+}
+
+async function runAgentA(userPrompt: string): Promise<string> {
+  const systemPrompt = `You are WokAI Agent A (Human Worker Thinker).
+Your job is to think like a human worker hired by the user. When the user gives you a request or tells you to do something, think of all the things a real human could do to accomplish it, without any tool limitations.
+Create a detailed, step-by-step list of all the tasks you will perform, explaining line by line how you will complete each task. Speak in the first person ("I will...") and sound extremely proactive, competent, and thorough. Make it realistic and actionable.`;
+
+  return await callOpenRouter(userPrompt, systemPrompt, "meta-llama/llama-3.3-70b-instruct:free");
+}
+
+async function runAgentB(agentAOutput: string): Promise<string> {
+  const systemPrompt = `You are WokAI Agent B (Tool Mapper and Adaptor).
+Your job is to compare and match the steps/tasks planned by Agent A with our available tools.
+Here is the strict list of allowed tools we have:
+- "gmail.summarize": Summarize inbox, detect urgency, draft replies.
+- "gmail.send": Send a fresh email to a specific recipient.
+- "gmail.search": Search Gmail messages using filters.
+- "calendar.createEvent": Schedule a meeting or event.
+- "calendar.listEvents": List upcoming calendar events.
+- "calendar.deleteEvent": Cancel or delete a calendar event.
+- "drive.search": Search Drive for files.
+- "docs.create": Create a Google Doc.
+- "sheets.createTracker": Create a Google Sheet tracker.
+- "slides.createDeck": Create a Google Slides deck.
+- "contacts.search": Find contact email or phone.
+- "calls.prepare": Prepare a phone call script.
+- "browser.plan": Plan browser automation with approval pause.
+- "devices.openApp": Launch an application on host device.
+- "devices.terminal": Execute a shell command on host.
+- "devices.fileAccess": Scan local directories for files.
+- "devices.queueCommand": Queue a command for an offline device.
+- "maps.searchPlaces": Search Google Places for locations.
+- "maps.getDirections": Calculate directions and travel time.
+- "maps.estimateTravel": Estimate travel buffer for meetings.
+- "search.google": Search the web using Google Search.
+- "notifications.create": Create an in-app alert.
+- "memory.retain": Save personal preferences.
+
+For each step in Agent A's output:
+1. Identify if we have a matching tool. E.g., if Agent A says "I will draft a docs file", identify: "Yes, we can make it, we have a tool like this: docs.create".
+2. If there is no exact matching tool, replace that step with the best solution and tool we have (for example, if Agent A says "I will draw a logo", replace it with using search.google or a browser.plan to find a generator, or devices.terminal to run an image generation script).
+Provide the matching and adaptation as a clear list of matched/adapted steps with their assigned tools.`;
+
+  return await callOpenRouter(agentAOutput, systemPrompt, "qwen/qwen3-coder:free");
+}
+
+async function runAgent1(agentAOutput: string, userPrompt: string): Promise<string> {
+  const systemPrompt = `You are WokAI Agent 1 (Worthful Conversational Responder).
+Your job is to generate a natural, helpful, and extremely professional conversational response to the user.
+You must construct this reply based on the plan/thinking of Agent A. Explain the steps that will be taken to fulfill their request so it looks highly worthful, detailed, and clear.
+Avoid mentioning internal variables, technical JSON formats, or backend tool names (like "gmail.send" or "Agent B"), but describe the actions (e.g. "I will search your Google Drive, draft the project proposal, and queue an email draft for your review").
+Keep it to 2-3 engaging, professional, and reassuring sentences.`;
+
+  const prompt = `User's prompt: "${userPrompt}"\n\nAgent A's thinking/tasks:\n${agentAOutput}`;
+  return await callOpenRouter(prompt, systemPrompt, "meta-llama/llama-3.2-3b-instruct:free");
+}
+
+async function runAgent2(agentBOutput: string, userPrompt: string): Promise<Partial<AgentPlan>> {
+  const systemPrompt = `You are WokAI Agent 2 (Structured Plan Generator).
+Your job is to translate the tool-mapped steps from Agent B into a structured JSON plan containing the exact WokAI Action objects and Suggested Tasks.
+You MUST choose tools from this strict allowed list:
+- "gmail.summarize": Summarize inbox, detect urgency, draft replies.
+- "gmail.send": Send a fresh email to a specific recipient.
+- "gmail.search": Search Gmail messages using filters.
+- "calendar.createEvent": Schedule a meeting or event.
+- "calendar.listEvents": List upcoming calendar events.
+- "calendar.deleteEvent": Cancel or delete a calendar event.
+- "drive.search": Search Drive for files.
+- "docs.create": Create a Google Doc.
+- "sheets.createTracker": Create a Google Sheet tracker.
+- "slides.createDeck": Create a Google Slides deck.
+- "contacts.search": Find contact email or phone.
+- "calls.prepare": Prepare a phone call script.
+- "browser.plan": Plan browser automation with approval pause.
+- "devices.openApp": Launch an application on host device.
+- "devices.terminal": Execute a shell command on host.
+- "devices.fileAccess": Scan local directories for files.
+- "devices.queueCommand": Queue a command for an offline device.
+- "maps.searchPlaces": Search Google Places for locations.
+- "maps.getDirections": Calculate directions and travel time.
+- "maps.estimateTravel": Estimate travel buffer for meetings.
+- "search.google": Search the web using Google Search.
+- "notifications.create": Create an in-app alert.
+- "memory.retain": Save personal preferences.
+
+Security Guidelines:
+- Sensitive actions ("devices.terminal", "gmail.summarize", "gmail.send", "gmail.search", "calendar.createEvent", "calendar.listEvents", "calendar.deleteEvent", "docs.create", "sheets.createTracker", "slides.createDeck", "browser.plan", "devices.openApp") must have "sensitive": true, and "status": "NEEDS_APPROVAL".
+- All action objects must have the keys: "id" (format: "action-[random]"), "tool", "label" (detailed description of what will be done), "status", "sensitive", and "createdAt" (ISO string).
+
+Return ONLY a strict raw JSON block matching this format (no markdown formatting, no codeblocks):
+{
+  "riskLevel": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
+  "reasoning": ["step-by-step logic detailing why these actions were chosen"],
+  "plan": ["friendly summary of the steps to execute"],
+  "actions": [
+    {
+      "id": "action-12345",
+      "tool": "gmail.summarize",
+      "label": "Summarize inbox to extract key deadlines",
+      "status": "NEEDS_APPROVAL",
+      "sensitive": true,
+      "createdAt": "2026-06-25T10:00:00.000Z"
+    }
+  ],
+  "suggestedTasks": [
+    {
+      "id": "task-12345",
+      "title": "Inbox review",
+      "description": "Created from user prompt to handle email backlog",
+      "deadline": "2026-06-26T10:00:00.000Z",
+      "priority": "HIGH",
+      "status": "todo",
+      "progress": 0,
+      "subtasks": ["Check messages", "List followups"],
+      "source": "chat"
+    }
+  ]
+}`;
+
+  const prompt = `User prompt: "${userPrompt}"\n\nAgent B's tool mapping:\n${agentBOutput}`;
+  try {
+    const response = await callOpenRouter(prompt, systemPrompt, "qwen/qwen3-coder:free");
+    const cleanJson = response.replace(/```json|```/g, "").trim();
+    return JSON.parse(cleanJson) as Partial<AgentPlan>;
+  } catch (err) {
+    console.error("[WokAI Conductor] Agent 2 parse error:", err);
+    return {};
+  }
+}
+
+async function runAgent4(
+  userPrompt: string,
+  agent1Output: string,
+  actions: WokaiAction[]
 ): Promise<Array<{ id: string; title: string; content: string }>> {
-  const promptText = `
-You are WokAI Agent 4 (Content Generator). Your job is to generate BOTH:
+  const systemPrompt = `You are WokAI Agent 4 (Content Generator).
+Your job is to generate BOTH:
 1. A precise, dynamic "title" (the name/title of the document, sheet, presentation, email subject, calendar event, or terminal command description).
 2. The detailed "content" (payload/body/script) to be used when executing the action.
 
@@ -290,177 +507,63 @@ You MUST suggest appropriate titles and contents depending on the tool:
 - For "devices.terminal": "title" is a short description of the command, and "content" is the exact terminal command line.
 - For all other tools: "title" is a descriptive name, and "content" is the instruction details.
 
-User Request: "${message}"
-Current Action Plan: ${JSON.stringify(actions)}
+You must align the contents with Agent 1's conversational response so it matches exactly what was promised.
 
-Return strict JSON ONLY. Do NOT wrap it in markdown codeblocks. The output must be a JSON array of objects, where each object has "id", "title", and "content" fields:
+Return strict JSON ONLY. Do NOT wrap it in markdown codeblocks. The output must be a JSON array of objects:
 [
   { "id": "action-xxx", "title": "...", "content": "..." }
-]
-`;
+]`;
 
-  let responseText = "";
-
-  if (geminiKey) {
-    try {
-      console.log("Agent 4: Requesting content generation via primary Gemini API Key.");
-      const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({
-        model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
-      });
-      const result = await model.generateContent(promptText);
-      responseText = result.response.text();
-    } catch (err) {
-      console.error("Agent 4: Primary Gemini API Key failed:", err);
-    }
+  const prompt = `User prompt: "${userPrompt}"\n\nAgent 1's conversational response:\n"${agent1Output}"\n\nActions plan:\n${JSON.stringify(actions)}`;
+  try {
+    const response = await callOpenRouter(prompt, systemPrompt, "qwen/qwen3-coder:free");
+    const cleanJson = response.replace(/```json|```/g, "").trim();
+    return JSON.parse(cleanJson) as Array<{ id: string; title: string; content: string }>;
+  } catch (err) {
+    console.error("[WokAI Conductor] Agent 4 parse error:", err);
+    return [];
   }
-
-  if (!responseText && googleToken) {
-    try {
-      console.log("Agent 4: Requesting content generation via primary Gemini OAuth.");
-      const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${googleToken}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }]
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      }
-    } catch (err) {
-      console.error("Agent 4: Primary Gemini OAuth failed:", err);
-    }
-  }
-
-  if (!responseText && process.env.OPENROUTER_API_KEY) {
-    try {
-      console.log("Agent 4: Requesting content generation via OpenRouter.");
-      const model = process.env.OPENROUTER_MODEL || "qwen/qwen3-coder:free";
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://wokai.app",
-          "X-Title": "WokAI OS"
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content: promptText }]
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        responseText = data.choices?.[0]?.message?.content || "";
-      }
-    } catch (err) {
-      console.error("Agent 4: OpenRouter failed:", err);
-    }
-  }
-
-  if (responseText) {
-    try {
-      const cleanJson = responseText.replace(/```json|```/g, "").trim();
-      return JSON.parse(cleanJson) as Array<{ id: string; title: string; content: string }>;
-    } catch (err) {
-      console.error("Agent 4: Failed to parse generated content JSON:", err);
-    }
-  }
-
-  return [];
 }
 
-export async function generateAgentHashPlanSummary(
-  message: string,
-  actions: WokaiAction[],
-  geminiKey?: string,
-  googleToken?: string
+async function runAgent3(
+  actionsFromAgent2: WokaiAction[],
+  contentFromAgent4: Array<{ id: string; title: string; content: string }>
+): Promise<WokaiAction[]> {
+  const systemPrompt = `You are WokAI Agent 3 (API Handler).
+Your job is to prepare the final actions list for execution. You will receive the planned actions from Agent 2 and the content payloads generated by Agent 4.
+Combine them by injecting the content and title from Agent 4 into the corresponding action objects. Ensure the parameters are syntactically valid and well-formatted for our API layers.
+Return the final array of WokaiAction objects as strict JSON. Do NOT wrap it in markdown codeblocks.`;
+
+  const prompt = `Actions from Agent 2:\n${JSON.stringify(actionsFromAgent2)}\n\nContent from Agent 4:\n${JSON.stringify(contentFromAgent4)}`;
+  try {
+    const response = await callOpenRouter(prompt, systemPrompt, "qwen/qwen3-coder:free");
+    const cleanJson = response.replace(/```json|```/g, "").trim();
+    return JSON.parse(cleanJson) as WokaiAction[];
+  } catch (err) {
+    console.error("[WokAI Conductor] Agent 3 parse error:", err);
+    return actionsFromAgent2.map((action, idx) => {
+      const found = contentFromAgent4.find((ac) => ac.id === action.id) || contentFromAgent4[idx];
+      return found ? { ...action, content: found.content, title: found.title } : action;
+    });
+  }
+}
+
+async function runAgentHashPlanSummary(
+  agent1Output: string,
+  actions: WokaiAction[]
 ): Promise<string> {
-  const promptText = `
-You are WokAI Agent # (Plan Summarizer).
-Your job is to look at the user's initial request and the planned actions (with the contents/details generated by Agent 4), and write a friendly, concise, natural conversational summary response to the user explaining what WokAI is going to do to fulfill their request.
-- User Request: "${message}"
-- Planned Actions: ${JSON.stringify(actions)}
+  const systemPrompt = `You are WokAI Agent # (Plan Summarizer).
+Your job is to describe all the steps to be completed for doing the user's task.
+Match the reply given by Agent 1 with the actions we are planning to execute, and write a concise, professional, and friendly summary of the actual execution steps we will take.
+Write ONLY the final response. Max 2-3 sentences. Do not mention technical terms like "JSON", "agent #", or internal tool names unless natural (e.g. "I will draft a Google Doc").`;
 
-Write ONLY the final response summary to the user. Max 2-3 sentences. Keep it very professional and helpful. Do not mention technical terms like "JSON", "agent #", or internal tool names unless natural (e.g. "I will draft a Google Doc").
-`;
-
-  let responseText = "";
-
-  if (geminiKey) {
-    try {
-      console.log("Agent #: Requesting plan summary via primary Gemini API Key.");
-      const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({
-        model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
-      });
-      const result = await model.generateContent(promptText);
-      responseText = result.response.text().trim();
-    } catch (err) {
-      console.error("Agent #: Primary Gemini API Key failed:", err);
-    }
+  const prompt = `Agent 1's reply: "${agent1Output}"\n\nPlanned Actions: ${JSON.stringify(actions)}`;
+  try {
+    return await callOpenRouter(prompt, systemPrompt, "meta-llama/llama-3.2-3b-instruct:free");
+  } catch (err) {
+    console.error("[WokAI Conductor] Agent # plan summary error:", err);
+    return `I have prepared a plan to execute your request. I will run the required tools like ${actions.map(a => a.tool).join(", ")}.`;
   }
-
-  if (!responseText && googleToken) {
-    try {
-      console.log("Agent #: Requesting plan summary via primary Gemini OAuth.");
-      const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${googleToken}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }]
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-      }
-    } catch (err) {
-      console.error("Agent #: Primary Gemini OAuth failed:", err);
-    }
-  }
-
-  if (!responseText && process.env.OPENROUTER_API_KEY) {
-    try {
-      console.log("Agent #: Requesting plan summary via OpenRouter.");
-      const model = process.env.OPENROUTER_MODEL || "qwen/qwen3-coder:free";
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://wokai.app",
-          "X-Title": "WokAI OS"
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content: promptText }]
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        responseText = data.choices?.[0]?.message?.content?.trim() || "";
-      }
-    } catch (err) {
-      console.error("Agent #: OpenRouter failed:", err);
-    }
-  }
-
-  if (responseText) {
-    return responseText;
-  }
-
-  return `I have prepared a plan to execute your request. I will run the required tools like ${actions.map(a => a.tool).join(", ")}.`;
 }
 
 export async function generateAgentHashExecutionSummary(
@@ -468,88 +571,27 @@ export async function generateAgentHashExecutionSummary(
   label: string,
   output: string,
   geminiKey?: string,
-  googleToken?: string
+  googleToken?: string,
+  agent1Output?: string
 ): Promise<string> {
   const promptText = `
 You are WokAI Agent # (API Output Summarizer).
 Your job is to look at the execution of an API tool and its raw output, and summarize the results to the user in a friendly, clear, and helpful way.
+Additionally, you should match the reply given by Agent 1 with what we were actually doing and our completed tasks, describing all the steps completed.
 - Executed Tool: "${tool}"
 - Action Label: "${label}"
 - Raw API Output: "${output}"
+- Agent 1's Reply: "${agent1Output || 'None'}"
 
-Write ONLY the final user-facing summary of what was done and what the results are. Keep it short and readable. Do not output JSON or mention internal variable names.
+Write ONLY the final user-facing summary of what was done and what the results are, matching it with what Agent 1 said. Keep it short and readable. Do not output JSON or mention internal variable names.
 `;
 
-  let responseText = "";
-
-  if (geminiKey) {
-    try {
-      console.log("Agent #: Requesting execution summary via primary Gemini API Key.");
-      const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({
-        model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
-      });
-      const result = await model.generateContent(promptText);
-      responseText = result.response.text().trim();
-    } catch (err) {
-      console.error("Agent #: Primary Gemini API Key failed for execution summary:", err);
-    }
+  try {
+    return await callOpenRouter(promptText, undefined, "meta-llama/llama-3.2-3b-instruct:free");
+  } catch (err) {
+    console.error("[WokAI Conductor] Agent # execution summary error:", err);
+    return `Action completed. Results: ${output.slice(0, 200)}`;
   }
-
-  if (!responseText && googleToken) {
-    try {
-      console.log("Agent #: Requesting execution summary via primary Gemini OAuth.");
-      const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${googleToken}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }]
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-      }
-    } catch (err) {
-      console.error("Agent #: Primary Gemini OAuth failed for execution summary:", err);
-    }
-  }
-
-  if (!responseText && process.env.OPENROUTER_API_KEY) {
-    try {
-      console.log("Agent #: Requesting execution summary via OpenRouter.");
-      const model = process.env.OPENROUTER_MODEL || "qwen/qwen3-coder:free";
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://wokai.app",
-          "X-Title": "WokAI OS"
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content: promptText }]
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        responseText = data.choices?.[0]?.message?.content?.trim() || "";
-      }
-    } catch (err) {
-      console.error("Agent #: OpenRouter failed for execution summary:", err);
-    }
-  }
-
-  if (responseText) {
-    return responseText;
-  }
-
-  return `Action completed. Results: ${output.slice(0, 200)}`;
 }
 
 async function evaluatePlanWithAgent5(
@@ -577,41 +619,17 @@ Return a strict JSON object ONLY. Do NOT wrap it in markdown codeblocks. The out
 }
 `;
 
-  if (!process.env.OPENROUTER_API_KEY) {
-    console.log("Agent 5: OpenRouter API key missing, auto-approving.");
-    return { approved: true };
-  }
-
   try {
-    console.log("Agent 5: Evaluating plan quality via OpenRouter.");
-    const model = process.env.OPENROUTER_MODEL || "qwen/qwen3-coder:free";
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://wokai.app",
-        "X-Title": "WokAI OS"
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: promptText }]
-      })
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      const text = data.choices?.[0]?.message?.content || "";
-      const cleanJson = text.replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(cleanJson);
-      return {
-        approved: !!parsed.approved,
-        feedback: parsed.feedback || "",
-        refinedPrompt: parsed.refinedPrompt || ""
-      };
-    }
+    const text = await callOpenRouter(promptText, undefined, "meta-llama/llama-3.3-70b-instruct:free");
+    const cleanJson = text.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(cleanJson);
+    return {
+      approved: !!parsed.approved,
+      feedback: parsed.feedback || "",
+      refinedPrompt: parsed.refinedPrompt || ""
+    };
   } catch (err) {
-    console.error("Agent 5: Evaluation failed:", err);
+    console.error("[WokAI Conductor] Agent 5 evaluation error:", err);
   }
 
   return { approved: true };
@@ -632,333 +650,75 @@ export async function generateAgentPlan(
     return baseline;
   }
 
-  let conversationReply = baseline.response;
-  let parsedPlan: Partial<AgentPlan> = {};
+  // Phase: Agent A
+  onProgress?.("agentA");
+  console.log("WokAI Conductor: Invoking Agent A (Human Worker Thinker)...");
+  const agentAOutput = await runAgentA(message);
 
-  // 2. Primary Choice: Gemini API (API key or OAuth access token)
-  const geminiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  if (geminiKey || googleToken) {
-    const promptText = `
-You are the WokAI Conductor. Return strict JSON ONLY for:
-${message}
+  // Phase: Agent 1 and Agent B (concurrently)
+  onProgress?.("agent1");
+  onProgress?.("agentB");
+  console.log("WokAI Conductor: Invoking Agent 1 and Agent B concurrently...");
+  const [agent1Output, agentBOutput] = await Promise.all([
+    runAgent1(agentAOutput, message),
+    runAgentB(agentAOutput)
+  ]);
 
-You MUST choose tools from this strict allowed list:
-- "gmail.summarize": Summarize inbox, detect urgency, draft replies.
-- "gmail.send": Send a fresh email to a specific recipient.
-- "gmail.search": Search Gmail messages using filters.
-- "calendar.findSlots": Find free time slots.
-- "calendar.createEvent": Schedule a meeting or event.
-- "calendar.listEvents": List upcoming calendar events.
-- "calendar.deleteEvent": Cancel or delete a calendar event.
-- "drive.search": Search Drive for files.
-- "docs.create": Create a Google Doc.
-- "sheets.createTracker": Create a Google Sheet tracker.
-- "slides.createDeck": Create a Google Slides deck.
-- "contacts.search": Find contact email or phone.
-- "calls.prepare": Prepare a phone call script.
-- "browser.plan": Plan browser automation with approval pause.
-- "devices.openApp": Launch an application on host device.
-- "devices.terminal": Execute a shell command on host.
-- "devices.fileAccess": Scan local directories for files.
-- "devices.queueCommand": Queue a command for an offline device.
-- "maps.searchPlaces": Search Google Places for locations.
-- "maps.getDirections": Calculate directions and travel time.
-- "maps.estimateTravel": Estimate travel buffer for meetings.
-- "search.google": Search the web using Google Search.
-- "notifications.create": Create an in-app alert.
-- "memory.retain": Save personal preferences.
+  // Phase: Agent 2
+  onProgress?.("agent2");
+  console.log("WokAI Conductor: Invoking Agent 2 (Structured Plan Generator)...");
+  const parsedPlan = await runAgent2(agentBOutput, message);
+  const actions = parsedPlan.actions || [];
 
-Security: Sensitive actions must have "sensitive": true, "status": "NEEDS_APPROVAL".
-All action objects must have keys: "id", "tool", "label", "status", "sensitive", "createdAt".
+  let finalActions = actions;
+  if (actions.length > 0) {
+    // Phase: Agent 4
+    onProgress?.("agent4");
+    console.log("WokAI Conductor: Invoking Agent 4 (Content Generator)...");
+    const contentFromAgent4 = await runAgent4(message, agent1Output, actions);
 
-If the user message is a simple greeting or capability question with no actionable request, return:
-{ "intent": "greeting", "response": "friendly greeting", "riskLevel": "LOW", "reasoning": [], "plan": [], "actions": [], "suggestedTasks": [] }
-
-Otherwise return:
-{
-  "intent": "work_completion",
-  "response": "friendly conversational response to the user's message (max 2 sentences, natural and helpful)",
-  "riskLevel": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
-  "reasoning": string[],
-  "plan": string[],
-  "actions": Array<{ id: string, tool: string, label: string, status: string, sensitive: boolean, createdAt: string }>,
-  "suggestedTasks": Array<{ id: string, title: string, description: string, deadline: string, priority: string, status: "todo", progress: 0, subtasks: string[], source: "chat" }>
-}
-`;
-
-    if (geminiKey) {
-      onProgress?.("agent3");
-      try {
-        console.log("WokAI Conductor: Requesting plan from primary Gemini API (via API Key).");
-        const genAI = new GoogleGenerativeAI(geminiKey);
-        const model = genAI.getGenerativeModel({
-          model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
-        });
-        const result = await model.generateContent(promptText);
-        const text = result.response.text().replace(/```json|```/g, "").trim();
-        parsedPlan = JSON.parse(text) as Partial<AgentPlan>;
-        if (parsedPlan.response) {
-          conversationReply = parsedPlan.response;
-        }
-        console.log("WokAI Conductor: Successfully generated plan via primary Gemini API Key.");
-      } catch (err) {
-        console.error("WokAI Conductor: Primary Gemini API Key failed:", err);
-      }
-    }
-
-    if (Object.keys(parsedPlan).length === 0 && googleToken) {
-      onProgress?.("agent3");
-      try {
-        console.log("WokAI Conductor: Requesting plan from primary Gemini API (via OAuth token).");
-        const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${googleToken}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }]
-          })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.replace(/```json|```/g, "").trim();
-          if (text) {
-            parsedPlan = JSON.parse(text) as Partial<AgentPlan>;
-            if (parsedPlan.response) {
-              conversationReply = parsedPlan.response;
-            }
-            console.log("WokAI Conductor: Successfully generated plan via Gemini OAuth.");
-          }
-        } else {
-          const errText = await res.text().catch(() => "");
-          console.warn(`WokAI Conductor: Primary Gemini OAuth failed with status ${res.status}: ${errText}`);
-        }
-      } catch (err) {
-        console.error("WokAI Conductor: Primary Gemini OAuth failed:", err);
-      }
-    }
+    // Phase: Agent 3
+    onProgress?.("agent3");
+    console.log("WokAI Conductor: Invoking Agent 3 (API Handler)...");
+    finalActions = await runAgent3(actions, contentFromAgent4);
   }
 
-  // 3. Fallback Choice: OpenRouter Integration (only if Gemini failed or is unconfigured)
-  if (Object.keys(parsedPlan).length === 0 && process.env.OPENROUTER_API_KEY) {
-    onProgress?.("agent1");
-    // Model 1: Conversational Reply Generation (Lightweight)
-    const replyModels = [
-      "meta-llama/llama-3.2-3b-instruct:free",
-      "liquid/lfm-2.5-1.2b-thinking:free",
-      "openrouter/free"
-    ];
-
-    for (const model of replyModels) {
-      try {
-        console.log(`WokAI Conductor: Requesting fallback conversational reply from OpenRouter model ${model}`);
-        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://wokai.app",
-            "X-Title": "WokAI OS"
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              {
-                role: "system",
-                content: "You are WokAI, a friendly AI operating system assistant. Generate a natural, helpful, conversational response to the user's message. This is a simple chat like chatting with ChatGPT, so feel free to respond fully and naturally. Do not mention technical tools, actions, JSON, or plans."
-              },
-              {
-                role: "user",
-                content: message
-              }
-            ]
-          })
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.choices && data.choices[0] && data.choices[0].message) {
-            conversationReply = data.choices[0].message.content.trim();
-            console.log("WokAI Conductor: Successfully generated fallback reply via model:", model);
-            break;
-          }
-        }
-      } catch (err) {
-        console.warn(`WokAI Conductor: Fallback reply generation failed for model ${model}:`, err);
-      }
-    }
-
-    onProgress?.("agent2");
-    // Model 2: Strict JSON Action Planner (High-Capability)
-    const plannerModels = Array.from(new Set([
-      process.env.OPENROUTER_MODEL,
-      ...OPENROUTER_MODELS_POOL
-    ].filter(Boolean) as string[]));
-
-    const plannerPrompt = `
-You are the WokAI Conductor, the backend planning engine of WokAI OS.
-Analyze the user's message and generate a structured JSON object representing the action plan to execute.
-
-You MUST choose tools from this strict allowed list:
-- "gmail.summarize": Summarizes the user's Gmail inbox. Use when the user asks to read, check, or summarize emails/inbox.
-- "gmail.send": Sends a fresh email to a specific recipient. Use when the user asks to send an email, write an email, or notify someone.
-- "gmail.search": Searches Gmail messages using specific query filters (e.g. from:sender, is:unread, subject:abc). Use when the user asks to find, filter or search specific emails.
-- "calendar.createEvent": Schedules meetings/events on Google Calendar. Use when the user asks to schedule, book, or block time.
-- "calendar.listEvents": Lists upcoming calendar events. Use when user wants to see what is on their schedule or calendar.
-- "calendar.deleteEvent": Cancels/deletes an event on Google Calendar. Use when the user asks to cancel, remove, or delete a calendar meeting/event.
-- "drive.search": Searches Drive for files. Use when the user asks to locate, search, or find files in Google Drive.
-- "docs.create": Creates a Google Doc. Use when the user asks to create a document, draft a report, or write notes.
-- "sheets.createTracker": Creates a Google Sheet. Use when the user asks to create a tracker sheet or budget spreadsheet.
-- "slides.createDeck": Creates a Google Slides presentation. Use when the user asks to create a slide deck or outline.
-- "devices.openApp": Launches an application (like "chrome", "vs code", "terminal") on the user's host machine. Use when the user asks to open or run an application.
-- "devices.terminal": Executes shell commands on the user's local host machine. Use when the user asks to run commands, CLI scripts, directory listings (ls, dir), or terminal execution.
-- "devices.fileAccess": Indexes/finds local files on the user's desktop directories. Use when the user asks to scan, find, or search local files.
-- "browser.plan": Automates web form fills and submissions. Use when the user asks to automate browser work (e.g. apply to internships, fill out forms).
-- "maps.searchPlaces": Searches Google Places for nearby locations or addresses. Use when the user asks to locate, search, or find a place or address.
-- "maps.getDirections": Calculates travel time and directions between locations. Use when the user asks for directions, travel times, or route distance.
-- "search.google": Performs a web search using Google Search. Use when the user asks to search the web, lookup search results, or search Google.
-- "memory.retain": Saves personal preferences or habits.
-
-Security status guidelines:
-- Sensitive actions ("devices.terminal", "gmail.summarize", "gmail.send", "gmail.search", "calendar.createEvent", "calendar.listEvents", "calendar.deleteEvent", "docs.create", "sheets.createTracker", "slides.createDeck", "browser.plan", "devices.openApp") must have "sensitive: true" and "status: 'NEEDS_APPROVAL'".
-- All action objects must have the keys: "id" (format: "action-[random]"), "tool", "label" (detailed description of what will be done), "status", "sensitive", and "createdAt" (ISO string).
-
-CRITICAL CONVERSATIONAL QUERY RULE:
-If the user message is just a simple greeting ("hello", "hey", "hi"), a conversational check ("are you there?", "how are you"), or a general question about your capabilities without requesting an action, you MUST return empty arrays for "actions" and "suggestedTasks" (e.g. "actions": [], "suggestedTasks": []), set "intent" to "greeting", and set "response" to a friendly conversational reply. DO NOT return placeholder actions or tasks under any circumstances.
-
-Return ONLY a raw JSON block matching this format (do NOT wrap it in markdown codeblocks):
-{
-  "intent": "work_completion" | "daily_planning" | "greeting",
-  "riskLevel": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
-  "reasoning": ["step-by-step logic detailing why these actions were chosen"],
-  "plan": ["friendly summary of the steps to execute"],
-  "actions": [
-    {
-      "id": "action-12345",
-      "tool": "gmail.summarize",
-      "label": "Summarize inbox to extract key deadlines",
-      "status": "NEEDS_APPROVAL",
-      "sensitive": true,
-      "createdAt": "2026-06-25T10:00:00.000Z"
-    }
-  ],
-  "suggestedTasks": [
-    {
-      "id": "task-12345",
-      "title": "Inbox review",
-      "description": "Created from user prompt to handle email backlog",
-      "deadline": "2026-06-26T10:00:00.000Z",
-      "priority": "HIGH",
-      "status": "todo",
-      "progress": 0,
-      "subtasks": ["Check messages", "List followups"],
-      "source": "chat"
-    }
-  ]
-}
-
-User Message: "${message}"
-`;
-
-    for (const model of plannerModels) {
-      try {
-        console.log(`WokAI Conductor: Requesting technical plan from fallback planner model ${model}`);
-        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://wokai.app",
-            "X-Title": "WokAI OS"
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              {
-                role: "user",
-                content: plannerPrompt
-              }
-            ]
-          })
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.choices && data.choices[0] && data.choices[0].message) {
-            let text = data.choices[0].message.content.trim();
-            text = text.replace(/```json|```/g, "").trim();
-            parsedPlan = JSON.parse(text) as Partial<AgentPlan>;
-            console.log(`WokAI Conductor: Successfully generated plan via fallback model: ${model}`);
-            break;
-          }
-        } else {
-          const errText = await res.text().catch(() => "");
-          console.warn(`WokAI Conductor: Fallback planner model ${model} failed with status ${res.status}: ${errText}`);
-        }
-      } catch (err) {
-        console.error(`WokAI Conductor: Fallback plan generation failed for model ${model}:`, err);
-      }
-    }
+  // Phase: Agent #
+  onProgress?.("agent#");
+  console.log("WokAI Conductor: Invoking Agent # (Plan Summarizer)...");
+  let agentHashSummary = "";
+  if (finalActions.length > 0) {
+    agentHashSummary = await runAgentHashPlanSummary(agent1Output, finalActions);
   }
 
-  // 4. Merge Logic (use LLM outputs directly if successful, fallback to baseline only on full failure)
-  const llmSucceeded = Object.keys(parsedPlan).length > 0;
-
-  let mergedActions = llmSucceeded
-    ? (parsedPlan.actions || [])
-    : baseline.actions;
-
-  const mergedTasks = llmSucceeded
-    ? (parsedPlan.suggestedTasks || [])
-    : baseline.suggestedTasks;
-
+  const mergedTasks = parsedPlan.suggestedTasks || [];
   const mergedMemories = [
     ...baseline.memoryWrites,
     ...(parsedPlan.memoryWrites || [])
   ];
 
-  // 5. Agent 4: Generate Content
-  if (mergedActions.length > 0) {
-    onProgress?.("agent4");
-    try {
-      const actionContents = await generateAgent4Content(message, mergedActions, geminiKey, googleToken);
-      mergedActions = mergedActions.map((action, idx) => {
-        const found = actionContents.find((ac) => ac.id === action.id) || actionContents[idx];
-        return found ? { ...action, content: found.content, title: found.title } : action;
-      });
-    } catch (err) {
-      console.error("WokAI Conductor: Agent 4 content generation failed:", err);
-    }
-  }
+  // We compile the full plan.
+  const currentPlan: AgentPlan = {
+    intent: parsedPlan.intent || baseline.intent || "work_completion",
+    riskLevel: parsedPlan.riskLevel || baseline.riskLevel,
+    response: agent1Output, // Agent 1's reply goes to the user as response field
+    reasoning: parsedPlan.reasoning || [],
+    plan: agentHashSummary ? [agentHashSummary] : (parsedPlan.plan || []),
+    actions: finalActions,
+    suggestedTasks: mergedTasks,
+    memoryWrites: mergedMemories,
+    needsApproval: finalActions.some((a) => a.status === "NEEDS_APPROVAL")
+  };
 
-  // Agent #: Summarizer Agent (Generate response based on plan details)
-  if (mergedActions.length > 0) {
-    onProgress?.("agent#");
-    try {
-      conversationReply = await generateAgentHashPlanSummary(message, mergedActions, geminiKey, googleToken);
-    } catch (err) {
-      console.error("WokAI Conductor: Agent # plan summary generation failed:", err);
-    }
-  }
-
-  if (mergedActions.length > 0 && pass === 1) {
+  // Phase: Agent 5 (Review and Approve)
+  if (finalActions.length > 0 && pass === 1) {
     onProgress?.("agent5");
-    const currentPlan = {
-      ...baseline,
-      ...parsedPlan,
-      response: conversationReply,
-      actions: mergedActions,
-      suggestedTasks: mergedTasks,
-      memoryWrites: mergedMemories,
-      riskLevel: parsedPlan.riskLevel || baseline.riskLevel,
-      needsApproval: mergedActions.some((a) => a.status === "NEEDS_APPROVAL")
-    } satisfies AgentPlan;
-
+    console.log("WokAI Conductor: Invoking Agent 5 (Quality Assurance & Evaluator)...");
     const evaluation = await evaluatePlanWithAgent5(message, currentPlan);
     if (!evaluation.approved && evaluation.refinedPrompt) {
-      console.log(`Agent 5: Action plan rejected. Retrying with refined prompt: "${evaluation.refinedPrompt}"`);
+      console.log(`Agent 5: Plan rejected. Retrying with refined prompt: "${evaluation.refinedPrompt}"`);
+      
+      // Recursive call starting again from Agent A with the refined prompt
       const refinedPlan = await generateAgentPlan(evaluation.refinedPrompt, onProgress, googleToken, 2);
       
       onProgress?.("agent5");
@@ -979,18 +739,9 @@ User Message: "${message}"
     }
   }
 
-  if (mergedActions.length > 0) {
+  if (finalActions.length > 0) {
     onProgress?.("api");
   }
 
-  return {
-    ...baseline,
-    ...parsedPlan,
-    response: conversationReply,
-    actions: mergedActions,
-    suggestedTasks: mergedTasks,
-    memoryWrites: mergedMemories,
-    riskLevel: parsedPlan.riskLevel || baseline.riskLevel,
-    needsApproval: mergedActions.some((a) => a.status === "NEEDS_APPROVAL")
-  } satisfies AgentPlan;
+  return currentPlan;
 }

@@ -9,7 +9,8 @@ const summarizeRequestSchema = z.object({
   tool: z.string(),
   label: z.string(),
   output: z.string(),
-  googleToken: z.string().optional()
+  googleToken: z.string().optional(),
+  agent1Output: z.string().optional()
 });
 
 export async function POST(request: NextRequest) {
@@ -28,7 +29,8 @@ export async function POST(request: NextRequest) {
       parsed.data.label,
       parsed.data.output,
       geminiKey,
-      parsed.data.googleToken
+      parsed.data.googleToken,
+      parsed.data.agent1Output
     );
     return NextResponse.json({ summary });
   } catch (err: any) {
