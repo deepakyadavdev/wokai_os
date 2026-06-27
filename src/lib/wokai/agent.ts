@@ -274,8 +274,12 @@ async function callLLM(
   preferredModel?: string
 ): Promise<string> {
   const apiKey = process.env.LLM_API_KEY || process.env.OPENROUTER_API_KEY;
-  let baseUrl = process.env.LLM_BASE_URL || "https://openrouter.ai/api/v1/chat/completions";
+  let baseUrl = (process.env.LLM_BASE_URL || "https://openrouter.ai/api/v1/chat/completions").trim();
   
+  if (baseUrl && !/^https?:\/\//i.test(baseUrl)) {
+    baseUrl = `https://${baseUrl}`;
+  }
+
   if (baseUrl && !baseUrl.endsWith("/chat/completions")) {
     const normalized = baseUrl.replace(/\/$/, "");
     baseUrl = `${normalized}/chat/completions`;
