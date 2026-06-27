@@ -318,6 +318,7 @@ async function callOpenRouter(
   ].filter(Boolean) as string[];
 
   const uniqueModels = Array.from(new Set(modelsToTry));
+  let lastErrorMsg = "";
 
   for (const model of uniqueModels) {
     try {
@@ -350,14 +351,33 @@ async function callOpenRouter(
         }
       } else {
         const errText = await res.text().catch(() => "");
+        lastErrorMsg = `Status ${res.status}: ${errText}`;
         console.warn(`[WokAI Conductor] OpenRouter failed for model ${model} with status ${res.status}: ${errText}`);
       }
-    } catch (err) {
+    } catch (err: any) {
+      lastErrorMsg = err instanceof Error ? err.message : String(err);
       console.error(`[WokAI Conductor] OpenRouter exception for model ${model}:`, err);
     }
   }
 
-  throw new Error("All OpenRouter models failed to respond.");
+  // Attempt Gemini fallback as a last resort before giving up
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  if (geminiKey) {
+    try {
+      console.log("[WokAI Conductor] All OpenRouter models failed. Falling back to Gemini API.");
+      const genAI = new GoogleGenerativeAI(geminiKey);
+      const model = genAI.getGenerativeModel({
+        model: process.env.GEMINI_MODEL || "gemini-1.5-flash"
+      });
+      const promptText = systemPrompt ? `${systemPrompt}\n\nUser Message:\n${prompt}` : prompt;
+      const result = await model.generateContent(promptText);
+      return result.response.text().trim();
+    } catch (err) {
+      console.error("[WokAI Conductor] Gemini fallback after OpenRouter failure failed:", err);
+    }
+  }
+
+  throw new Error(`All OpenRouter models failed to respond. Last error: ${lastErrorMsg || "Unknown error"}`);
 }
 
 async function runAgentA(userPrompt: string): Promise<string> {
