@@ -18,6 +18,8 @@ export interface ChatSession {
   createdAt: string; // ISO
   updatedAt: string; // ISO
   messages: ChatMessage[];
+  model?: string;
+  systemPrompt?: string;
 }
 
 // ── helpers ────────────────────────────────────────────────────
@@ -131,6 +133,9 @@ export interface UseChatSessionsReturn {
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   filteredSessions: ChatSession[];
+  updateSessionModel: (sessionId: string, model: string) => void;
+  updateSessionSystemPrompt: (sessionId: string, systemPrompt: string) => void;
+  importSessions: (imported: ChatSession[]) => void;
 }
 
 export function useChatSessions(): UseChatSessionsReturn {
@@ -240,6 +245,47 @@ export function useChatSessions(): UseChatSessionsReturn {
     [sessions]
   );
 
+  const updateSessionModel = React.useCallback(
+    (sessionId: string, model: string) => {
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionId ? { ...s, model, updatedAt: now() } : s
+        )
+      );
+    },
+    []
+  );
+
+  const updateSessionSystemPrompt = React.useCallback(
+    (sessionId: string, systemPrompt: string) => {
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionId ? { ...s, systemPrompt, updatedAt: now() } : s
+        )
+      );
+    },
+    []
+  );
+
+  const importSessions = React.useCallback(
+    (imported: ChatSession[]) => {
+      setSessions((prev) => {
+        const map = new Map<string, ChatSession>();
+        prev.forEach(s => map.set(s.id, s));
+        imported.forEach(s => map.set(s.id, s));
+        const finalSessions = Array.from(map.values()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        if (finalSessions.length > 0) {
+          const activeExists = finalSessions.some(s => s.id === activeSessionId);
+          if (!activeExists) {
+            setActiveSessionId(finalSessions[0].id);
+          }
+        }
+        return finalSessions;
+      });
+    },
+    [activeSessionId]
+  );
+
   const groupedSessions = React.useMemo(
     () => groupSessions(sortedSessions),
     [sortedSessions]
@@ -264,6 +310,9 @@ export function useChatSessions(): UseChatSessionsReturn {
     groupedSessions,
     searchQuery,
     setSearchQuery,
-    filteredSessions
+    filteredSessions,
+    updateSessionModel,
+    updateSessionSystemPrompt,
+    importSessions
   };
 }

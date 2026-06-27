@@ -6,6 +6,35 @@
 
 @layer base {
   :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 166 76% 40%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 166 76% 40%;
+    --success: 142.1 76.2% 36.3%;
+    --warning: 38 92% 50%;
+    --danger: 350 80% 50%;
+    --signal: 199 89% 48%;
+    --radius: 0.5rem;
+    --font-geist-sans: "Inter", "Geist", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+    --font-geist-mono: "Geist Mono", "Cascadia Code", "SFMono-Regular", ui-monospace, monospace;
+  }
+
+  .dark {
     --background: 222 42% 5%;
     --foreground: 210 40% 96%;
     --card: 224 34% 8%;
@@ -29,9 +58,6 @@
     --warning: 38 92% 56%;
     --danger: 350 86% 62%;
     --signal: 199 89% 58%;
-    --radius: 0.5rem;
-    --font-geist-sans: "Inter", "Geist", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-    --font-geist-mono: "Geist Mono", "Cascadia Code", "SFMono-Regular", ui-monospace, monospace;
   }
 
   * {

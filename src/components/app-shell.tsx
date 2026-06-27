@@ -26,6 +26,21 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useChatSessions } from "@/hooks/use-chat-sessions";
 import type { ChatSession } from "@/hooks/use-chat-sessions";
 
+// ── sidebar context ────────────────────────────────────────────
+interface SidebarContextType {
+  isOpen: boolean;
+  setIsOpen: (open: boolean) => void;
+}
+
+const SidebarContext = React.createContext<SidebarContextType>({
+  isOpen: true,
+  setIsOpen: () => {}
+});
+
+export function useSidebar() {
+  return React.useContext(SidebarContext);
+}
+
 // ── bottom nav config ──────────────────────────────────────────
 
 const NAV_ITEMS = [
@@ -85,6 +100,33 @@ function SessionGroup({
   );
 }
 
+function RelativeTime({ iso }: { iso: string }) {
+  const [timeStr, setTimeStr] = React.useState("...");
+
+  React.useEffect(() => {
+    const updateTime = () => {
+      try {
+        const diff = Date.now() - new Date(iso).getTime();
+        const diffMins = Math.floor(diff / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffMins < 1) setTimeStr("just now");
+        else if (diffMins < 60) setTimeStr(`${diffMins}m ago`);
+        else if (diffHours < 24) setTimeStr(`${diffHours}h ago`);
+        else setTimeStr(`${diffDays}d ago`);
+      } catch {
+        setTimeStr("some time ago");
+      }
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 60000);
+    return () => clearInterval(interval);
+  }, [iso]);
+
+  return <span>{timeStr}</span>;
+}
+
 function SessionItem({
   session,
   isActive,
@@ -97,42 +139,43 @@ function SessionItem({
   onDelete: (id: string) => void;
 }) {
   const [hovered, setHovered] = React.useState(false);
+  const modelName = session.model || "Gemini 3.5 Flash";
 
   return (
     <li
       className={cn(
-        "group flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer select-none transition-colors duration-150",
+        "group relative flex flex-col items-start gap-0.5 p-3 rounded-lg cursor-pointer select-none transition-all duration-150 mb-1 border border-transparent",
         isActive
-          ? "bg-accent/60 text-emerald-400"
-          : "text-muted-foreground hover:bg-accent/30 hover:text-foreground"
+          ? "bg-slate-200/60 dark:bg-accent/60 border-slate-300/30 dark:border-border/30"
+          : "hover:bg-slate-100 dark:hover:bg-accent/20"
       )}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={() => onSelect(session.id)}
     >
-      <MessageSquare
-        className={cn(
-          "shrink-0 transition-colors duration-150",
-          isActive ? "text-emerald-400" : "text-muted-foreground/50"
+      <div className="flex w-full items-start justify-between gap-2">
+        <span className="flex-1 truncate text-[13px] font-medium text-slate-800 dark:text-slate-200 leading-snug">
+          {session.title}
+        </span>
+        {(hovered || isActive) && (
+          <button
+            aria-label="Delete chat"
+            className="shrink-0 p-0.5 rounded text-slate-400 hover:text-red-500 transition-all duration-150"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(session.id);
+            }}
+          >
+            <Trash2 size={12} />
+          </button>
         )}
-        size={13}
-      />
-      <span className="flex-1 truncate text-[13px] leading-snug">{session.title}</span>
-      {(hovered || isActive) && (
-        <button
-          aria-label="Delete chat"
-          className={cn(
-            "shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-150",
-            "hover:text-destructive"
-          )}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(session.id);
-          }}
-        >
-          <Trash2 size={12} />
-        </button>
-      )}
+      </div>
+      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">
+        <RelativeTime iso={session.updatedAt} /> • {session.messages.length} messages
+      </span>
+      <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded mt-1.5">
+        {modelName}
+      </span>
     </li>
   );
 }
@@ -186,6 +229,7 @@ function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, firebaseConfigured, signOut } = useAuth();
+  const { isOpen } = useSidebar();
   const {
     activeSessionId,
     setActiveSessionId,
@@ -219,34 +263,40 @@ function Sidebar() {
   return (
     <aside
       className={cn(
-        "hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-[260px] z-40",
-        "bg-[#0d1117] border-r border-border/60"
+        "hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-[260px] z-40 transition-transform duration-300 ease-in-out",
+        "bg-slate-50 dark:bg-[#0d1117] border-r border-slate-200 dark:border-border/60",
+        isOpen ? "translate-x-0" : "-translate-x-full"
       )}
     >
-      {/* ── Logo ── */}
-      <div className="flex items-center gap-3 px-4 py-5 shrink-0">
-        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-900/40">
-          <Bot size={18} className="text-white" />
+      {/* ── Top Bar / Logo / New Chat ── */}
+      <div className="flex items-center justify-between px-4 py-4 shrink-0 border-b border-slate-200/60 dark:border-border/40 bg-slate-100/30 dark:bg-slate-900/10 mb-3">
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-6 rounded-md bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-300">
+            <Bot size={14} />
+          </div>
+          <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 select-none">History</span>
         </div>
-        <div>
-          <p className="text-[15px] font-bold leading-tight text-foreground">WokAI</p>
-          <p className="text-[11px] text-muted-foreground leading-tight">AI Work Companion</p>
-        </div>
-      </div>
-
-      {/* ── New Chat ── */}
-      <div className="px-3 mb-3 shrink-0">
+        
         <button
           id="new-chat-btn"
           onClick={handleNewChat}
-          className={cn(
-            "w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg",
-            "bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm",
-            "transition-colors duration-150 shadow-md shadow-emerald-900/30"
-          )}
+          title="New Chat"
+          className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
         >
-          <Plus size={16} />
-          New Chat
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+            <path d="M18.375 2.625a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4Z" />
+          </svg>
         </button>
       </div>
 
@@ -255,7 +305,7 @@ function Sidebar() {
         <div className="relative">
           <Search
             size={13}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/60 pointer-events-none"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-muted-foreground/60 pointer-events-none"
           />
           <input
             id="chat-search-input"
@@ -264,15 +314,15 @@ function Sidebar() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className={cn(
-              "w-full pl-7 pr-7 py-1.5 text-[12px] rounded-md",
-              "bg-accent/40 border border-border/40 text-foreground placeholder:text-muted-foreground/50",
-              "focus:outline-none focus:ring-1 focus:ring-ring/50 transition-colors duration-150"
+              "w-full pl-7 pr-7 py-1.5 text-[12px] rounded-md border",
+              "bg-white dark:bg-accent/40 border-slate-200 dark:border-border/40 text-slate-800 dark:text-foreground placeholder:text-slate-400 dark:placeholder:text-muted-foreground/50",
+              "focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors duration-150"
             )}
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-muted-foreground/60 hover:text-slate-600 dark:hover:text-foreground transition-colors"
             >
               <X size={12} />
             </button>
@@ -281,14 +331,14 @@ function Sidebar() {
       </div>
 
       {/* ── Chat History ── */}
-      <div className="flex-1 overflow-y-auto px-2 pb-2">
+      <div className="flex-1 overflow-y-auto px-2 pb-2 scrollbar-thin">
         {showFiltered ? (
           <div>
-            <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 select-none">
+            <p className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-muted-foreground/60 select-none">
               Results
             </p>
             {filteredSessions.length === 0 ? (
-              <p className="px-3 py-4 text-[12px] text-muted-foreground/60 text-center">
+              <p className="px-3 py-4 text-[12px] text-slate-400 dark:text-muted-foreground/60 text-center">
                 No chats found
               </p>
             ) : (
@@ -339,45 +389,57 @@ function Sidebar() {
         )}
       </div>
 
-      {/* ── Divider ── */}
-      <div className="shrink-0 border-t border-border/40 mx-3" />
+      {/* ── All Chats Button ── */}
+      <div className="p-3 shrink-0 border-t border-slate-200/60 dark:border-border/40 bg-slate-100/10 dark:bg-slate-900/10">
+        <button
+          className={cn(
+            "w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-slate-200 dark:border-border/60",
+            "bg-white dark:bg-card hover:bg-slate-50 dark:hover:bg-accent/40 text-slate-700 dark:text-slate-300 font-medium text-xs shadow-sm",
+            "transition-colors duration-150"
+          )}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect width="7" height="7" x="3" y="3" rx="1" />
+            <rect width="7" height="7" x="14" y="3" rx="1" />
+            <rect width="7" height="7" x="14" y="14" rx="1" />
+            <rect width="7" height="7" x="3" y="14" rx="1" />
+          </svg>
+          All Chats
+        </button>
+      </div>
 
-      {/* ── Bottom Nav ── */}
-      <nav className="shrink-0 px-2 py-2">
-        <ul className="space-y-0.5">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            const isActive = pathname.startsWith(href);
-            return (
-              <li key={href}>
-                <Link
-                  href={href}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium transition-colors duration-150",
-                    isActive
-                      ? "text-emerald-400 bg-accent/50"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent/30"
-                  )}
-                >
-                  <Icon
-                    size={15}
-                    className={isActive ? "text-emerald-400" : "text-muted-foreground/70"}
-                  />
-                  {label}
-                  {isActive && (
-                    <ChevronRight size={12} className="ml-auto text-emerald-400/60" />
-                  )}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-
-      {/* ── Divider ── */}
-      <div className="shrink-0 border-t border-border/40 mx-3" />
+      {/* ── Secondary Nav Icons for Workspace Apps ── */}
+      <div className="px-3 py-2 flex items-center justify-around gap-1 bg-slate-100/50 dark:bg-slate-900/20 border-t border-slate-200/40 dark:border-border/10 shrink-0">
+        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+          const isActive = pathname.startsWith(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              title={label}
+              className={cn(
+                "p-1.5 rounded transition-all duration-150 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-accent/50",
+                isActive && "text-emerald-600 dark:text-emerald-400 bg-slate-200 dark:bg-accent/60"
+              )}
+            >
+              <Icon size={14} />
+            </Link>
+          );
+        })}
+      </div>
 
       {/* ── User Card ── */}
-      <div className="shrink-0">
+      <div className="shrink-0 border-t border-slate-200/60 dark:border-border/40 bg-slate-50 dark:bg-[#0d1117]">
         {user && user.uid !== "demo-user" ? (
           <UserCard
             name={user.name}
@@ -387,10 +449,10 @@ function Sidebar() {
         ) : (
           <div className="px-3 py-3 flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-medium leading-tight text-foreground truncate">
+              <p className="text-[13px] font-medium leading-tight text-slate-800 dark:text-foreground truncate">
                 {user ? user.name : "Not signed in"}
               </p>
-              <p className="text-[11px] text-muted-foreground truncate">
+              <p className="text-[11px] text-slate-500 dark:text-muted-foreground truncate">
                 {user ? user.email : "Please sign in to proceed"}
               </p>
             </div>
@@ -416,8 +478,8 @@ function MobileTabBar() {
     <nav
       className={cn(
         "lg:hidden fixed bottom-0 left-0 right-0 z-40",
-        "bg-[#0d1117] border-t border-border/60",
-        "flex items-center justify-around px-2 py-2 safe-area-bottom"
+        "bg-white dark:bg-[#0d1117] border-t border-slate-200 dark:border-border/60",
+        "flex items-center justify-around px-2 py-2 safe-area-bottom shadow-[0_-4px_12px_rgba(0,0,0,0.05)]"
       )}
     >
       {MOBILE_TABS.map(({ href, label, icon: Icon }) => {
@@ -429,8 +491,8 @@ function MobileTabBar() {
             className={cn(
               "flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-colors duration-150",
               isActive
-                ? "text-emerald-400"
-                : "text-muted-foreground hover:text-foreground"
+                ? "text-emerald-600 dark:text-emerald-400 font-semibold"
+                : "text-slate-500 dark:text-muted-foreground hover:text-slate-800 dark:hover:text-foreground"
             )}
           >
             <Icon size={20} />
@@ -445,13 +507,20 @@ function MobileTabBar() {
 // ── app shell ─────────────────────────────────────────────────
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const [isOpen, setIsOpen] = React.useState(true);
+
   return (
-    <div className="min-h-screen bg-[#0a0f1e]">
-      <Sidebar />
-      <MobileTabBar />
-      <main className="lg:ml-[260px] min-h-screen flex flex-col pb-16 lg:pb-0">
-        {children}
-      </main>
-    </div>
+    <SidebarContext.Provider value={{ isOpen, setIsOpen }}>
+      <div className="min-h-screen bg-slate-50/50 dark:bg-[#0a0f1e] text-slate-800 dark:text-slate-100 font-sans transition-colors duration-150">
+        <Sidebar />
+        <MobileTabBar />
+        <main className={cn(
+          "min-h-screen flex flex-col pb-16 lg:pb-0 transition-all duration-300 ease-in-out",
+          isOpen ? "lg:ml-[260px]" : "lg:ml-0"
+        )}>
+          {children}
+        </main>
+      </div>
+    </SidebarContext.Provider>
   );
 }
