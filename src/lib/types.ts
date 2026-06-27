@@ -77,6 +77,7 @@ export interface WokaiAction {
   output?: string;
   content?: string;
   title?: string;
+  summary?: string;
 }
 
 export interface WokaiDevice {

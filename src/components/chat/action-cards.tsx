@@ -132,6 +132,63 @@ function ContentPreview({ content, title = "Generated Content Preview" }: { cont
   );
 }
 
+function ActionOutputView({ action, borderColor = "border-muted/30" }: { action: WokaiAction; borderColor?: string }) {
+  const [showRaw, setShowRaw] = React.useState(false);
+
+  if (!action.output && !action.summary) return null;
+
+  return (
+    <div className="mt-3 space-y-2">
+      {/* Agent # Summary (Shown by default) */}
+      {action.summary && (
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm transition-all duration-200 hover:border-emerald-500/30">
+          <div className="flex items-center gap-1.5 font-semibold text-emerald-400 text-xs mb-1 font-sans">
+            <span className="inline-flex size-4 items-center justify-center rounded-full bg-emerald-500/10 text-[10px] text-emerald-400 font-bold">#</span>
+            Agent # Summary
+          </div>
+          <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap">{action.summary}</p>
+        </div>
+      )}
+
+      {/* If there is no summary yet, but there is raw output, we fallback to showing raw output */}
+      {!action.summary && action.output && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-sm">
+          <div className="font-semibold text-amber-400 text-xs mb-1 font-sans uppercase tracking-wider">Raw Execution Output</div>
+          <pre className="text-zinc-300 text-xs font-mono whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed overflow-x-auto max-h-60">{action.output}</pre>
+        </div>
+      )}
+
+      {/* Option to toggle raw API output (if summary exists) */}
+      {action.summary && action.output && (
+        <div className="space-y-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowRaw(!showRaw)}
+            className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/10 px-2.5 rounded-lg flex items-center gap-1.5 transition-all duration-150"
+          >
+            {showRaw ? "Hide Raw API Output" : "Show Raw API Output"}
+          </Button>
+
+          {showRaw && (
+            <div className={`rounded-xl border ${borderColor} bg-black/30 p-3 text-xs space-y-3`}>
+              <div>
+                <div className="font-semibold text-zinc-400 text-[10px] mb-1 font-mono uppercase tracking-wider">Raw API Output</div>
+                <pre className="text-zinc-300 font-mono text-xs whitespace-pre-wrap leading-relaxed overflow-x-auto bg-black/25 p-2 rounded max-h-60 border border-border/10">{action.output}</pre>
+              </div>
+              
+              <div className="border-t border-border/10 pt-2">
+                <div className="font-semibold text-emerald-400 text-[10px] mb-1 font-mono uppercase tracking-wider">Agent # Summary</div>
+                <p className="text-zinc-300 font-sans text-sm leading-relaxed whitespace-pre-wrap">{action.summary}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─────────────────────────── EMAIL card ─────────────────────────── */
 
 function EmailCard({ action, onApprove }: { action: WokaiAction; onApprove: () => void }) {
@@ -147,11 +204,7 @@ function EmailCard({ action, onApprove }: { action: WokaiAction; onApprove: () =
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
         <ContentPreview content={action.content} title="Email Body Preview" />
-        {action.output && (
-          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-blue-500/20 font-mono">
-            {action.output}
-          </div>
-        )}
+        <ActionOutputView action={action} borderColor="border-blue-500/20" />
       </div>
       {needsApprove && (
         <div className="mt-3 flex gap-2">
@@ -179,11 +232,7 @@ function CalendarCard({ action, onApprove }: { action: WokaiAction; onApprove: (
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
         <ContentPreview content={action.content} title="Event Description" />
-        {action.output && (
-          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-violet-500/20 font-mono">
-            {action.output}
-          </div>
-        )}
+        <ActionOutputView action={action} borderColor="border-violet-500/20" />
       </div>
       {needsApprove && (
         <div className="mt-3">
@@ -211,11 +260,7 @@ function CallCard({ action, onApprove }: { action: WokaiAction; onApprove: () =>
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
         <ContentPreview content={action.content} title="Call Script" />
-        {action.output && (
-          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-green-500/20 font-mono">
-            {action.output}
-          </div>
-        )}
+        <ActionOutputView action={action} borderColor="border-green-500/20" />
       </div>
       {needsApprove && (
         <div className="mt-3">
@@ -238,11 +283,7 @@ function DriveCard({ action }: { action: WokaiAction }) {
         <div>
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
-        {action.output && (
-          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-orange-500/20 font-mono">
-            {action.output}
-          </div>
-        )}
+        <ActionOutputView action={action} borderColor="border-orange-500/20" />
       </div>
     </ResultCard>
   );
@@ -262,11 +303,7 @@ function BrowserCard({ result, action, onApprove, onReject }: { result: AgentPla
           <StatusDot status={action.status} />
           <span className="flex-1">{action.label}</span>
         </div>
-        {action.output && (
-          <div className="text-xs text-muted-foreground mt-2 pl-4 italic">
-            {action.output}
-          </div>
-        )}
+        <ActionOutputView action={action} borderColor="border-yellow-500/20" />
       </div>
       {!isDone && !isRejected && (
         <div className="mt-3 flex gap-2">
@@ -303,12 +340,7 @@ function TerminalCard({ action, onApprove }: { action: WokaiAction; onApprove: (
         </div>
         <ContentPreview content={action.content} title="Command to execute" />
         {isDone || isFailed ? (
-          <div className={cn(
-            "bg-black/50 p-2 rounded text-[11px] leading-4 whitespace-pre overflow-x-auto font-mono",
-            isFailed ? "text-red-400 border border-red-500/20" : "text-emerald-400/90"
-          )}>
-            {action.output || "No output returned."}
-          </div>
+          <ActionOutputView action={action} borderColor="border-zinc-500/20" />
         ) : (
           <div className="text-zinc-500 italic">Command execution paused. Needs approval.</div>
         )}
@@ -342,14 +374,7 @@ function AppLauncherCard({ action, onApprove }: { action: WokaiAction; onApprove
         <div>
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
-        {action.output && (
-          <div className={cn(
-            "mt-2 text-xs whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed font-mono",
-            isFailed ? "text-red-400 border border-red-500/20" : "text-muted-foreground border border-cyan-500/20"
-          )}>
-            {action.output}
-          </div>
-        )}
+        <ActionOutputView action={action} borderColor="border-cyan-500/20" />
       </div>
       {needsApprove && (
         <div className="mt-3">
@@ -376,11 +401,7 @@ function MapsCard({ action, onApprove }: { action: WokaiAction; onApprove?: () =
         <div>
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
-        {action.output && (
-          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-rose-500/20 font-mono">
-            {action.output}
-          </div>
-        )}
+        <ActionOutputView action={action} borderColor="border-rose-500/20" />
       </div>
       {needsApprove && onApprove && (
         <div className="mt-3">
@@ -405,11 +426,7 @@ function SearchCard({ action, onApprove }: { action: WokaiAction; onApprove?: ()
         <div>
           <span className="text-muted-foreground">Query: </span>{action.label}
         </div>
-        {action.output && (
-          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-teal-500/20 font-mono max-h-48 overflow-y-auto">
-            {action.output}
-          </div>
-        )}
+        <ActionOutputView action={action} borderColor="border-teal-500/20" />
       </div>
       {needsApprove && onApprove && (
         <div className="mt-3">
@@ -434,11 +451,7 @@ function ContactsCard({ action, onApprove }: { action: WokaiAction; onApprove?: 
         <div>
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
-        {action.output && (
-          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-indigo-500/20 font-mono">
-            {action.output}
-          </div>
-        )}
+        <ActionOutputView action={action} borderColor="border-indigo-500/20" />
       </div>
       {needsApprove && onApprove && (
         <div className="mt-3">
@@ -464,11 +477,7 @@ function DocsCard({ action, onApprove }: { action: WokaiAction; onApprove?: () =
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
         <ContentPreview content={action.content} title="Document Content Draft" />
-        {action.output && (
-          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-blue-400/20 font-mono">
-            {action.output}
-          </div>
-        )}
+        <ActionOutputView action={action} borderColor="border-blue-400/20" />
       </div>
       {needsApprove && onApprove && (
         <div className="mt-3">
@@ -494,11 +503,7 @@ function SheetsCard({ action, onApprove }: { action: WokaiAction; onApprove?: ()
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
         <ContentPreview content={action.content} title="Spreadsheet Data Draft" />
-        {action.output && (
-          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-emerald-500/20 font-mono">
-            {action.output}
-          </div>
-        )}
+        <ActionOutputView action={action} borderColor="border-emerald-500/20" />
       </div>
       {needsApprove && onApprove && (
         <div className="mt-3">
@@ -524,11 +529,7 @@ function SlidesCard({ action, onApprove }: { action: WokaiAction; onApprove?: ()
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
         <ContentPreview content={action.content} title="Slide Outline Draft" />
-        {action.output && (
-          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-orange-400/20 font-mono">
-            {action.output}
-          </div>
-        )}
+        <ActionOutputView action={action} borderColor="border-orange-400/20" />
       </div>
       {needsApprove && onApprove && (
         <div className="mt-3">
@@ -635,7 +636,7 @@ function ApprovalBanner() {
 
 interface ActionCardsProps {
   result: AgentPlan;
-  onUpdateActionStatus?: (actionId: string, status: ActionStatus, output?: string) => Promise<void> | void;
+  onUpdateActionStatus?: (actionId: string, status: ActionStatus, output?: string, summary?: string) => Promise<void> | void;
   onUpdatePlan?: (updatedPlan: AgentPlan) => void;
 }
 
@@ -1843,13 +1844,38 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
         output = `Execution failed: ${errMsg}`;
       }
 
+      let summary: string | undefined = undefined;
+      if (finalStatus === "COMPLETED" && output) {
+        try {
+          console.log(`[WokAI OS] Agent # summarizing execution output for tool: ${tool}...`);
+          const token = getGoogleToken();
+          const sumRes = await fetch("/api/agent/summarize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              tool,
+              label,
+              output,
+              googleToken: token || undefined
+            })
+          });
+          if (sumRes.ok) {
+            const sumData = await sumRes.json();
+            summary = sumData.summary;
+            console.log(`[WokAI OS] Agent # summary: "${summary}"`);
+          }
+        } catch (sumErr) {
+          console.error("[WokAI OS] Agent # summarizer failed:", sumErr);
+        }
+      }
+
       if (onUpdateActionStatus) {
-        await onUpdateActionStatus(actionId, finalStatus, output);
+        await onUpdateActionStatus(actionId, finalStatus, output, summary);
       }
 
       if (onUpdatePlan) {
         const updatedActions = result.actions.map((a) =>
-          a.id === actionId ? { ...a, status: finalStatus, output } : a
+          a.id === actionId ? { ...a, status: finalStatus, output, summary } : a
         );
         const updatedNeedsApproval = updatedActions.some(
           (a) => a.status === "NEEDS_APPROVAL"

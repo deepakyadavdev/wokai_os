@@ -190,6 +190,8 @@ export function ChatConsole({
                   ? "Agent 3: Analyzing context..."
                   : progressStatus === "agent4"
                   ? "Agent 4: Generating tool content..."
+                  : progressStatus === "agent#"
+                  ? "Agent #: Summarizing plan details..."
                   : progressStatus === "agent5"
                   ? "Agent 5: Reviewing quality & approving..."
                   : progressStatus === "api"

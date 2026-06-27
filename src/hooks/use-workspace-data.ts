@@ -110,11 +110,11 @@ export function useWorkspaceData(user: UserProfile | null, currentPage?: string)
   );
 
   const updateActionStatus = React.useCallback(
-    async (actionId: string, status: ActionStatus, output?: string) => {
+    async (actionId: string, status: ActionStatus, output?: string, summary?: string) => {
       setSnapshot((current) => ({
         ...current,
         actions: current.actions.map((a) =>
-          a.id === actionId ? { ...a, status, output: output ?? a.output } : a
+          a.id === actionId ? { ...a, status, output: output ?? a.output, summary: summary ?? a.summary } : a
         )
       }));
 
@@ -125,7 +125,7 @@ export function useWorkspaceData(user: UserProfile | null, currentPage?: string)
             const { doc, setDoc, serverTimestamp } = await import("firebase/firestore");
             await setDoc(
               doc(db, "users", user.uid, "actions", actionId),
-              { status, output: output ?? null, updatedAt: serverTimestamp() },
+              { status, output: output ?? null, summary: summary ?? null, updatedAt: serverTimestamp() },
               { merge: true }
             );
           } catch (err: any) {
