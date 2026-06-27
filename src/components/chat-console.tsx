@@ -72,6 +72,7 @@ export function ChatConsole({
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let result: AgentPlan | null = null;
+      let streamError: string | null = null;
 
       if (reader) {
         let buffer = "";
@@ -91,7 +92,7 @@ export function ChatConsole({
               } else if (data.status === "done") {
                 result = data.result;
               } else if (data.status === "error") {
-                throw new Error(data.error || "Streaming error occurred.");
+                streamError = data.error || "Streaming error occurred.";
               }
             } catch (e) {
               console.error("Error parsing stream line:", e);
@@ -105,12 +106,16 @@ export function ChatConsole({
             if (data.status === "done") {
               result = data.result;
             } else if (data.status === "error") {
-              throw new Error(data.error || "Streaming error occurred.");
+              streamError = data.error || "Streaming error occurred.";
             }
           } catch (e) {
             console.error("Error parsing final stream chunk:", e);
           }
         }
+      }
+
+      if (streamError) {
+        throw new Error(streamError);
       }
 
       if (!result) throw new Error("No plan returned from streaming conductor.");
