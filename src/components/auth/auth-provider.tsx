@@ -13,6 +13,7 @@ interface AuthContextValue {
   loading: boolean;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  loginWithAccessKey: (key: string) => boolean;
 }
 
 const localUser: UserProfile = {
@@ -46,11 +47,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch("http://localhost:4317/auth/session").catch(() => null);
+        const res = await fetch("http://127.0.0.1:4317/auth/session").catch(() => null);
         if (res && res.ok) {
           const session = await res.json().catch(() => null);
           if (session && session.token && session.profile) {
             localStorage.setItem("googleAccessToken", session.token);
+            if (session.firebaseToken) {
+              localStorage.setItem("firebaseToken", session.firebaseToken);
+            }
             setUser(session.profile);
             clearInterval(interval);
           }
@@ -82,12 +86,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const isDesktopFlow = urlParams.get("desktop") === "true" || sessionStorage.getItem("desktopFlow") === "true";
           if (isDesktopFlow && firebaseUser) {
             try {
-              const token = await firebaseUser.getIdToken();
-              await fetch("http://localhost:4317/auth/callback", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token, profile: toProfile(firebaseUser) })
-              });
+              const firebaseToken = await firebaseUser.getIdToken();
+              const googleToken = localStorage.getItem("googleAccessToken") || "";
+              const payload = { token: googleToken, firebaseToken, profile: toProfile(firebaseUser) };
+
+              // Try loopback callback on both localhost and 127.0.0.1 to avoid routing blocks
+              await Promise.any([
+                fetch("http://localhost:4317/auth/callback", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payload)
+                }),
+                fetch("http://127.0.0.1:4317/auth/callback", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payload)
+                })
+              ]).catch(() => null);
+
               sessionStorage.removeItem("desktopFlow");
             } catch (err) {
               console.error("[WokAI OS] Auth callback to companion failed:", err);
@@ -129,9 +145,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut: async () => {
         if (auth) await signOutOfFirebase();
         if (isElectron || typeof window !== "undefined") {
-          await fetch("http://localhost:4317/auth/clear", { method: "POST" }).catch(() => null);
+          await Promise.any([
+            fetch("http://localhost:4317/auth/clear", { method: "POST" }),
+            fetch("http://127.0.0.1:4317/auth/clear", { method: "POST" })
+          ]).catch(() => null);
         }
         setUser(firebaseConfigured ? null : localUser);
+      },
+      loginWithAccessKey: (key: string) => {
+        try {
+          const raw = decodeURIComponent(escape(atob(key.trim())));
+          const data = JSON.parse(raw);
+          if (data && data.profile) {
+            if (data.googleToken) localStorage.setItem("googleAccessToken", data.googleToken);
+            if (data.firebaseToken) localStorage.setItem("firebaseToken", data.firebaseToken);
+            setUser(data.profile);
+            return true;
+          }
+        } catch (e) {
+          console.error("[WokAI OS] Invalid access key format:", e);
+        }
+        return false;
       }
     }),
     [auth, firebaseConfigured, loading, user, isElectron]

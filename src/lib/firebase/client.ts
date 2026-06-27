@@ -46,6 +46,7 @@ export async function signInWithGoogle() {
   const auth = getFirebaseAuth();
   if (!auth) throw new Error("Firebase is not configured.");
   const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
   provider.addScope("email");
   provider.addScope("profile");
   provider.addScope("https://www.googleapis.com/auth/gmail.modify");

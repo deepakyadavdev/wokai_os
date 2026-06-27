@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
+import { getFirebaseAuth } from "@/lib/firebase/client";
 
 const FEATURES = [
   "Schedules meetings through conversation",
@@ -14,9 +15,13 @@ const FEATURES = [
 ];
 
 export function LoginCard() {
-  const { signIn, firebaseConfigured, user } = useAuth();
+  const { signIn, firebaseConfigured, user, loginWithAccessKey } = useAuth();
   const router = useRouter();
   const [isDesktopSuccess, setIsDesktopSuccess] = React.useState(false);
+  const [accessKey, setAccessKey] = React.useState("");
+  const [pastedKey, setPastedKey] = React.useState("");
+
+  const isElectron = typeof window !== "undefined" && window.navigator.userAgent.toLowerCase().indexOf("electron") > -1;
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -30,6 +35,27 @@ export function LoginCard() {
       }
     }
   }, [user]);
+
+  // Generate Access Key for browser to copy
+  React.useEffect(() => {
+    async function generateKey() {
+      if (isDesktopSuccess && user && user.uid !== "local-user") {
+        try {
+          const auth = getFirebaseAuth();
+          if (auth && auth.currentUser) {
+            const firebaseToken = await auth.currentUser.getIdToken();
+            const googleToken = localStorage.getItem("googleAccessToken") || "";
+            const payload = JSON.stringify({ googleToken, firebaseToken, profile: user });
+            const key = btoa(unescape(encodeURIComponent(payload)));
+            setAccessKey(key);
+          }
+        } catch (e) {
+          console.error("Failed to generate access key:", e);
+        }
+      }
+    }
+    generateKey();
+  }, [isDesktopSuccess, user]);
 
   if (isDesktopSuccess) {
     return (
@@ -55,9 +81,30 @@ export function LoginCard() {
               Connected Successfully!
             </h1>
             <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-              Your Google Account is securely connected. You can now close this browser tab and return to the WokAI Desktop application.
+              If your desktop app did not log in automatically, copy the Access Key below and paste it in the desktop app:
             </p>
           </div>
+
+          {accessKey && (
+            <div className="space-y-2 text-left">
+              <textarea
+                readOnly
+                value={accessKey}
+                onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                className="w-full h-24 p-2 text-[10px] font-mono bg-black/40 border border-border rounded resize-none select-all focus:outline-none"
+              />
+              <Button
+                size="sm"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold"
+                onClick={() => {
+                  navigator.clipboard.writeText(accessKey);
+                  alert("Access Key copied to clipboard!");
+                }}
+              >
+                Copy Access Key
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -116,6 +163,38 @@ export function LoginCard() {
           Continue with Google
           <ArrowRight size={16} />
         </Button>
+
+        {/* Electron Paste Fallback */}
+        {isElectron && (
+          <div className="mt-6 pt-6 border-t border-border/40 text-left animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <p className="text-xs font-medium text-muted-foreground mb-2">
+              Google Login blocked? Paste your Access Key here:
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Paste Access Key..."
+                value={pastedKey}
+                onChange={(e) => setPastedKey(e.target.value)}
+                className="flex-1 px-3 py-1.5 text-xs bg-black/40 border border-border rounded focus:outline-none focus:ring-1 focus:ring-emerald-500 text-foreground placeholder:text-muted-foreground/40 font-mono truncate"
+              />
+              <Button
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold px-4"
+                onClick={() => {
+                  const success = loginWithAccessKey(pastedKey);
+                  if (success) {
+                    router.push("/chat");
+                  } else {
+                    alert("Invalid Access Key. Please try copying it again.");
+                  }
+                }}
+              >
+                Submit
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
