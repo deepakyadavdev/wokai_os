@@ -20,4 +20,8 @@ firestore-debug.log
 ui-debug.log
 wokai-companion.exe
 playwright-profile/
+desktop-build/
+desktop-app/node_modules/
+desktop-entry.js
+
 
