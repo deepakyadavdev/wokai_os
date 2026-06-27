@@ -111,10 +111,18 @@ app.post("/browser/run", async (req, res) => {
 });
 
 const PORT = 4317;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n======================================================`);
   console.log(`WokAI OS Local Companion Service Active on Port ${PORT}`);
   console.log(`Detecting local Chrome installation...`);
   console.log(`Ready for one-click local app and browser operations!`);
   console.log(`======================================================\n`);
+});
+
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.warn(`[WokAI Companion] Port ${PORT} is already in use. Assuming service is already active.`);
+  } else {
+    console.error(`[WokAI Companion] Server error:`, err.message);
+  }
 });
