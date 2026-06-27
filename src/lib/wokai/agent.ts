@@ -327,15 +327,65 @@ async function callLLM(
       headers,
       body: JSON.stringify({
         model,
-        messages
+        messages,
+        stream: true
       })
     });
 
     if (res.ok) {
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content;
-      if (content) {
-        return content.trim();
+      if (res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let fullContent = "";
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            if (trimmed === "data: [DONE]") continue;
+            if (trimmed.startsWith("data: ")) {
+              try {
+                const parsed = JSON.parse(trimmed.substring(6));
+                const text = parsed.choices?.[0]?.delta?.content;
+                if (text) {
+                  fullContent += text;
+                }
+              } catch (err) {
+                // Ignore parse errors on partial streams
+              }
+            }
+          }
+        }
+
+        if (buffer && buffer.startsWith("data: ") && buffer !== "data: [DONE]") {
+          try {
+            const parsed = JSON.parse(buffer.substring(6));
+            const text = parsed.choices?.[0]?.delta?.content;
+            if (text) {
+              fullContent += text;
+            }
+          } catch (err) {
+            // Ignore
+          }
+        }
+
+        if (fullContent.trim()) {
+          return fullContent.trim();
+        }
+      }
+
+      // Fallback: If streaming body was unavailable, try standard non-stream parse
+      const data = await res.json().catch(() => null);
+      if (data && data.choices?.[0]?.message?.content) {
+        return data.choices[0].message.content.trim();
       }
     }
     const errText = await res.text().catch(() => "");
