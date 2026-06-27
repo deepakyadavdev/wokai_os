@@ -136,9 +136,12 @@ function ContentPreview({ content, title = "Generated Content Preview" }: { cont
 
 function EmailCard({ action, onApprove }: { action: WokaiAction; onApprove: () => void }) {
   const isDone = action.status === "COMPLETED";
+  const isFailed = action.status === "FAILED";
+  const isRunning = action.status === "RUNNING";
+  const needsApprove = action.status === "NEEDS_APPROVAL" || isRunning;
   return (
-    <ResultCard className="border-blue-500/30 bg-blue-500/10">
-      <CardHeader icon={Mail} label={isDone ? "Email Sent Successfully" : "Email Draft Created"} iconClass="text-blue-400" />
+    <ResultCard className={isFailed ? "border-red-500/30 bg-red-500/10" : "border-blue-500/30 bg-blue-500/10"}>
+      <CardHeader icon={Mail} label={isDone ? "Email Sent Successfully" : isFailed ? "Email Sending Failed" : "Email Draft Created"} iconClass={isFailed ? "text-red-400" : "text-blue-400"} />
       <div className="space-y-1.5 text-sm">
         <div>
           <span className="text-muted-foreground">Action: </span>{action.label}
@@ -150,10 +153,10 @@ function EmailCard({ action, onApprove }: { action: WokaiAction; onApprove: () =
           </div>
         )}
       </div>
-      {!isDone && (
+      {needsApprove && (
         <div className="mt-3 flex gap-2">
-          <Button size="sm" onClick={onApprove} className="bg-blue-600 text-white hover:bg-blue-500" disabled={action.status === "RUNNING"}>
-            {action.status === "RUNNING" ? <Loader2 className="size-3 animate-spin" /> : "Send"}
+          <Button size="sm" onClick={onApprove} className="bg-blue-600 text-white hover:bg-blue-500" disabled={isRunning}>
+            {isRunning ? <Loader2 className="size-3 animate-spin" /> : "Send"}
           </Button>
         </div>
       )}
@@ -165,9 +168,12 @@ function EmailCard({ action, onApprove }: { action: WokaiAction; onApprove: () =
 
 function CalendarCard({ action, onApprove }: { action: WokaiAction; onApprove: () => void }) {
   const isDone = action.status === "COMPLETED";
+  const isFailed = action.status === "FAILED";
+  const isRunning = action.status === "RUNNING";
+  const needsApprove = action.status === "NEEDS_APPROVAL" || isRunning;
   return (
-    <ResultCard className="border-violet-500/30 bg-violet-500/10">
-      <CardHeader icon={CalendarDays} label={isDone ? "Event Confirmed on Calendar" : "Event Drafted"} iconClass="text-violet-400" />
+    <ResultCard className={isFailed ? "border-red-500/30 bg-red-500/10" : "border-violet-500/30 bg-violet-500/10"}>
+      <CardHeader icon={CalendarDays} label={isDone ? "Event Confirmed on Calendar" : isFailed ? "Event Creation Failed" : "Event Drafted"} iconClass={isFailed ? "text-red-400" : "text-violet-400"} />
       <div className="space-y-1.5 text-sm">
         <div>
           <span className="text-muted-foreground">Action: </span>{action.label}
@@ -179,10 +185,10 @@ function CalendarCard({ action, onApprove }: { action: WokaiAction; onApprove: (
           </div>
         )}
       </div>
-      {!isDone && (
+      {needsApprove && (
         <div className="mt-3">
-          <Button size="sm" onClick={onApprove} className="bg-violet-600 text-white hover:bg-violet-500" disabled={action.status === "RUNNING"}>
-            {action.status === "RUNNING" ? <Loader2 className="size-3 animate-spin" /> : "Approve Event"}
+          <Button size="sm" onClick={onApprove} className="bg-violet-600 text-white hover:bg-violet-500" disabled={isRunning}>
+            {isRunning ? <Loader2 className="size-3 animate-spin" /> : "Approve Event"}
           </Button>
         </div>
       )}
@@ -194,9 +200,12 @@ function CalendarCard({ action, onApprove }: { action: WokaiAction; onApprove: (
 
 function CallCard({ action, onApprove }: { action: WokaiAction; onApprove: () => void }) {
   const isDone = action.status === "COMPLETED";
+  const isFailed = action.status === "FAILED";
+  const isRunning = action.status === "RUNNING";
+  const needsApprove = action.status === "NEEDS_APPROVAL" || isRunning;
   return (
-    <ResultCard className="border-green-500/30 bg-green-500/10">
-      <CardHeader icon={Phone} label={isDone ? "Call Placed and Logged" : "Contact Found"} iconClass="text-green-400" />
+    <ResultCard className={isFailed ? "border-red-500/30 bg-red-500/10" : "border-green-500/30 bg-green-500/10"}>
+      <CardHeader icon={Phone} label={isDone ? "Call Placed and Logged" : isFailed ? "Phone Call Failed" : "Contact Found"} iconClass={isFailed ? "text-red-400" : "text-green-400"} />
       <div className="space-y-1.5 text-sm">
         <div>
           <span className="text-muted-foreground">Action: </span>{action.label}
@@ -208,10 +217,10 @@ function CallCard({ action, onApprove }: { action: WokaiAction; onApprove: () =>
           </div>
         )}
       </div>
-      {!isDone && (
+      {needsApprove && (
         <div className="mt-3">
-          <Button size="sm" onClick={onApprove} className="bg-green-600 text-white hover:bg-green-500" disabled={action.status === "RUNNING"}>
-            {action.status === "RUNNING" ? <Loader2 className="size-3 animate-spin" /> : "Call Now"}
+          <Button size="sm" onClick={onApprove} className="bg-green-600 text-white hover:bg-green-500" disabled={isRunning}>
+            {isRunning ? <Loader2 className="size-3 animate-spin" /> : "Call Now"}
           </Button>
         </div>
       )}
@@ -277,27 +286,37 @@ function BrowserCard({ result, action, onApprove, onReject }: { result: AgentPla
 
 function TerminalCard({ action, onApprove }: { action: WokaiAction; onApprove: () => void }) {
   const isDone = action.status === "COMPLETED";
+  const isFailed = action.status === "FAILED";
+  const isRunning = action.status === "RUNNING";
+  const needsApprove = action.status === "NEEDS_APPROVAL" || isRunning;
   return (
-    <ResultCard className="border-zinc-500/30 bg-zinc-950 font-mono text-zinc-300">
-      <CardHeader icon={Cpu} label={isDone ? "Terminal Execution Completed" : "Terminal Authorization Required"} iconClass="text-emerald-400" />
+    <ResultCard className={isFailed ? "border-red-500/30 bg-zinc-950 font-mono text-zinc-300" : "border-zinc-500/30 bg-zinc-950 font-mono text-zinc-300"}>
+      <CardHeader 
+        icon={Cpu} 
+        label={isDone ? "Terminal Execution Completed" : isFailed ? "Terminal Execution Failed" : "Terminal Authorization Required"} 
+        iconClass={isFailed ? "text-red-400" : "text-emerald-400"} 
+      />
       <div className="space-y-2 text-xs">
         <div className="flex items-center gap-1.5 text-zinc-500">
           <span>$</span>
           <span className="text-zinc-200">{action.label}</span>
         </div>
         <ContentPreview content={action.content} title="Command to execute" />
-        {isDone ? (
-          <div className="bg-black/50 p-2 rounded text-[11px] leading-4 text-emerald-400/90 whitespace-pre overflow-x-auto font-mono">
+        {isDone || isFailed ? (
+          <div className={cn(
+            "bg-black/50 p-2 rounded text-[11px] leading-4 whitespace-pre overflow-x-auto font-mono",
+            isFailed ? "text-red-400 border border-red-500/20" : "text-emerald-400/90"
+          )}>
             {action.output || "No output returned."}
           </div>
         ) : (
           <div className="text-zinc-500 italic">Command execution paused. Needs approval.</div>
         )}
       </div>
-      {!isDone && (
+      {needsApprove && (
         <div className="mt-3 flex gap-2 font-sans">
-          <Button size="sm" onClick={onApprove} className="bg-emerald-600 text-white hover:bg-emerald-500" disabled={action.status === "RUNNING"}>
-            {action.status === "RUNNING" ? <Loader2 className="size-3 animate-spin" /> : "Approve & Run"}
+          <Button size="sm" onClick={onApprove} className="bg-emerald-600 text-white hover:bg-emerald-500" disabled={isRunning}>
+            {isRunning ? <Loader2 className="size-3 animate-spin" /> : "Approve & Run"}
           </Button>
         </div>
       )}
@@ -309,23 +328,33 @@ function TerminalCard({ action, onApprove }: { action: WokaiAction; onApprove: (
 
 function AppLauncherCard({ action, onApprove }: { action: WokaiAction; onApprove: () => void }) {
   const isDone = action.status === "COMPLETED";
+  const isFailed = action.status === "FAILED";
+  const isRunning = action.status === "RUNNING";
+  const needsApprove = action.status === "NEEDS_APPROVAL" || isRunning;
   return (
-    <ResultCard className="border-cyan-500/30 bg-cyan-500/10">
-      <CardHeader icon={MonitorSmartphone} label={isDone ? "Application Launched" : "App Launch Requested"} iconClass="text-cyan-400" />
+    <ResultCard className={isFailed ? "border-red-500/30 bg-red-500/10" : "border-cyan-500/30 bg-cyan-500/10"}>
+      <CardHeader 
+        icon={MonitorSmartphone} 
+        label={isDone ? "Application Launched" : isFailed ? "App Launch Failed" : "App Launch Requested"} 
+        iconClass={isFailed ? "text-red-400" : "text-cyan-400"} 
+      />
       <div className="space-y-1.5 text-sm">
         <div>
           <span className="text-muted-foreground">Action: </span>{action.label}
         </div>
         {action.output && (
-          <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed border border-cyan-500/20 font-mono">
+          <div className={cn(
+            "mt-2 text-xs whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed font-mono",
+            isFailed ? "text-red-400 border border-red-500/20" : "text-muted-foreground border border-cyan-500/20"
+          )}>
             {action.output}
           </div>
         )}
       </div>
-      {!isDone && (
+      {needsApprove && (
         <div className="mt-3">
-          <Button size="sm" onClick={onApprove} className="bg-cyan-600 text-white hover:bg-cyan-500" disabled={action.status === "RUNNING"}>
-            {action.status === "RUNNING" ? <Loader2 className="size-3 animate-spin" /> : "Open App"}
+          <Button size="sm" onClick={onApprove} className="bg-cyan-600 text-white hover:bg-cyan-500" disabled={isRunning}>
+            {isRunning ? <Loader2 className="size-3 animate-spin" /> : "Open App"}
           </Button>
         </div>
       )}
@@ -337,10 +366,12 @@ function AppLauncherCard({ action, onApprove }: { action: WokaiAction; onApprove
 
 function MapsCard({ action, onApprove }: { action: WokaiAction; onApprove?: () => void }) {
   const isDone = action.status === "COMPLETED";
-  const needsApprove = action.status === "NEEDS_APPROVAL";
+  const isFailed = action.status === "FAILED";
+  const isRunning = action.status === "RUNNING";
+  const needsApprove = action.status === "NEEDS_APPROVAL" || isRunning;
   return (
-    <ResultCard className="border-rose-500/30 bg-rose-500/10">
-      <CardHeader icon={Globe} label="Google Maps Agent" iconClass="text-rose-400" />
+    <ResultCard className={isFailed ? "border-red-500/30 bg-red-500/10" : "border-rose-500/30 bg-rose-500/10"}>
+      <CardHeader icon={Globe} label={isDone ? "Google Maps Completed" : isFailed ? "Route Calculation Failed" : "Google Maps Agent"} iconClass={isFailed ? "text-red-400" : "text-rose-400"} />
       <div className="space-y-1.5 text-sm">
         <div>
           <span className="text-muted-foreground">Action: </span>{action.label}
@@ -353,8 +384,8 @@ function MapsCard({ action, onApprove }: { action: WokaiAction; onApprove?: () =
       </div>
       {needsApprove && onApprove && (
         <div className="mt-3">
-          <Button size="sm" onClick={onApprove} className="bg-rose-600 text-white hover:bg-rose-500" disabled={action.status === "RUNNING"}>
-            {action.status === "RUNNING" ? <Loader2 className="size-3 animate-spin" /> : "Calculate Route"}
+          <Button size="sm" onClick={onApprove} className="bg-rose-600 text-white hover:bg-rose-500" disabled={isRunning}>
+            {isRunning ? <Loader2 className="size-3 animate-spin" /> : "Calculate Route"}
           </Button>
         </div>
       )}
@@ -1777,7 +1808,19 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
       } catch (err: any) {
         console.error("[WokAI OS] Tool Execution Exception:", err);
         finalStatus = "FAILED";
-        output = `Execution failed: ${err.message || err}`;
+        let errMsg = "";
+        if (err instanceof Error) {
+          errMsg = err.stack || err.message;
+        } else if (typeof err === "object" && err !== null) {
+          try {
+            errMsg = JSON.stringify(err, null, 2);
+          } catch (e) {
+            errMsg = String(err);
+          }
+        } else {
+          errMsg = String(err);
+        }
+        output = `Execution failed: ${errMsg}`;
       }
 
       if (onUpdateActionStatus) {
