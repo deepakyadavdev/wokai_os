@@ -1,158 +1,132 @@
-LI # WokAI
+# WokAI OS: The Agentic Productivity Operating System
 
-**The AI That Helps You Finish Work Before It's Too Late.**
+WokAI OS is a futuristic, command-center productivity operating system powered by a coordinated multi-agent orchestration architecture. It goes beyond the limits of standard chatbots: WokAI constructs logical step-by-step plans, writes files, schedules meetings, checks emails, executes host shell commands, places outbound phone calls, and controls active browser instances through automated scripts—all while keeping sensitive operations behind user approval gates.
 
-WokAI is a Next.js productivity operating system inspired by OMP's agent architecture. It is not a plain chatbot: it plans work, remembers preferences, creates tasks, detects deadline risk, drafts safe actions, queues device/browser jobs, and pauses sensitive operations for approval.
+---
 
-## What Is Built
+## 🚀 The Core Architecture: 5-Agent + Agent # Orchestration
 
-- Futuristic command-center UI with Dashboard, Chat, Tasks, Memory, Inbox, Calendar, Drive, Workspace, Devices, Life Saver, Browser Agent, Settings, and Login routes.
-- OMP-inspired agent runtime: conductor, subagents, typed tool registry, approval gates, memory writes, task generation, and audit-ready action logs.
-- Gemini route handler with deterministic demo fallback when `GEMINI_API_KEY` is missing.
-- Firebase Auth and Firestore-ready user-scoped storage under `users/{uid}/...`.
-- Google API OAuth scaffolding for Gmail, Calendar, Drive, Docs, Sheets, Slides, and People.
-- Browser-agent architecture with demo mode and optional local Playwright worker handoff.
-- Phone workflow with `tel:` demo fallback and optional Twilio outbound call adapter.
-- Firestore rules, `.env.example`, Vercel config, OMP docs, and deployment notes.
+WokAI OS implements a structured, sequential **OMP-inspired Multi-Agent Conductor** pipeline. Instead of relying on a single prompt-response loop, WokAI distributes cognitive load across specialized agents to guarantee correctness, safety, and thoroughness:
 
-## OMP For This Project
-
-OMP is used as the recommended coding-agent workflow for the repo and as inspiration for WokAI's app architecture.
-
-Install OMP on Windows:
-
-```powershell
-irm https://omp.sh/install.ps1 | iex
+```mermaid
+graph TD
+    User([User Prompt]) --> AgentA[Agent A: Human Thinker]
+    AgentA --> Agent1[Agent 1: Conversational Responder]
+    AgentA --> AgentB[Agent B: Tool Mapper]
+    AgentB --> Agent2[Agent 2: Structured JSON Planner]
+    Agent2 --> Agent4[Agent 4: Content & Subject Generator]
+    Agent4 --> Agent3[Agent 3: API Parameter Binder]
+    Agent1 --> AgentHash[Agent #: Plan Summarizer]
+    Agent3 --> AgentHash
+    AgentHash --> Agent5{Agent 5: QA & Risk Evaluator}
+    Agent5 -- Approved --> Output[Live Action Cards & Chat Summary]
+    Agent5 -- Rejected --> Refine[Feedback & Recursive Prompt Refinement]
+    Refine --> AgentA
 ```
 
-Other official install options:
+### 1. **Agent A (Human Worker Thinker)**
+*   **Role**: Cognitive deconstruction of user intent.
+*   **Prompting Focus**: It ignores tool constraints and models the step-by-step actions a highly proactive, competent human assistant would take to complete the request.
 
-```sh
-bun install -g @oh-my-pi/pi-coding-agent
-curl -fsSL https://omp.sh/install | sh
-brew install can1357/tap/omp
-mise use -g github:can1357/oh-my-pi
+### 2. **Agent B (Tool Mapper & Adaptor)**
+*   **Role**: System API capability matching.
+*   **Prompting Focus**: Maps Agent A's human steps to WokAI's registered list of allowed system tools (e.g. `gmail.send`, `calendar.createEvent`, `devices.terminal`). If no direct match exists, it adapts the step using fallback mechanisms (like browser plans or terminal operations).
+
+### 3. **Agent 1 (Worthful Conversational Responder)**
+*   **Role**: User-facing conversational engine.
+*   **Prompting Focus**: Drafts a natural, professional reply explaining the upcoming steps to the user in 2-3 sentences, free from technical JSON formats or backend tool names.
+
+### 4. **Agent 2 (Structured Plan Generator)**
+*   **Role**: JSON Plan Synthesizer.
+*   **Prompting Focus**: Translates Agent B's mapped tools into a structured JSON block containing exact `WokaiAction` objects, assigns unique IDs, evaluates risk level (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`), and classifies sensitive actions requiring approval.
+
+### 5. **Agent 4 (Content Generator)**
+*   **Role**: Contextual payload writer.
+*   **Prompting Focus**: Dynamically writes exact code, script bodies, markdown docs, search query terms, email subjects/bodies, or terminal command lines needed for each scheduled action.
+
+### 6. **Agent 3 (API Handler)**
+*   **Role**: API Parameter Binder.
+*   **Prompting Focus**: Merges structured actions from Agent 2 with payload contents from Agent 4, outputting fully hydrated, syntactically valid execution parameters.
+
+### 7. **Agent # (Plan Summarizer)**
+*   **Role**: Execution Summary Engine.
+*   **Prompting Focus**: Looks at Agent 1's conversational response and the compiled API action list, generating a concise, high-level summary of what will run. 
+*   *Note*: When actions execute, Agent # is invoked again via `/api/agent/summarize` to convert raw JSON outputs (like a raw email list or JSON calendar array) into readable summaries.
+
+### 8. **Agent 5 (Quality Assurance & Evaluator)**
+*   **Role**: Gatekeeper & Auditor.
+*   **Prompting Focus**: Evaluates the plan against the original prompt. If any actions are irrelevant, unsafe, or missing, it rejects the plan, creates structured feedback, and triggers a recursive conductor pass with a refined prompt to fix the plan.
+
+---
+
+## 🛠️ API Integrations & Native Execution Details
+
+WokAI OS connects to local and cloud services to execute actions.
+
+### 1. **Google Workspace APIs**
+WokAI uses OAuth 2.0 authorization with Google Cloud APIs:
+*   **Gmail API (`gmail.send`, `gmail.search`, `gmail.summarize`)**: Reads threads, searches messages with structured query strings, drafts and sends emails.
+*   **Google Calendar API (`calendar.createEvent`, `calendar.listEvents`)**: Creates scheduled meetings with descriptions/agendas, lists calendars, and removes cancelled events.
+*   **Google Drive API (`drive.search`)**: Performs searches against files using user queries, returning names, IDs, mimeTypes, modified times, and direct `webViewLink` references.
+*   **Google Docs, Sheets, & Slides APIs (`docs.create`, `sheets.createTracker`, `slides.createDeck`)**: Generates documents with structured layouts and templates.
+
+### 2. **Local Companion Daemon (Host Execution)**
+For local operation, WokAI communicates with the **WokAI Companion Service** running on port `4317`:
+*   **Terminal Execution (`devices.terminal`)**: Executes native host commands (Command Prompt/PowerShell) with 15-second safety timeout controllers.
+*   **Application Launcher (`devices.openApp`)**: Spawns native processes on the local machine.
+*   **Online/Offline Command Queueing**: Queues commands for execution when offline and syncs them back to Firestore.
+
+### 3. **Playwright Browser Agent (`browser.plan`)**
+*   **Workflow**: Executes dynamic web automation using a headless/headed Chromium instance (configured via Playwright to bypass automation detection).
+*   **Safety Guard**: Pauses browser execution and requests user approval before clicking final forms submit buttons or conducting uploads.
+
+### 4. **Twilio Outbound Calling (`calls.prepare`)**
+*   **Workflow**: Prepares outbound phone call script bodies. If Twilio environment variables are active, it initiates voice calls using Twilio's REST API.
+
+---
+
+## 💎 Premium UI/UX Highlights
+
+*   **Real-time Conductor Log**: Displays a live, sequential step-by-step progress trace showing which agent is thinking and which has completed (`✓ Done`). This gives users instant visual feedback on processing latency.
+*   **Unified Command Center**: Dashboard cards displaying pending actions, active user tasks, personalized memories, email status, and device connections.
+*   **Action Output Toggle**: Every execution card displays Agent #'s friendly result summary by default, with an expandable "Show Raw API Output" toggle rendering the raw JSON API output side-by-side.
+*   **Approval Gates**: All actions marked as sensitive are paused until the user clicks "Approve".
+
+---
+
+## ⚙️ Setup & Installation
+
+### Local Web Server Setup:
+1. Install dependencies:
+   ```bash
+   npm install --cache .npm-cache
+   ```
+2. Configure Environment:
+   ```bash
+   cp .env.example .env.local
+   # Fill in GEMINI_API_KEY, Google OAuth keys, Firebase credentials, and optional Twilio API keys.
+   ```
+3. Run Development Server:
+   ```bash
+   npm run dev
+   ```
+
+### Local Companion Setup:
+To run terminal commands and browser automations locally, start the companion node server:
+```bash
+node wokai-companion.js
 ```
+The Next.js client automatically detects the companion on port `4317` and routes local actions there.
 
-After installing project dependencies, you can also run the local OMP package:
-
-```sh
-npm run omp
-npm run omp:plan
-npm run omp:resume
-```
-
-Recommended OMP workflow:
-
-1. Use `npm run omp:plan` for non-trivial changes.
-2. Split work into subagents: UI, Firebase, Google APIs, agent runtime, tests.
-3. Keep sensitive actions approval-gated.
-4. Run `npm run verify` before deploying.
-5. Store durable repo lessons in `docs/omp-memory.md`.
-
-## Local Setup
-
-```sh
-npm install --cache .npm-cache
-cp .env.example .env.local
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-The app runs in demo mode without secrets. Add env vars to unlock live Gemini, Firebase, Google OAuth, and Twilio behavior.
-
-## Environment Variables
-
-Copy `.env.example` to `.env.local` and fill:
-
-- `GEMINI_API_KEY`
-- `NEXT_PUBLIC_FIREBASE_*`
-- optional Firebase Admin vars for server-side verification
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
-- optional `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`
-- optional `LOCAL_BROWSER_AGENT_URL` and `BROWSER_AGENT_MODE=local`
-
-## Firebase
-
-1. Create a Firebase project.
-2. Enable Google sign-in in Firebase Authentication.
-3. Create a web app and copy the `NEXT_PUBLIC_FIREBASE_*` values.
-4. Enable Firestore.
-5. Deploy rules:
-
-```sh
-firebase deploy --only firestore:rules
-```
-
-Data is user-scoped:
-
-```txt
-users/{uid}
-users/{uid}/tasks/{taskId}
-users/{uid}/memories/{memoryId}
-users/{uid}/actions/{actionId}
-users/{uid}/devices/{deviceId}
-users/{uid}/audit_logs/{logId}
-```
-
-## Google APIs
-
-Enable these APIs in Google Cloud:
-
-- Gmail API
-- Google Calendar API
-- Google Drive API
-- Google Docs API
-- Google Sheets API
-- Google Slides API
-- People API
-
-Add OAuth redirect URI:
-
-```txt
-http://localhost:3000/api/google/callback
-https://YOUR_VERCEL_DOMAIN/api/google/callback
-```
-
-The current app includes the auth URL route and integration scaffolding. Production token persistence should store encrypted OAuth tokens under `users/{uid}/integrations/google`.
-
-## Browser Agent
-
-Vercel serverless is not a good place for long-running Playwright sessions. WokAI ships a safe architecture:
-
-- default `BROWSER_AGENT_MODE=demo`
-- optional `BROWSER_AGENT_MODE=local`
-- local worker URL from `LOCAL_BROWSER_AGENT_URL`
-- job model pauses before submit, payment, upload, send, or destructive actions
-
-## Phone Calls
-
-WokAI supports realistic call workflow:
-
-- demo mode returns a `tel:` link and call script
-- Twilio mode places an outbound call if Twilio env vars are present
-- call summaries and action items are designed to be stored in Firestore
-
-## Verify
-
-```sh
-npm run typecheck
-npm run lint
-npm run build
-```
-
-Or run all:
-
-```sh
+### Verify Build Quality:
+Ensure type safety and linting compliance before shipping:
+```bash
 npm run verify
 ```
 
-## Deploy To Vercel
+---
 
-See `docs/deployment.md`.
-
-## Sources
-
-- OMP docs: [https://omp.sh](https://omp.sh)
-- OMP package: [@oh-my-pi/pi-coding-agent](https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent)
+## 📦 Tech Stack
+*   **Frontend**: Next.js (App Router), TypeScript, Tailwind CSS, Shadcn/ui elements, Lucide Icons, Framer Motion.
+*   **Backend**: Next.js Route Handlers (SSE streaming), Express (Companion Service), Playwright (Browser Automation), Google APIs, Twilio.
+*   **Database & Auth**: Google Firebase Auth, Cloud Firestore database rules.
