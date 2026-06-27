@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { Bot, Check, ArrowRight, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -13,8 +14,54 @@ const FEATURES = [
 ];
 
 export function LoginCard() {
-  const { signIn, firebaseConfigured } = useAuth();
+  const { signIn, firebaseConfigured, user } = useAuth();
   const router = useRouter();
+  const [isDesktopSuccess, setIsDesktopSuccess] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("desktop") === "true") {
+        sessionStorage.setItem("desktopFlow", "true");
+        // If we are logged in with a real firebase account, show success screen
+        if (user && user.uid !== "local-user") {
+          setIsDesktopSuccess(true);
+        }
+      }
+    }
+  }, [user]);
+
+  if (isDesktopSuccess) {
+    return (
+      <div className="relative w-full max-w-sm">
+        {/* Glow orb behind card */}
+        <div className="pointer-events-none absolute inset-0 -z-10 scale-150 rounded-full bg-[radial-gradient(ellipse_at_center,hsl(166_79%_40%/0.25),transparent_65%)]" />
+
+        {/* Card */}
+        <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-card/90 p-8 shadow-2xl backdrop-blur-sm text-center">
+          {/* Subtle card inner glow */}
+          <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,hsl(166_79%_40%/0.08),transparent_60%)]" />
+
+          {/* Shield Check icon */}
+          <div className="mb-6 flex justify-center">
+            <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/10 shadow-[0_0_32px_hsl(166_79%_40%/0.3)]">
+              <ShieldCheck size={40} className="text-emerald-400" />
+            </div>
+          </div>
+
+          {/* Success Title */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Connected Successfully!
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              Your Google Account is securely connected. You can now close this browser tab and return to the WokAI Desktop application.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full max-w-sm">

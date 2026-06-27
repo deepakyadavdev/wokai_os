@@ -6,9 +6,28 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+let currentSession = null;
+
 // A. Health check endpoint to tell the web interface we are running
 app.get("/health", (req, res) => {
   res.json({ status: "running", platform: process.platform });
+});
+
+// Auth callbacks for external browser sign-in loop
+app.post("/auth/callback", (req, res) => {
+  const { token, profile } = req.body;
+  currentSession = { token, profile };
+  console.log(`[WokAI Companion] Session authenticated for: ${profile?.email}`);
+  res.json({ success: true });
+});
+
+app.get("/auth/session", (req, res) => {
+  res.json(currentSession);
+});
+
+app.post("/auth/clear", (req, res) => {
+  currentSession = null;
+  res.json({ success: true });
 });
 
 // B. Direct Command / Application execution
