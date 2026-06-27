@@ -121,12 +121,16 @@ export function useWorkspaceData(user: UserProfile | null, currentPage?: string)
       if (firebaseReady && user) {
         const db = getFirebaseDb();
         if (db) {
-          const { doc, setDoc, serverTimestamp } = await import("firebase/firestore");
-          await setDoc(
-            doc(db, "users", user.uid, "actions", actionId),
-            { status, output: output ?? null, updatedAt: serverTimestamp() },
-            { merge: true }
-          );
+          try {
+            const { doc, setDoc, serverTimestamp } = await import("firebase/firestore");
+            await setDoc(
+              doc(db, "users", user.uid, "actions", actionId),
+              { status, output: output ?? null, updatedAt: serverTimestamp() },
+              { merge: true }
+            );
+          } catch (err: any) {
+            console.warn("[WokAI OS] Failed to update action status in Firestore:", err.message);
+          }
         }
       }
     },
