@@ -691,8 +691,11 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
       try {
         const checkRes = await fetch("http://localhost:4317/health").catch(() => null);
         if (checkRes && checkRes.ok) {
-          localHost = "http://localhost:4317";
-          console.log("[WokAI OS] Local Companion daemon detected at http://localhost:4317. Routing actions locally!");
+          const checkData = await checkRes.json().catch(() => null);
+          if (checkData && checkData.status === "running") {
+            localHost = "http://localhost:4317";
+            console.log("[WokAI OS] Local Companion daemon verified at http://localhost:4317. Routing actions locally!");
+          }
         }
       } catch (e) {}
 
@@ -720,6 +723,10 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
               signal
             });
             console.log(`[WokAI OS] [Browser Agent] Response Status: ${res.status}`);
+            if (!res.ok) {
+              const errText = await res.text().catch(() => "");
+              throw new Error(`HTTP Error ${res.status}: ${errText || res.statusText || "Server returned empty response"}`);
+            }
             const data = await res.json();
             console.log(`[WokAI OS] [Browser Agent] Response Data:`, data);
             output = data.message || data.currentStep || "Successfully completed form fill and submission on Playwright agent.";
@@ -777,6 +784,10 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
               signal
             });
             console.log(`[WokAI OS] [Terminal Exec] Response Status: ${res.status}`);
+            if (!res.ok) {
+              const errText = await res.text().catch(() => "");
+              throw new Error(`HTTP Error ${res.status}: ${errText || res.statusText || "Server returned empty response"}`);
+            }
             const data = await res.json();
             console.log(`[WokAI OS] [Terminal Exec] Response Data:`, data);
             if (res.ok) {
@@ -1471,13 +1482,18 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
 
           console.log(`[WokAI OS] [Open App] Executing local command: "${cmd}" to launch ${app}`);
           const { signal, clear } = createTimeoutSignal();
-          try {
-            const res = await fetch("/api/devices/exec", {
+           try {
+            const endpoint = localHost ? `${localHost}/exec` : "/api/devices/exec";
+            const res = await fetch(endpoint, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ command: cmd }),
               signal
             });
+            if (!res.ok) {
+              const errText = await res.text().catch(() => "");
+              throw new Error(`HTTP Error ${res.status}: ${errText || res.statusText || "Server returned empty response"}`);
+            }
             const data = await res.json();
             if (res.ok) {
               output = `Successfully launched ${app} app on your computer.`;
@@ -1529,6 +1545,10 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
               body: JSON.stringify({ command }),
               signal
             });
+            if (!res.ok) {
+              const errText = await res.text().catch(() => "");
+              throw new Error(`HTTP Error ${res.status}: ${errText || res.statusText || "Server returned empty response"}`);
+            }
             const data = await res.json();
             if (res.ok) {
               if (isWrite && action?.content) {

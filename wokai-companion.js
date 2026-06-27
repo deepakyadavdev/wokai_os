@@ -1,7 +1,6 @@
 const express = require("express");
 const cors = require("cors");
 const { exec } = require("child_process");
-const { chromium } = require("playwright");
 
 const app = express();
 app.use(cors());
@@ -37,11 +36,11 @@ app.post("/browser/run", async (req, res) => {
     return res.status(400).json({ error: "Goal is required." });
   }
 
-  console.log(`[WokAI Companion] Launching Playwright browser automation for goal: "${goal}"`);
+  console.log(`[WokAI Companion] Running browser goal: "${goal}"`);
 
   let browser;
   try {
-    // Launch Chrome locally with automation stealth flags
+    const { chromium } = require("playwright");
     browser = await chromium.launch({
       headless: false,
       channel: "chrome",
@@ -53,10 +52,8 @@ app.post("/browser/run", async (req, res) => {
     });
     const page = await context.newPage();
 
-    // Navigate to Google as a starting point
     await page.goto("https://www.google.com");
 
-    // Execute standard search automation steps
     const isSearch = /search|find|lookup/i.test(goal);
     if (isSearch) {
       const q = goal.replace(/search for|search|find|google/i, "").trim();
@@ -73,8 +70,24 @@ app.post("/browser/run", async (req, res) => {
       message: "Browser operation completed. Browser remains open for review."
     });
   } catch (err) {
-    console.error(`[WokAI Companion] Browser automation error:`, err);
-    res.status(500).json({ error: err.message });
+    console.warn("[WokAI Companion] Playwright launch failed, falling back to system browser:", err.message);
+    try {
+      let url = "https://www.google.com";
+      const q = goal.replace(/search for|search|find|google/i, "").trim();
+      if (q) {
+        url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+      }
+      const cmd = process.platform === "win32" ? `start "" "${url}"` : `open "${url}"`;
+      exec(cmd);
+      res.json({
+        status: "completed",
+        goal,
+        message: `Opened native browser to: ${url}`
+      });
+    } catch (fallbackErr) {
+      console.error("[WokAI Companion] Browser fallback failed:", fallbackErr.message);
+      res.status(500).json({ error: fallbackErr.message });
+    }
   }
 });
 
