@@ -9,6 +9,7 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   result?: AgentPlan;
+  thinkingLogs?: Array<{ agent: string; output: string }>;
   timestamp: string; // ISO
 }
 

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowUp,
+  Send,
   CalendarDays,
   Files,
   Globe,
@@ -12,10 +12,7 @@ import {
   Phone,
   Plus,
   Bot,
-  Loader2,
-  Eye,
-  EyeOff,
-  User
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,7 +25,6 @@ import { useChatSessions } from "@/hooks/use-chat-sessions";
 import { cn } from "@/lib/utils";
 import type { AgentPlan } from "@/lib/types";
 import { getGoogleToken } from "@/lib/google/token";
-import { useSidebar } from "@/components/app-shell";
 
 /* ─────────────────────────── Android/Robot head SVG ─────────────────────────── */
 function AndroidBotIcon({ className }: { className?: string }) {
@@ -162,6 +158,29 @@ function ClientOnlyTime({ iso }: { iso: string }) {
   return <>{relativeTime(iso)}</>;
 }
 
+function getFriendlyAgentName(status: string): string {
+  switch (status) {
+    case "agentA_done":
+      return "Agent A: Human Worker Thinker";
+    case "agent1_done":
+      return "Agent 1: Worthful Conversational Responder";
+    case "agentB_done":
+      return "Agent B: Tool Mapper and Adaptor";
+    case "agent2_done":
+      return "Agent 2: Structured Plan Generator";
+    case "agent4_done":
+      return "Agent 4: Content Generator";
+    case "agent3_done":
+      return "Agent 3: API Handler";
+    case "agent#_done":
+      return "Agent #: Plan Summarizer";
+    case "agent5_done":
+      return "Agent 5: Quality Assurance & Evaluator";
+    default:
+      return "Agent Conductor Sub-Process";
+  }
+}
+
 /* ─────────────────────────── Quick chips ─────────────────────────── */
 
 const CHIPS = [
@@ -172,27 +191,11 @@ const CHIPS = [
   { label: "Call", icon: Phone, prompt: "Help me place a call" }
 ];
 
-const MODELS = [
-  "kimi-k2",
-  "kimi-k3",
-  "Gemini 3.5 Flash",
-  "Gemini 3.5 Pro"
-];
-
-const SYSTEM_PROMPTS = [
-  "Select a System Prompt...",
-  "Creative Assistant",
-  "Code Expert",
-  "Data Analyst",
-  "Product Manager"
-];
-
 /* ─────────────────────────── Main component ─────────────────────────── */
 
 export function ChatMain() {
   const { user } = useAuth();
-  const { snapshot, mergeAgentResult, updateActionStatus } = useWorkspaceData(user);
-  const { isOpen, setIsOpen } = useSidebar();
+  const { mergeAgentResult, updateActionStatus } = useWorkspaceData(user);
   
   const {
     activeSession,
@@ -201,8 +204,6 @@ export function ChatMain() {
     createSession,
     setActiveSessionId,
     updateMessageResult,
-    updateSessionModel,
-    updateSessionSystemPrompt,
     importSessions,
     sessions
   } = useChatSessions();
@@ -210,6 +211,9 @@ export function ChatMain() {
   const [pending, setPending] = React.useState(false);
   const [progressStatus, setProgressStatus] = React.useState<string>("routing");
   const [inputValue, setInputValue] = React.useState("");
+  const [currentThinkingLogs, setCurrentThinkingLogs] = React.useState<Array<{ agent: string; output: string }>>([]);
+  const [expandedThinking, setExpandedThinking] = React.useState<Record<string, boolean>>({});
+
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -220,7 +224,7 @@ export function ChatMain() {
   /* Auto-scroll on message change */
   React.useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, pending]);
+  }, [messages, pending, currentThinkingLogs]);
 
   /* Auto-resize textarea */
   function resizeTextarea() {
@@ -252,6 +256,7 @@ export function ChatMain() {
       textareaRef.current.style.height = "28px";
     }
     setPending(true);
+    setCurrentThinkingLogs([]);
 
     setProgressStatus("routing");
     try {
@@ -286,6 +291,16 @@ export function ChatMain() {
               const data = JSON.parse(trimmed);
               if (data.status && data.status !== "done" && data.status !== "error") {
                 setProgressStatus(data.status);
+                if (data.status.endsWith("_done") && data.output) {
+                  setCurrentThinkingLogs((prev) => {
+                    const friendly = getFriendlyAgentName(data.status);
+                    const exists = prev.some((p) => p.agent === friendly);
+                    if (exists) {
+                      return prev.map((p) => p.agent === friendly ? { ...p, output: data.output } : p);
+                    }
+                    return [...prev, { agent: friendly, output: data.output }];
+                  });
+                }
               } else if (data.status === "done") {
                 result = data.result;
               } else if (data.status === "error") {
@@ -322,32 +337,21 @@ export function ChatMain() {
       addMessage(sessionId, {
         role: "assistant",
         content: result.response,
-        result
+        result,
+        thinkingLogs: currentThinkingLogs
       });
 
       toast.success("WokAI generated a plan");
     } catch (err) {
       addMessage(sessionId, {
         role: "assistant",
-        content: err instanceof Error ? err.message : "Something went wrong."
+        content: err instanceof Error ? err.message : "Something went wrong.",
+        thinkingLogs: currentThinkingLogs
       });
       toast.error("Agent request failed");
     } finally {
       setPending(false);
     }
-  }
-
-  /* Model & System prompt changes */
-  function handleModelChange(modelName: string) {
-    const sessionId = ensureSession();
-    updateSessionModel(sessionId, modelName);
-    toast.success(`Switched model to ${modelName}`);
-  }
-
-  function handleSystemPromptChange(promptName: string) {
-    const sessionId = ensureSession();
-    updateSessionSystemPrompt(sessionId, promptName);
-    toast.success(promptName ? `Switched prompt to ${promptName}` : "Reset system prompt");
   }
 
   /* Export / Import */
@@ -399,50 +403,19 @@ export function ChatMain() {
     e.target.value = "";
   }
 
-  /* Metrics counts matching screenshot default: 45 completed, 4 failed, 0 warning */
-  const completedCount = React.useMemo(() => {
-    const count = snapshot.actions.filter((a) => a.status === "COMPLETED").length;
-    return Math.max(45, count);
-  }, [snapshot.actions]);
-
-  const failedCount = React.useMemo(() => {
-    const count = snapshot.actions.filter((a) => a.status === "FAILED").length;
-    return Math.max(4, count);
-  }, [snapshot.actions]);
-
-  const pendingCount = React.useMemo(() => {
-    return snapshot.actions.filter((a) => a.status === "NEEDS_APPROVAL" || a.status === "RUNNING").length;
-  }, [snapshot.actions]);
-
   const isWelcome = messages.length === 0;
-  const currentModel = activeSession?.model || "kimi-k2";
-  const currentSystemPrompt = activeSession?.systemPrompt || "";
 
   const inputCard = (
     <div
       className={cn(
-        "relative flex items-end gap-2 rounded-xl border border-slate-200 dark:border-border/60 bg-white dark:bg-[#181d28] px-3.5 py-3 transition-all duration-200",
-        "shadow-[0_4px_16px_rgba(0,0,0,0.04)] dark:shadow-none focus-within:border-slate-300 dark:focus-within:border-emerald-500/50",
-        isWelcome ? "w-full max-w-2xl mt-4 border-slate-200/85" : "w-full"
+        "relative flex items-end gap-2.5 rounded-full border border-slate-200/90 dark:border-border/60 bg-white dark:bg-[#181d28] pl-5 pr-2 py-2 transition-all duration-200",
+        "shadow-[0_4px_20px_rgba(0,0,0,0.05)] dark:shadow-none focus-within:border-slate-300 dark:focus-within:border-emerald-500/50",
+        isWelcome ? "w-full max-w-2xl mt-4" : "w-full"
       )}
     >
-      <div className="flex shrink-0 items-center gap-1.5 pb-1">
-        <button
-          type="button"
-          title="Add attachment"
-          className="p-1 rounded-lg text-slate-400 dark:text-muted-foreground/60 hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-100 dark:hover:bg-accent/30 transition-colors"
-        >
-          <Plus size={15} className="stroke-[2.5]" />
-        </button>
-        <button
-          type="button"
-          title="Params"
-          className="p-1 rounded-lg text-slate-400 dark:text-muted-foreground/60 hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-100 dark:hover:bg-accent/30 transition-colors"
-        >
-          <svg width="14" height="10" viewBox="0 0 14 10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <path d="M1 2h12M1 8h12" />
-          </svg>
-        </button>
+      <div className="flex shrink-0 items-center gap-1 pb-1">
+        {/* Pink brain icon on the left */}
+        <span className="text-lg mr-1 select-none animate-pulse" role="img" aria-label="brain">🧠</span>
       </div>
 
       <textarea
@@ -459,11 +432,11 @@ export function ChatMain() {
             void handleSubmit();
           }
         }}
-        placeholder={isWelcome ? "Type your message... (Enter to send, Shift+Enter for new line)" : "Ask WokAI to rescue a deadline, schedule, email, call, browse, or find files…"}
+        placeholder="What's in your mind?..."
         rows={1}
         disabled={pending}
         className={cn(
-          "w-full flex-1 resize-none bg-transparent text-sm text-slate-800 dark:text-slate-100 outline-none",
+          "w-full flex-1 resize-none bg-transparent text-sm text-slate-900 dark:text-slate-100 outline-none",
           "placeholder:text-slate-400/80 dark:placeholder:text-muted-foreground/50 disabled:opacity-60",
           "min-h-[28px] max-h-[200px] py-1"
         )}
@@ -479,96 +452,33 @@ export function ChatMain() {
           <Mic className="size-4" />
         </button>
 
+        {/* Send button styled exactly like screenshot (blue circular button with Send paper airplane) */}
         <Button
           id="chat-send"
           size="icon"
           onClick={() => void handleSubmit()}
           disabled={pending || !inputValue.trim()}
           className={cn(
-            "size-8 shrink-0 rounded-full bg-slate-200 dark:bg-accent/60 text-slate-400 dark:text-muted-foreground transition-all duration-150",
-            inputValue.trim() && "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white"
+            "size-8 shrink-0 rounded-full bg-blue-600 text-white shadow-sm transition-all duration-150 hover:bg-blue-500",
+            "disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:bg-accent/40 dark:disabled:text-slate-500"
           )}
         >
-          <ArrowUp className="size-4 stroke-[2.5]" />
+          <Send className="size-3.5 stroke-[2.5]" />
         </Button>
       </div>
     </div>
   );
 
   return (
-    <div className="flex h-screen flex-col lg:h-[100dvh] bg-white dark:bg-[#0c1017]">
-      {/* ── Top Bar ─────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center justify-between border-b border-slate-200/60 dark:border-border/60 bg-white/80 dark:bg-background/80 px-4 py-2.5 backdrop-blur-md z-10 shadow-sm dark:shadow-none">
-        {/* Left: Model select and metrics */}
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <select
-              value={currentModel}
-              onChange={(e) => handleModelChange(e.target.value)}
-              className="bg-transparent border border-slate-200 dark:border-border/60 hover:bg-slate-50 dark:hover:bg-accent/40 rounded-lg px-2.5 py-1.5 pr-6 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none appearance-none cursor-pointer transition-colors"
-            >
-              {MODELS.map((m) => (
-                <option key={m} value={m} className="bg-white dark:bg-[#0d1117] text-slate-800 dark:text-slate-200">
-                  {m}
-                </option>
-              ))}
-            </select>
-            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-              <svg width="8" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M1 1l4 4 4-4" />
-              </svg>
-            </div>
-          </div>
-
-          {/* Metrics indicators matching screenshot */}
-          <div className="flex items-center gap-2.5 text-xs font-semibold select-none">
-            <div className="flex items-center gap-1.5" title="Successful actions">
-              <span className="text-green-600 dark:text-green-400">{completedCount}</span>
-              <span className="size-2 rounded-full bg-green-500" />
-            </div>
-            <div className="flex items-center gap-1.5" title="Blocked/Failed actions">
-              <span className="text-red-500 dark:text-red-400">{failedCount}</span>
-              <span className="size-2 rounded-full bg-red-500" />
-            </div>
-            <div className="flex items-center gap-1.5" title="Pending approvals">
-              <span className="text-orange-500 dark:text-orange-400">{pendingCount}</span>
-              <span className="size-2 rounded-full bg-orange-500" />
-            </div>
-          </div>
-
-          <div className="relative hidden sm:block">
-            <select
-              value={currentSystemPrompt}
-              onChange={(e) => handleSystemPromptChange(e.target.value)}
-              className="bg-transparent border border-slate-200 dark:border-border/60 hover:bg-slate-50 dark:hover:bg-accent/40 rounded-lg px-2.5 py-1.5 pr-6 text-xs font-semibold text-slate-500 dark:text-slate-400 focus:outline-none appearance-none cursor-pointer transition-colors"
-            >
-              {SYSTEM_PROMPTS.map((p) => (
-                <option key={p} value={p === "Select a System Prompt..." ? "" : p} className="bg-white dark:bg-[#0d1117] text-slate-800 dark:text-slate-200">
-                  {p}
-                </option>
-              ))}
-            </select>
-            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-              <svg width="8" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M1 1l4 4 4-4" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Sidebar visibility eye toggle & profile */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            title={isOpen ? "Hide History" : "Show History"}
-            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-accent/40 text-slate-500 dark:text-slate-400 transition-colors"
-          >
-            {isOpen ? <EyeOff size={16} /> : <Eye size={16} />}
-          </button>
-          
-          <div className="size-7 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-border/60 flex items-center justify-center text-slate-600 dark:text-slate-400 cursor-pointer hover:bg-slate-200 dark:hover:bg-accent/50 transition-colors">
-            <User className="size-4" />
-          </div>
+    <div className="flex h-screen flex-col lg:h-[100dvh] bg-white dark:bg-[#0c1017] relative overflow-hidden">
+      
+      {/* ── Floating Upgrade to Pro Tab (Right viewport edge) ── */}
+      <div className="fixed right-0 top-1/2 -translate-y-1/2 z-50 flex items-center bg-blue-600 text-white px-2 py-4 rounded-l-2xl shadow-lg cursor-pointer hover:bg-blue-500 transition-all select-none">
+        <div className="flex flex-col items-center gap-1.5 font-bold tracking-wider [writing-mode:vertical-lr] rotate-180 text-[10px] uppercase">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="text-yellow-400 rotate-90 mb-1">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          </svg>
+          <span>Upgrade to Pro</span>
         </div>
       </div>
 
@@ -645,7 +555,8 @@ export function ChatMain() {
             </div>
           </div>
         ) : (
-          <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6">
+          /* pb-48 pushes the last message clear of the sticky input bar's fade-out gradient */
+          <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 pt-6 pb-48">
             <AnimatePresence initial={false}>
               {messages.map((message) => (
                 <motion.div
@@ -654,22 +565,32 @@ export function ChatMain() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.22, ease: "easeOut" }}
                   className={cn(
-                    "flex flex-col",
+                    "flex flex-col w-full",
                     message.role === "user" ? "items-end" : "items-start"
                   )}
                 >
+                  {/* Message bubble */}
                   <div
                     className={cn(
-                      "px-4 py-3 text-sm leading-6",
+                      "px-5 py-4 text-sm leading-7 w-full border rounded-2xl shadow-sm",
                       message.role === "user"
-                        ? "ml-auto max-w-[72%] rounded-2xl rounded-br-sm bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm"
-                        : "mr-auto max-w-[85%] rounded-2xl rounded-bl-sm border border-slate-200 dark:border-border/50 bg-white dark:bg-card/90 text-slate-800 dark:text-slate-200 shadow-sm"
+                        ? "bg-slate-50 dark:bg-accent/10 border-slate-100 dark:border-border/40 text-slate-900 dark:text-slate-100"
+                        : "bg-white dark:bg-card/90 border-slate-100 dark:border-border/50 text-slate-900 dark:text-slate-100"
                     )}
                   >
+                    {/* Header info for assistant */}
+                    {message.role === "assistant" && (
+                      <div className="flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 mb-2 tracking-wide uppercase select-none">
+                        CHAT A.I +
+                      </div>
+                    )}
+
                     {message.role === "user" ? (
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      <p className="whitespace-pre-wrap text-slate-900 dark:text-slate-100">{message.content}</p>
                     ) : (
-                      <MarkdownRenderer content={message.content} />
+                      <div className="text-slate-900 dark:text-slate-100">
+                        <MarkdownRenderer content={message.content} />
+                      </div>
                     )}
 
                     {/* Rich action cards beneath assistant messages */}
@@ -682,6 +603,95 @@ export function ChatMain() {
                         }}
                       />
                     )}
+
+                    {/* Reactions & Regenerate toolbar beneath assistant messages */}
+                    {message.role === "assistant" && (
+                      <div className="flex flex-col w-full">
+                        {message.thinkingLogs && message.thinkingLogs.length > 0 && (
+                          <div className="mt-3.5 border-t border-slate-100 dark:border-border/20 pt-3">
+                            <button
+                              onClick={() => {
+                                setExpandedThinking((prev) => ({
+                                  ...prev,
+                                  [message.id]: !prev[message.id]
+                                }));
+                              }}
+                              className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 transition-colors select-none"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                className={cn(
+                                  "transition-transform duration-200",
+                                  expandedThinking[message.id] ? "rotate-90 text-blue-500" : ""
+                                )}
+                              >
+                                <polyline points="9 18 15 12 9 6" />
+                              </svg>
+                              <span>
+                                {expandedThinking[message.id] ? "Hide thinking process" : "Show thinking process"}
+                              </span>
+                            </button>
+
+                            {expandedThinking[message.id] && (
+                              <div className="mt-3 flex flex-col gap-3">
+                                {message.thinkingLogs.map((log) => (
+                                  <div key={log.agent} className="border border-slate-100 dark:border-border/40 bg-slate-50/50 dark:bg-card/25 rounded-xl p-3.5 text-xs">
+                                    <div className="font-bold text-slate-400 dark:text-muted-foreground/60 mb-2 uppercase select-none">
+                                      {log.agent}
+                                    </div>
+                                    <div className="text-slate-650 dark:text-slate-300 leading-relaxed font-mono whitespace-pre-wrap max-h-48 overflow-y-auto bg-slate-50/30 dark:bg-[#111622]/40 p-3 rounded-lg border border-slate-100 dark:border-border/20 shadow-inner">
+                                      {log.output}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between border-t border-slate-100 dark:border-border/20 mt-4 pt-2.5 text-slate-400 dark:text-muted-foreground select-none">
+                          <div className="flex items-center gap-3">
+                            <button className="p-1 hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-100 dark:hover:bg-accent/40 rounded transition-colors" title="Like">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+                            </button>
+                            <button className="p-1 hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-100 dark:hover:bg-accent/40 rounded transition-colors" title="Dislike">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm12-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>
+                            </button>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(message.content);
+                                toast.success("Copied to clipboard");
+                              }}
+                              className="p-1 hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-100 dark:hover:bg-accent/40 rounded transition-colors"
+                              title="Copy message"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+                            </button>
+                            <button className="p-1 hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-100 dark:hover:bg-accent/40 rounded transition-colors" title="More">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const index = messages.indexOf(message);
+                              if (index > 0) {
+                                void handleSubmit(messages[index - 1]?.content);
+                              }
+                            }}
+                            className="flex items-center gap-1.5 px-2.5 py-1 text-xs hover:text-slate-800 dark:hover:text-foreground hover:bg-slate-100 dark:hover:bg-accent/40 border border-slate-200 dark:border-border/60 rounded transition-colors font-medium"
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                            <span>Regenerate</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Relative timestamp */}
@@ -691,9 +701,22 @@ export function ChatMain() {
                 </motion.div>
               ))}
 
-              {/* Thinking indicator */}
+              {/* Thinking logs & progress indicator */}
               {pending && (
-                <motion.div key="thinking" className="flex flex-col items-start">
+                <motion.div key="thinking" className="flex flex-col items-start w-full gap-4">
+                  {/* Display current thinking logs so far */}
+                  {currentThinkingLogs.map((log) => (
+                    <div key={log.agent} className="w-full border border-slate-150 dark:border-border/50 bg-slate-50/50 dark:bg-card/40 rounded-xl p-4 text-xs shadow-sm">
+                      <div className="font-bold text-slate-500 dark:text-muted-foreground mb-2 flex items-center gap-1.5 uppercase select-none">
+                        <span className="inline-block size-1.5 rounded-full bg-blue-500 animate-ping" />
+                        {log.agent}
+                      </div>
+                      <div className="text-slate-700 dark:text-slate-350 leading-relaxed font-mono whitespace-pre-wrap max-h-48 overflow-y-auto bg-white dark:bg-[#111622] p-3 rounded-lg border border-slate-100 dark:border-border/40 shadow-inner">
+                        {log.output}
+                      </div>
+                    </div>
+                  ))}
+
                   <ThinkingIndicator status={progressStatus} />
                 </motion.div>
               )}

@@ -18,7 +18,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   const flushParagraph = (key: string | number) => {
     if (paragraphLines.length > 0) {
       blocks.push(
-        <p key={`p-${key}`} className="mb-2 leading-relaxed text-sm last:mb-0">
+        <p key={`p-${key}`} className="mb-2 leading-relaxed text-sm last:mb-0 text-slate-900 dark:text-slate-100">
           {renderInline(paragraphLines.join("\n"))}
         </p>
       );
@@ -31,8 +31,8 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       const Tag = currentList.type;
       const listClass =
         currentList.type === "ol"
-          ? "list-decimal pl-6 mb-2 space-y-1 text-sm text-foreground"
-          : "list-disc pl-6 mb-2 space-y-1 text-sm text-foreground";
+          ? "list-decimal pl-6 mb-2 space-y-1 text-sm text-slate-900 dark:text-slate-100"
+          : "list-disc pl-6 mb-2 space-y-1 text-sm text-slate-900 dark:text-slate-100";
       blocks.push(
         <Tag key={`list-${key}`} className={listClass}>
           {currentList.items.map((item, idx) => (
@@ -84,7 +84,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       const headingText = headingMatch[2];
       const HeadingTag = `h${level}` as any;
 
-      let headingClass = "font-bold mt-3 mb-2 tracking-tight text-foreground";
+      let headingClass = "font-bold mt-3 mb-2 tracking-tight text-slate-900 dark:text-slate-100";
       if (level === 1) headingClass += " text-lg border-b pb-1 font-extrabold";
       else if (level === 2) headingClass += " text-base";
       else if (level === 3) headingClass += " text-sm font-semibold";
@@ -161,14 +161,14 @@ function renderInline(text: string): React.ReactNode[] {
   return parts.map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       return (
-        <strong key={index} className="font-semibold text-foreground">
+        <strong key={index} className="font-semibold text-slate-900 dark:text-slate-100">
           {part.slice(2, -2)}
         </strong>
       );
     }
     if (part.startsWith("*") && part.endsWith("*")) {
       return (
-        <em key={index} className="italic text-foreground">
+        <em key={index} className="italic text-slate-900 dark:text-slate-100">
           {part.slice(1, -1)}
         </em>
       );

@@ -21,15 +21,13 @@ export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      const sendStatus = (status: string) => {
-        controller.enqueue(encoder.encode(JSON.stringify({ status }) + "\n"));
-      };
-
       try {
         const result = await generateAgentPlan(
           parsed.data.message,
-          (phase) => {
-            sendStatus(phase);
+          (phase, output) => {
+            controller.enqueue(
+              encoder.encode(JSON.stringify({ status: phase, output: output || undefined }) + "\n")
+            );
           },
           parsed.data.googleToken
         );

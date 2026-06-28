@@ -681,7 +681,7 @@ Return a strict JSON object ONLY. Do NOT wrap it in markdown codeblocks. The out
 
 export async function generateAgentPlan(
   message: string,
-  onProgress?: (phase: string) => void,
+  onProgress?: (phase: string, output?: string) => void,
   googleToken?: string,
   pass = 1
 ): Promise<AgentPlan> {
@@ -698,20 +698,28 @@ export async function generateAgentPlan(
   onProgress?.("agentA");
   console.log("WokAI Conductor: Invoking Agent A (Human Worker Thinker)...");
   const agentAOutput = await runAgentA(message);
+  onProgress?.("agentA_done", agentAOutput);
 
   // Phase: Agent 1 and Agent B (concurrently)
   onProgress?.("agent1");
   onProgress?.("agentB");
   console.log("WokAI Conductor: Invoking Agent 1 and Agent B concurrently...");
   const [agent1Output, agentBOutput] = await Promise.all([
-    runAgent1(agentAOutput, message),
-    runAgentB(agentAOutput)
+    runAgent1(agentAOutput, message).then((out) => {
+      onProgress?.("agent1_done", out);
+      return out;
+    }),
+    runAgentB(agentAOutput).then((out) => {
+      onProgress?.("agentB_done", out);
+      return out;
+    })
   ]);
 
   // Phase: Agent 2
   onProgress?.("agent2");
   console.log("WokAI Conductor: Invoking Agent 2 (Structured Plan Generator)...");
   const parsedPlan = await runAgent2(agentBOutput, message);
+  onProgress?.("agent2_done", JSON.stringify(parsedPlan, null, 2));
   const actions = parsedPlan.actions || [];
 
   let finalActions = actions;
@@ -720,11 +728,13 @@ export async function generateAgentPlan(
     onProgress?.("agent4");
     console.log("WokAI Conductor: Invoking Agent 4 (Content Generator)...");
     const contentFromAgent4 = await runAgent4(message, agent1Output, actions);
+    onProgress?.("agent4_done", JSON.stringify(contentFromAgent4, null, 2));
 
     // Phase: Agent 3
     onProgress?.("agent3");
     console.log("WokAI Conductor: Invoking Agent 3 (API Handler)...");
     finalActions = await runAgent3(actions, contentFromAgent4);
+    onProgress?.("agent3_done", JSON.stringify(finalActions, null, 2));
   }
 
   // Phase: Agent #
@@ -733,6 +743,7 @@ export async function generateAgentPlan(
   let agentHashSummary = "";
   if (finalActions.length > 0) {
     agentHashSummary = await runAgentHashPlanSummary(agent1Output, finalActions);
+    onProgress?.("agent#_done", agentHashSummary);
   }
 
   const mergedTasks = parsedPlan.suggestedTasks || [];
@@ -759,6 +770,7 @@ export async function generateAgentPlan(
     onProgress?.("agent5");
     console.log("WokAI Conductor: Invoking Agent 5 (Quality Assurance & Evaluator)...");
     const evaluation = await evaluatePlanWithAgent5(message, currentPlan);
+    onProgress?.("agent5_done", JSON.stringify(evaluation, null, 2));
     if (!evaluation.approved && evaluation.refinedPrompt) {
       console.log(`Agent 5: Plan rejected. Retrying with refined prompt: "${evaluation.refinedPrompt}"`);
       
@@ -767,6 +779,7 @@ export async function generateAgentPlan(
       
       onProgress?.("agent5");
       const secondEvaluation = await evaluatePlanWithAgent5(evaluation.refinedPrompt, refinedPlan);
+      onProgress?.("agent5_done", JSON.stringify(secondEvaluation, null, 2));
       if (secondEvaluation.approved) {
         console.log("Agent 5: Refined action plan approved on second pass.");
         return refinedPlan;
