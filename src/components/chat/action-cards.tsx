@@ -176,11 +176,6 @@ function ActionOutputView({ action, borderColor = "border-muted/30" }: { action:
                 <div className="font-semibold text-zinc-400 text-[10px] mb-1 font-mono uppercase tracking-wider">Raw API Output</div>
                 <pre className="text-zinc-300 font-mono text-xs whitespace-pre-wrap leading-relaxed overflow-x-auto bg-black/25 p-2 rounded max-h-60 border border-border/10">{action.output}</pre>
               </div>
-              
-              <div className="border-t border-border/10 pt-2">
-                <div className="font-semibold text-emerald-400 text-[10px] mb-1 font-mono uppercase tracking-wider">Agent # Summary</div>
-                <p className="text-zinc-300 font-sans text-sm leading-relaxed whitespace-pre-wrap">{action.summary}</p>
-              </div>
             </div>
           )}
         </div>

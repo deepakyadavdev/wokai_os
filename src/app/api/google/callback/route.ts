@@ -48,17 +48,22 @@ export async function GET(request: NextRequest) {
       refresh_token?: string;
     };
 
-    // Redirect back to settings with token in query params.
-    // The client-side will read and save it via saveGoogleToken().
+    // Store token in SameSite=Strict cookie instead of URL query params.
+    // SameSite=Strict prevents the cookie from being sent on cross-origin requests,
+    // and avoids token leakage via browser history, server logs, and referrer headers.
+    const expiresIn = tokens.expires_in ?? 3600;
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const redirect = new URL("/settings", appUrl);
-    redirect.searchParams.set("access_token", tokens.access_token);
-    redirect.searchParams.set(
-      "expires_in",
-      String(tokens.expires_in ?? 3600)
-    );
+    redirect.searchParams.set("oauth", "success");
 
-    return NextResponse.redirect(redirect.toString());
+    return NextResponse.redirect(redirect.toString(), {
+      headers: {
+        "Set-Cookie": [
+          `wokai_google_token=${encodeURIComponent(tokens.access_token)}; Path=/; Max-Age=${expiresIn}; SameSite=Strict${process.env.NODE_ENV === "production" ? "; Secure" : ""}`,
+          `wokai_google_expires=${String(Date.now() + expiresIn * 1000)}; Path=/; Max-Age=${expiresIn}; SameSite=Strict${process.env.NODE_ENV === "production" ? "; Secure" : ""}`
+        ].join(", ")
+      }
+    });
   } catch (err) {
     console.error("Google OAuth callback error:", err);
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";

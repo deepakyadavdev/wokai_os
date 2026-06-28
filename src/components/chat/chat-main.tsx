@@ -214,6 +214,7 @@ export function ChatMain() {
   const [progressStatus, setProgressStatus] = React.useState<string>("routing");
   const [inputValue, setInputValue] = React.useState("");
   const [currentThinkingLogs, setCurrentThinkingLogs] = React.useState<Array<{ agent: string; output: string }>>([]);
+  const thinkingLogsRef = React.useRef<Array<{ agent: string; output: string }>>([]);
   const [expandedThinking, setExpandedThinking] = React.useState<Record<string, boolean>>({});
 
   const {
@@ -302,6 +303,7 @@ export function ChatMain() {
     }
     setPending(true);
     setCurrentThinkingLogs([]);
+    thinkingLogsRef.current = [];
 
     setProgressStatus("routing");
     try {
@@ -339,14 +341,16 @@ export function ChatMain() {
               if (data.status && data.status !== "done" && data.status !== "error") {
                 setProgressStatus(data.status);
                 if (data.status.endsWith("_done") && data.output) {
-                  setCurrentThinkingLogs((prev) => {
-                    const friendly = getFriendlyAgentName(data.status);
-                    const exists = prev.some((p) => p.agent === friendly);
-                    if (exists) {
-                      return prev.map((p) => p.agent === friendly ? { ...p, output: data.output } : p);
-                    }
-                    return [...prev, { agent: friendly, output: data.output }];
-                  });
+                  const friendly = getFriendlyAgentName(data.status);
+                  const exists = thinkingLogsRef.current.some((p) => p.agent === friendly);
+                  if (exists) {
+                    thinkingLogsRef.current = thinkingLogsRef.current.map((p) =>
+                      p.agent === friendly ? { ...p, output: data.output } : p
+                    );
+                  } else {
+                    thinkingLogsRef.current = [...thinkingLogsRef.current, { agent: friendly, output: data.output }];
+                  }
+                  setCurrentThinkingLogs(thinkingLogsRef.current);
                 }
               } else if (data.status === "done") {
                 result = data.result;
@@ -385,7 +389,7 @@ export function ChatMain() {
         role: "assistant",
         content: result.response,
         result,
-        thinkingLogs: currentThinkingLogs
+        thinkingLogs: thinkingLogsRef.current
       });
 
       toast.success("WokAI generated a plan");
@@ -393,7 +397,7 @@ export function ChatMain() {
       addMessage(sessionId, {
         role: "assistant",
         content: err instanceof Error ? err.message : "Something went wrong.",
-        thinkingLogs: currentThinkingLogs
+        thinkingLogs: thinkingLogsRef.current
       });
       toast.error("Agent request failed");
     } finally {

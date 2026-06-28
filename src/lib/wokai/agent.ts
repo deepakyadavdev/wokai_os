@@ -664,8 +664,7 @@ export async function generateAgentHashExecutionSummary(
   googleToken?: string,
   agent1Output?: string
 ): Promise<string> {
-  const promptText = `
-You are WokAI Agent # (Execution Result Summarizer).
+  const systemPrompt = `You are WokAI Agent # (Execution Result Summarizer).
 Your job is to look at the execution of an API tool and its raw output, and summarize the results to the user in a friendly, clear, and helpful way.
 
 Follow these rules:
@@ -673,11 +672,17 @@ Follow these rules:
 2. If the execution failed, state the failure explicitly and clearly. Do not attempt to soften or rewrite the history of failures.
 3. Match the results with the reply given by Agent 1 and our completed tasks.
 
-Write ONLY the final user-facing summary of what was done and what the results are, matching it with what Agent 1 said. Keep it short and readable. Do not output JSON or mention internal variable names.
-`;
+Write ONLY the final user-facing summary of what was done and what the results are, matching it with what Agent 1 said. Keep it short and readable (1-2 sentences). Do not output JSON or mention internal variable names.`;
+
+  const prompt = `Tool Executed: ${tool} (${label})
+Raw API Output:
+"${output}"
+
+Agent 1 Response Context:
+"${agent1Output || "None"}"`;
 
   try {
-    return await callLLM(promptText, undefined, "meta-llama/llama-3.2-3b-instruct:free");
+    return await callLLM(prompt, systemPrompt, "meta-llama/llama-3.2-3b-instruct:free");
   } catch (err) {
     console.error("[WokAI Conductor] Agent # execution summary error:", err);
     return `Action completed. Results: ${output.slice(0, 200)}`;
