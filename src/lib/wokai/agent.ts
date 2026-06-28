@@ -1,6 +1,7 @@
 import { demoSnapshot } from "@/lib/data/demo";
 import type { AgentPlan, RiskLevel, WokaiAction, WokaiMemory, WokaiTask } from "@/lib/types";
 import { getTool } from "@/lib/wokai/tools";
+import { recallRelevantMemories } from "@/lib/wokai/memory-agent";
 
 function id(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -241,7 +242,7 @@ const OPENROUTER_MODELS_POOL = [
   "nvidia/nemotron-embed-vl-1b-v2:free"
 ];
 
-async function callLLM(
+export async function callLLM(
   prompt: string,
   systemPrompt?: string,
   preferredModel?: string
@@ -377,7 +378,15 @@ async function callLLM(
   }
 }
 
-async function runAgentA(userPrompt: string, resolvedIntent?: ResolvedIntent): Promise<string> {
+async function runAgentA(
+  userPrompt: string,
+  resolvedIntent?: ResolvedIntent,
+  memories?: WokaiMemory[]
+): Promise<string> {
+  const memoriesBlock = memories && memories.length > 0
+    ? `\n\nRelevant memories about the user (use these to personalize your plan):\n${memories.map((m) => `- [${m.type}] ${m.title}: ${m.content}`).join("\n")}`
+    : "";
+
   const systemPrompt = `You are WokAI Agent A (Planning & Reasoning Agent).
 Your job is to think and reason about the user's request. You must be an extremely truthfulness-first, anti-hallucination, and deterministic planning component.
 
@@ -386,6 +395,7 @@ Follow these strict rules:
 2. INFER OBVIOUS INTENT. You should infer the intended service, application, or tool when confidence is high (refer to the resolved intent provided). Infer services, but never invent execution data.
 3. DISTINGUISH CERTAINTY. Classify parameters into: Known, Highly Likely, Possible, Unknown, or Impossible. Only Unknown and Impossible should block planning/execution. Highly Likely interpretation must proceed.
 4. Smart Clarification: Ask for clarification only when multiple valid interpretations would change the actual execution or introduce meaningful risk.
+5. USE STORED MEMORIES: When relevant memories are provided, incorporate them into your reasoning. Reference the user's preferences, habits, contacts, or context to make personalized plans.${memoriesBlock}
 
 You MUST format your output as a text report containing exactly the following sections:
 - **FACTS**: [List of verified facts and details explicitly provided by the user]
@@ -400,7 +410,7 @@ You MUST format your output as a text report containing exactly the following se
 - **POSTCONDITIONS**: [The expected state after successful execution]
 - **PLANNED_STEPS**: [The step-by-step tasks you will execute, in the first person "I will...".]`;
 
-  const prompt = resolvedIntent 
+  const prompt = resolvedIntent
     ? `Resolved Intent Context: ${JSON.stringify(resolvedIntent, null, 2)}\n\nUser request: "${userPrompt}"`
     : `User request: "${userPrompt}"`;
   return await callLLM(prompt, systemPrompt, "meta-llama/llama-3.3-70b-instruct:free");
@@ -913,7 +923,8 @@ export async function generateAgentPlan(
   googleToken?: string,
   pass = 1,
   isVoice = false,
-  history?: Array<{ role: string; content: string }>
+  history?: Array<{ role: string; content: string }>,
+  memories?: WokaiMemory[]
 ): Promise<AgentPlan> {
   let activeMessage = message;
   let detectedLang = "English";
@@ -978,12 +989,19 @@ export async function generateAgentPlan(
   onProgress?.("routing");
   const baseline = deterministicAgentPlan(activeMessage);
 
-
+  // Phase: Memory Recall
+  let recalledMemories: WokaiMemory[] = [];
+  if (memories && memories.length > 0) {
+    onProgress?.("memory_recall");
+    console.log("WokAI Conductor: Recalling relevant memories...");
+    recalledMemories = await recallRelevantMemories(activeMessage, memories);
+    onProgress?.("memory_recall_done", `Recalled ${recalledMemories.length} relevant memories`);
+  }
 
   // Phase: Agent A
   onProgress?.("agentA");
   console.log("WokAI Conductor: Invoking Agent A (Human Worker Thinker)...");
-  const agentAOutput = await runAgentA(activeMessage, resolvedIntent);
+  const agentAOutput = await runAgentA(activeMessage, resolvedIntent, recalledMemories);
   onProgress?.("agentA_done", agentAOutput);
 
   // Phase: Agent 1 and Agent B (concurrently)

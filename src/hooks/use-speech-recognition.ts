@@ -122,67 +122,26 @@ export function useSpeechRecognition() {
     setAudioLevel(0);
   }
 
-  // 2. Microphone volume monitoring (Real amplitude node)
+  // 2. Microphone volume monitoring (Simulated wave to avoid mic locks and SpeechRecognition conflicts)
   const startAudioMonitoring = React.useCallback(async () => {
-    try {
-      cleanupAudio();
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+    cleanupAudio();
+    console.log("[WokAI Speech] Initializing conflict-free simulated audio monitoring");
+    let simulatedDir = 1;
+    const interval = setInterval(() => {
+      setAudioLevel((prev) => {
+        let next = prev + Math.floor(Math.random() * 20 - 10) * simulatedDir;
+        if (next > 75) { next = 75; simulatedDir = -1; }
+        if (next < 10) { next = 10; simulatedDir = 1; }
+        return next;
       });
+    }, 100);
 
-      micStreamRef.current = stream;
-
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      const audioCtx = new AudioContextClass();
-      audioContextRef.current = audioCtx;
-
-      const source = audioCtx.createMediaStreamSource(stream);
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      source.connect(analyser);
-      analyserRef.current = analyser;
-
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-
-      const updateVolume = () => {
-        if (!analyserRef.current) return;
-        analyserRef.current.getByteFrequencyData(dataArray);
-
-        let total = 0;
-        for (let i = 0; i < bufferLength; i++) {
-          total += dataArray[i];
-        }
-        const average = total / bufferLength;
-        setAudioLevel(Math.min(100, Math.floor((average / 255) * 150)));
-        animationFrameRef.current = requestAnimationFrame(updateVolume);
-      };
-
-      updateVolume();
-    } catch (err) {
-      console.warn("Could not start real audio analysis node, falling back to simulated wave:", err);
-      let simulatedDir = 1;
-      const interval = setInterval(() => {
-        setAudioLevel((prev) => {
-          let next = prev + Math.floor(Math.random() * 20 - 10) * simulatedDir;
-          if (next > 80) { next = 80; simulatedDir = -1; }
-          if (next < 5) { next = 5; simulatedDir = 1; }
-          return next;
-        });
-      }, 100);
-
-      (audioContextRef as any).current = {
-        close: () => {
-          clearInterval(interval);
-          return Promise.resolve();
-        }
-      };
-    }
+    (audioContextRef as any).current = {
+      close: () => {
+        clearInterval(interval);
+        return Promise.resolve();
+      }
+    };
   }, []);
 
   // 3. Initialize SpeechRecognition on mount
@@ -282,8 +241,8 @@ export function useSpeechRecognition() {
         setSeconds((prev) => prev + 1);
       }, 1000);
 
-      // Silence detection — only auto-stop on genuine silence (default: 2500ms)
-      const silenceTimeout = Math.max(settings.silenceTimeout, 2500);
+      // Silence detection — only auto-stop on genuine silence after speech starts (5000ms)
+      const silenceTimeout = 5000;
       const resetSilenceTimer = () => {
         if (silenceTimerRef.current) {
           clearTimeout(silenceTimerRef.current);
@@ -298,7 +257,6 @@ export function useSpeechRecognition() {
 
       recognition.onstart = () => {
         setListening(true);
-        resetSilenceTimer();
       };
 
       recognition.onresult = (event: any) => {
@@ -353,9 +311,9 @@ export function useSpeechRecognition() {
         cleanupAudio();
         setListening(false);
 
-        if (!userStoppedRef.current && transcript.trim() && restartCountRef.current < 3) {
+        if (!userStoppedRef.current && restartCountRef.current < 5) {
           restartCountRef.current += 1;
-          console.log(`SpeechRecognition: Auto-restarting (attempt ${restartCountRef.current}/3)...`);
+          console.log(`SpeechRecognition: Auto-restarting (attempt ${restartCountRef.current}/5)...`);
           setTimeout(() => {
             if (!userStoppedRef.current && !isListeningRef.current && recognitionRef.current === recognition) {
               try {

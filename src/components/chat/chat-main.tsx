@@ -197,7 +197,7 @@ const CHIPS = [
 
 export function ChatMain() {
   const { user } = useAuth();
-  const { mergeAgentResult, updateActionStatus } = useWorkspaceData(user);
+  const { snapshot, mergeAgentResult, updateActionStatus } = useWorkspaceData(user);
   
   const {
     activeSession,
@@ -323,7 +323,14 @@ export function ChatMain() {
           message: msg,
           googleToken: getGoogleToken() || undefined,
           isVoice: isVoiceInput,
-          history: messages.slice(-6).map((m) => ({ role: m.role, content: m.content }))
+          history: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
+          memories: snapshot.memories.slice(0, 50).map((m) => ({
+            id: m.id,
+            type: m.type,
+            title: m.title,
+            content: m.content,
+            confidence: m.confidence
+          }))
         })
       });
 

@@ -61,11 +61,12 @@ export interface WokaiTask {
 
 export interface WokaiMemory {
   id: string;
-  type: "preference" | "habit" | "contact" | "deadline" | "context";
+  type: "preference" | "habit" | "contact" | "deadline" | "context" | "skill" | "relationship";
   title: string;
   content: string;
   confidence: number;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface WokaiAction {
