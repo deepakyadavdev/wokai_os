@@ -28,5 +28,5 @@ export function isTwilioConfigured() {
 }
 
 export function demoModeEnabled() {
-  return process.env.NEXT_PUBLIC_DEMO_MODE !== "false";
+  return process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 }

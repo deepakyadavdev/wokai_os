@@ -155,17 +155,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       loginWithAccessKey: (key: string) => {
         try {
-          const raw = decodeURIComponent(escape(atob(key.trim())));
-          const data = JSON.parse(raw);
-          if (data && data.profile) {
-            if (data.googleToken) {
-              localStorage.setItem("googleAccessToken", data.googleToken);
-              localStorage.setItem("googleTokenExpiry", String(Date.now() + 3600 * 1000));
-            }
-            if (data.firebaseToken) localStorage.setItem("firebaseToken", data.firebaseToken);
-            setUser(data.profile);
-            return true;
+          const trimmed = key.trim();
+          // Only accept base64url-encoded strings
+          if (!/^[A-Za-z0-9\-_]+=*$/.test(trimmed)) {
+            console.error("[WokAI OS] Invalid access key format: not a valid base64 string");
+            return false;
           }
+          const decoded = atob(trimmed.replace(/-/g, "+").replace(/_/g, "/"));
+          const data = JSON.parse(decoded);
+
+          // Validate structure: must have a profile with required fields
+          if (!data || typeof data !== "object" || !data.profile || typeof data.profile !== "object") {
+            console.error("[WokAI OS] Invalid access key: missing profile");
+            return false;
+          }
+
+          const profile = data.profile;
+          // Validate profile fields - only accept known safe fields
+          const safeProfile: UserProfile = {
+            uid: String(profile.uid || ""),
+            name: String(profile.name || "WokAI User"),
+            email: String(profile.email || ""),
+            photoURL: profile.photoURL ? String(profile.photoURL) : undefined
+          };
+
+          if (!safeProfile.uid || !safeProfile.email) {
+            console.error("[WokAI OS] Invalid access key: profile missing uid or email");
+            return false;
+          }
+
+          // Validate token fields if present
+          if (data.googleToken && typeof data.googleToken === "string") {
+            localStorage.setItem("googleAccessToken", data.googleToken);
+            localStorage.setItem("googleTokenExpiry", String(Date.now() + 3600 * 1000));
+          }
+          if (data.firebaseToken && typeof data.firebaseToken === "string") {
+            localStorage.setItem("firebaseToken", data.firebaseToken);
+          }
+
+          setUser(safeProfile);
+          return true;
         } catch (e) {
           console.error("[WokAI OS] Invalid access key format:", e);
         }

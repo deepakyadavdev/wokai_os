@@ -144,7 +144,7 @@ function ActionOutputView({ action, borderColor = "border-muted/30" }: { action:
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm transition-all duration-200 hover:border-emerald-500/30">
           <div className="flex items-center gap-1.5 font-semibold text-emerald-400 text-xs mb-1 font-sans">
             <span className="inline-flex size-4 items-center justify-center rounded-full bg-emerald-500/10 text-[10px] text-emerald-400 font-bold">#</span>
-            Agent # Summary
+            Summary of API output by Agent #
           </div>
           <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap">{action.summary}</p>
         </div>
@@ -153,7 +153,7 @@ function ActionOutputView({ action, borderColor = "border-muted/30" }: { action:
       {/* If there is no summary yet, but there is raw output, we fallback to showing raw output */}
       {!action.summary && action.output && (
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-sm">
-          <div className="font-semibold text-amber-400 text-xs mb-1 font-sans uppercase tracking-wider">Raw Execution Output</div>
+          <div className="font-semibold text-amber-400 text-xs mb-1 font-sans uppercase tracking-wider">Raw API Output</div>
           <pre className="text-zinc-300 text-xs font-mono whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed overflow-x-auto max-h-60">{action.output}</pre>
         </div>
       )}
@@ -167,7 +167,7 @@ function ActionOutputView({ action, borderColor = "border-muted/30" }: { action:
             onClick={() => setShowRaw(!showRaw)}
             className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/10 px-2.5 rounded-lg flex items-center gap-1.5 transition-all duration-150"
           >
-            {showRaw ? "Hide Raw API Output" : "Show Raw API Output"}
+            {showRaw ? "Hide Raw API Output" : "See Raw API Output"}
           </Button>
 
           {showRaw && (
@@ -653,21 +653,6 @@ interface ActionCardsProps {
 
 export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: ActionCardsProps) {
   const { actions } = result;
-
-  const runningActionsRef = React.useRef<Set<string>>(new Set());
-
-  React.useEffect(() => {
-    actions.forEach((action) => {
-      if (
-        (action.status === "NEEDS_APPROVAL" || action.status === "PLANNED" || action.status === "QUEUED") &&
-        !runningActionsRef.current.has(action.id)
-      ) {
-        runningActionsRef.current.add(action.id);
-        console.log(`[WokAI OS] Auto-approving and executing action: ${action.id} (${action.tool})`);
-        void handleApproveAction(action.id, action.tool, action.label);
-      }
-    });
-  }, [actions]);
 
   const hasGmail = hasAction(actions, "gmail");
   const hasCalendar = hasAction(actions, "calendar");
@@ -1555,56 +1540,56 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
           const { signal, clear } = createTimeoutSignal();
           try {
             let command = "dir";
-            const isWrite = /write|create|save|output|add/i.test(label);
             const isRead = /read|view|cat|show/i.test(label);
-            let filename = "notes.txt";
 
-            if (isWrite && action?.content) {
-              const fileMatch = label.match(/(?:write|create|save|to|named|titled)\s+(?:file|document)?\s*['"]?([a-zA-Z0-9_\-\.\/\\:]+)['"]?/i);
+            // Only allow safe, read-only commands via the exec endpoint
+            if (isRead) {
+              const fileMatch = label.match(/(?:read|view|cat|show)\s+(?:file|document)?\s*['"]?([a-zA-Z0-9_\-\.\/]+)['"]?/i);
               if (fileMatch && fileMatch[1]) {
-                filename = fileMatch[1];
-              }
-              const b64 = btoa(unescape(encodeURIComponent(action.content)));
-              command = `powershell -Command "[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${b64}')) | Out-File -FilePath '${filename}' -Encoding utf8"`;
-            } else if (isRead) {
-              const fileMatch = label.match(/(?:read|view|cat|show)\s+(?:file|document)?\s*['"]?([a-zA-Z0-9_\-\.\/\\:]+)['"]?/i);
-              if (fileMatch && fileMatch[1]) {
-                filename = fileMatch[1];
-                command = `powershell -Command "Get-Content -Path '${filename}'"`;
+                const filename = fileMatch[1].replace(/[;&|`$]/g, "");
+                // Only allow cat/type for reading (safe, allowed commands)
+                const safePath = filename.replace(/\.\//g, "").replace(/[\\]/g, "/");
+                if (!safePath.includes("..") && !safePath.startsWith("/")) {
+                  command = `cat "${safePath}"`;
+                } else {
+                  output = "Access denied: path traversal is not allowed.";
+                  finalStatus = "FAILED";
+                }
               }
             } else {
-              const pathMatch = label.match(/(?:in|of|scan|dir|directory)\s+['"]?([a-zA-Z0-9_\-\.\/\\:]+)['"]?/i);
+              const pathMatch = label.match(/(?:in|of|scan|dir|directory)\s+['"]?([a-zA-Z0-9_\-\.\/]+)['"]?/i);
               if (pathMatch && pathMatch[1]) {
-                command = `dir "${pathMatch[1]}"`;
+                const dir = pathMatch[1].replace(/[;&|`$]/g, "").replace(/[\\]/g, "/");
+                if (!dir.includes("..") && !dir.startsWith("/")) {
+                  command = `dir "${dir}"`;
+                } else {
+                  output = "Access denied: path traversal is not allowed.";
+                  finalStatus = "FAILED";
+                }
               }
             }
 
-            const endpoint = localHost ? `${localHost}/exec` : "/api/devices/exec";
-            const res = await fetch(endpoint, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ command }),
-              signal
-            });
-            if (!res.ok) {
-              const errText = await res.text().catch(() => "");
-              throw new Error(`HTTP Error ${res.status}: ${errText || res.statusText || "Server returned empty response"}`);
-            }
-            const data = await res.json();
-            if (res.ok) {
-              if (isWrite && action?.content) {
-                output = `Successfully wrote content to local file: ${filename}`;
-              } else {
-                output = data.stdout || data.stderr || "Operation completed successfully.";
+            if (finalStatus !== "FAILED") {
+              const endpoint = localHost ? `${localHost}/exec` : "/api/devices/exec";
+              const res = await fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ command }),
+                signal
+              });
+              if (!res.ok) {
+                const errText = await res.text().catch(() => "");
+                throw new Error(`HTTP Error ${res.status}: ${errText || res.statusText || "Server returned empty response"}`);
               }
-            } else {
-              output = `Failed to execute file access operation: ${data.error || ""}`;
-              finalStatus = "FAILED";
+              const data = await res.json();
+              output = data.stdout || data.stderr || "Operation completed successfully.";
             }
           } catch (err: any) {
             console.error(`[WokAI OS] [File Access] Error:`, err);
-            finalStatus = "FAILED";
-            output = `Failed to access files: ${err.message || err}`;
+            if (finalStatus !== "FAILED") {
+              finalStatus = "FAILED";
+              output = `Failed to access files: ${err.message || err}`;
+            }
           } finally {
             clear();
           }

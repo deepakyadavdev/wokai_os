@@ -824,7 +824,7 @@ export function ChatMain() {
                                 <polyline points="9 18 15 12 9 6" />
                               </svg>
                               <span>
-                                {expandedThinking[message.id] ? "Hide thinking process" : "Show thinking process"}
+                                {expandedThinking[message.id] ? "Hide thinking history" : "View thinking history"}
                               </span>
                             </button>
 

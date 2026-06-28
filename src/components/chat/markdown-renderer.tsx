@@ -186,14 +186,19 @@ function renderInline(text: string): React.ReactNode[] {
     const linkMatch = part.match(/^\[(.+?)\]\((.+?)\)$/);
     if (linkMatch) {
       const linkText = linkMatch[1];
-      const linkUrl = linkMatch[2];
+      let linkUrl = linkMatch[2];
+      // Strip dangerous URL schemes to prevent XSS
+      const dangerousSchemes = /^(javascript|data|vbscript|blob|file):/i;
       const isAbsoluteFile = linkUrl.startsWith("file:///");
+      if (dangerousSchemes.test(linkUrl)) {
+        linkUrl = "#";
+      }
       return (
         <a
           key={index}
           href={linkUrl}
-          target={isAbsoluteFile ? undefined : "_blank"}
-          rel={isAbsoluteFile ? undefined : "noopener noreferrer"}
+          target={linkUrl === "#" ? undefined : (isAbsoluteFile ? undefined : "_blank")}
+          rel={linkUrl === "#" ? undefined : (isAbsoluteFile ? undefined : "noopener noreferrer")}
           className="text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
         >
           {linkText}

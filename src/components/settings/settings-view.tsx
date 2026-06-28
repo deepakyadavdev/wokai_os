@@ -587,17 +587,14 @@ export function SettingsView() {
   const { user, firebaseConfigured } = useAuth();
   const [activeCategory, setActiveCategory] = React.useState<SettingsCategory>('profile');
 
-  // Capture Google access token from OAuth callback redirect
+  // Detect OAuth callback success and notify user
   React.useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      const accessToken = params.get("access_token");
-      const expiresIn = params.get("expires_in");
-      if (accessToken) {
-        saveGoogleToken(accessToken, expiresIn ? Number(expiresIn) : 3600);
-        toast.success("Google Access Token saved from OAuth callback!");
+      if (params.get("oauth") === "success") {
+        toast.success("Google OAuth authorization complete!");
         setActiveCategory('google');
-        // Clean URL
+        // Clean URL — token is now stored in cookies, not URL params
         window.history.replaceState({}, "", window.location.pathname);
       }
     }

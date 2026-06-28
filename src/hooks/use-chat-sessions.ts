@@ -235,15 +235,13 @@ export function useChatSessions(): UseChatSessionsReturn {
     (id: string) => {
       setSessions((prev) => {
         const next = prev.filter((s) => s.id !== id);
+        if (activeSessionId === id && next.length > 0) {
+          setActiveSessionId(next[0].id);
+        }
         return next;
       });
-      setActiveSessionId((prev) => {
-        if (prev !== id) return prev;
-        const remaining = sessions.filter((s) => s.id !== id);
-        return remaining.length > 0 ? remaining[0].id : null;
-      });
     },
-    [sessions]
+    [activeSessionId]
   );
 
   const updateSessionModel = React.useCallback(
@@ -268,12 +266,56 @@ export function useChatSessions(): UseChatSessionsReturn {
     []
   );
 
+  const sanitizeContent = React.useCallback((content: string): string => {
+    // Strip common prompt injection patterns that could manipulate the LLM
+    const injectionPatterns = [
+      /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|commands?)/gi,
+      /disregard\s+(all\s+)?(previous|prior|above|earlier)/gi,
+      /you\s+are\s+now\s+(a|an)/gi,
+      /new\s+(system|role|persona|instruction)/gi,
+      /\[SYSTEM\]/gi,
+      /\[INST\]/gi,
+      /<\|im_start\|>/gi,
+      /<\|im_end\|>/gi,
+      /system\s*:\s*you\s+must/gi,
+      /override\s+(all\s+)?(previous|prior)\s+(instructions?|rules?|constraints?)/gi,
+    ];
+    let sanitized = content;
+    for (const pattern of injectionPatterns) {
+      sanitized = sanitized.replace(pattern, "[removed]");
+    }
+    return sanitized;
+  }, []);
+
   const importSessions = React.useCallback(
     (imported: ChatSession[]) => {
+      if (!Array.isArray(imported)) {
+        console.error("[WokAI OS] Import failed: data is not an array");
+        return;
+      }
+
+      const MAX_SESSIONS = 200;
+      const MAX_MESSAGES_PER_SESSION = 500;
+      const MAX_CONTENT_LENGTH = 50000;
+      const sanitized = imported.slice(0, MAX_SESSIONS).map((s) => {
+        if (!s.id || !s.title || !Array.isArray(s.messages)) return null;
+        const truncatedTitle = s.title.slice(0, 200);
+        const sanitizedMessages = s.messages.slice(0, MAX_MESSAGES_PER_SESSION).map((m) => ({
+          ...m,
+          content: typeof m.content === "string" ? sanitizeContent(m.content.slice(0, MAX_CONTENT_LENGTH)) : ""
+        }));
+        return { ...s, title: truncatedTitle, messages: sanitizedMessages };
+      }).filter(Boolean) as ChatSession[];
+
+      if (sanitized.length === 0) {
+        console.error("[WokAI OS] Import failed: no valid sessions found after validation");
+        return;
+      }
+
       setSessions((prev) => {
         const map = new Map<string, ChatSession>();
         prev.forEach(s => map.set(s.id, s));
-        imported.forEach(s => map.set(s.id, s));
+        sanitized.forEach(s => map.set(s.id, s));
         const finalSessions = Array.from(map.values()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
         if (finalSessions.length > 0) {
           const activeExists = finalSessions.some(s => s.id === activeSessionId);
@@ -284,7 +326,7 @@ export function useChatSessions(): UseChatSessionsReturn {
         return finalSessions;
       });
     },
-    [activeSessionId]
+    [activeSessionId, sanitizeContent]
   );
 
   const groupedSessions = React.useMemo(

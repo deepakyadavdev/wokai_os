@@ -14,12 +14,13 @@ function detectRisk(message: string): RiskLevel {
 }
 
 function makeAction(toolName: WokaiAction["tool"], label: string): WokaiAction {
+  const tool = getTool(toolName);
   return {
     id: id("action"),
     tool: toolName,
     label,
-    status: "NEEDS_APPROVAL",
-    sensitive: false,
+    status: tool ? tool.statusWhenPlanned : "NEEDS_APPROVAL",
+    sensitive: tool ? tool.sensitive : true,
     createdAt: new Date().toISOString()
   };
 }
@@ -551,7 +552,7 @@ Return ONLY a strict raw JSON block matching this format (no markdown formatting
     return JSON.parse(cleanJson) as Partial<AgentPlan>;
   } catch (err) {
     console.error("[WokAI Conductor] Agent 2 parse error:", err);
-    return {};
+    throw new Error(`Failed to generate structured plan: ${err instanceof Error ? err.message : "unknown parse error"}`);
   }
 }
 
@@ -596,7 +597,7 @@ Return strict JSON ONLY. Do NOT wrap it in markdown codeblocks. The output must 
     return JSON.parse(cleanJson) as Array<{ id: string; title: string; content: string }>;
   } catch (err) {
     console.error("[WokAI Conductor] Agent 4 parse error:", err);
-    return [];
+    throw new Error(`Failed to generate action content: ${err instanceof Error ? err.message : "unknown parse error"}`);
   }
 }
 
@@ -1047,7 +1048,7 @@ export async function generateAgentPlan(
     actions: finalActions,
     suggestedTasks: mergedTasks,
     memoryWrites: mergedMemories,
-    needsApproval: false,
+    needsApproval: finalActions.some((a) => a.status === "NEEDS_APPROVAL"),
 
     // Redesigned prompt architecture metadata fields
     confidence_score: typeof parsedPlan.confidence_score === "number" ? parsedPlan.confidence_score : 1.0,
