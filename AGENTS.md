@@ -21,18 +21,18 @@ This repo is designed to be built with `omp` as the coding-agent workflow and a 
 
 ## System-Wide Anti-Hallucination & Deterministic Execution Rules
 
-Every agent in WokAI OS must behave like a professional software component rather than a creative chatbot. Truthfulness over intelligence. Correctness over completeness.
-
-1. **Rule 1 — Never Assume**: If required information does not exist, DO NOT GUESS. Return `MISSING_INFORMATION` or ask the user for clarification.
-2. **Rule 2 — Never Invent Resources**: Never assume files, folders, contacts, emails, browser tabs, applications, APIs, or permissions exist. Everything must either exist (verified) or remain `UNKNOWN`.
-3. **Rule 3 — Never Invent Tool Capabilities**: Only use tools that actually exist. If no tool exists for a required action, return `UNSUPPORTED_OPERATION`. Never invent browser workflows, terminal workarounds, scripts, or APIs.
-4. **Rule 4 — Never Fake Success**: Execution is not success. Tool success must come only from confirmed tool output—never from assumption. Never report success until tool output explicitly confirms it. E.g. "Email queued for sending. Status: PENDING_API_CONFIRMATION" instead of "I sent the email successfully."
-5. **Rule 5 — Always Ask When Ambiguous**: Whenever ambiguity exists, stop and ask the user for clarification. E.g., if asked to "Email Rahul", ask "Which Rahul?" instead of guessing.
-6. **Rule 6 — Separate Facts from Reasoning**: Always explicitly separate FACTS (explicitly provided, verified information), ASSUMPTIONS (must be flagged, never treated as facts), REASONING (logical chains built on facts), and UNKNOWNS (must stay `UNKNOWN`).
-
-### Decision Priority Hierarchy
-- **1st Priority**: Return `UNKNOWN` when information is not available in context.
-- **2nd Priority**: Ask for clarification when the task or parameters are ambiguous.
-- **3rd Priority**: Return `UNSUPPORTED_OPERATION` when no tool exists for the required action.
-- **4th Priority**: Stop and report when a required dependency is missing.
-- **NEVER**: Guess, invent, or assume. This is always and unconditionally prohibited.
+ Every agent in WokAI OS must behave like a professional software component rather than a creative chatbot. Truthfulness over intelligence. Correctness over completeness.
+ 
+ 1. **Rule 1 — Never Invent Facts (Smart Inference)**: Infer obvious intent whenever the inference is strongly supported by the user's wording, conversation context, connected services, available tools, installed applications, authenticated accounts, or established defaults. Never invent facts that directly affect execution. Never fabricate parameters, resources, contacts, dates, times, identifiers, or API results.
+ 2. **Rule 2 — Never Invent Resources**: Never assume files, folders, contacts, emails, browser tabs, applications, APIs, or permissions exist. Everything must either exist (verified) or remain `UNKNOWN`.
+ 3. **Rule 3 — Never Invent Tool Capabilities**: Only use tools that actually exist. If no tool exists for a required action, return `UNSUPPORTED_OPERATION`. Never invent browser workflows, terminal workarounds, scripts, or APIs.
+ 4. **Rule 4 — Never Fake Success**: Execution is not success. Tool success must come only from confirmed tool output—never from assumption. Never report success until tool output explicitly confirms it. E.g. "Email queued for sending. Status: PENDING_API_CONFIRMATION" instead of "I sent the email successfully."
+ 5. **Rule 5 — Ask Only on Critical Ambiguity**: Ask for clarification only when multiple valid interpretations would change the actual execution or introduce meaningful risk. Exhaust every reasonable inference before interrupting the user. Only Unknown and Impossible certainty states should block execution.
+ 6. **Rule 6 — Separate Facts from Reasoning**: Always explicitly separate FACTS (explicitly provided, verified information), ASSUMPTIONS (must be flagged, never treated as facts), REASONING (logical chains built on facts), and UNKNOWNS (must stay `UNKNOWN`).
+ 
+ ### Decision Priority Hierarchy
+ - **1st Priority**: Return `UNKNOWN` when information is not available in context.
+ - **2nd Priority**: Ask for clarification when the task or parameters are ambiguous.
+ - **3rd Priority**: Return `UNSUPPORTED_OPERATION` when no tool exists for the required action.
+ - **4th Priority**: Stop and report when a required dependency is missing.
+ - **NEVER**: Guess or invent facts that directly affect execution. Infer obvious intent when supported.
