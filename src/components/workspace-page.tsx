@@ -44,10 +44,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWorkspaceData } from "@/hooks/use-workspace-data";
 import { formatRelativeTime } from "@/lib/utils";
 import { highestRisk, riskCopy } from "@/lib/wokai/risk";
-import type { ActionStatus, BrowserJob, RiskLevel, WorkspaceSnapshot, WokaiTask, WokaiDevice } from "@/lib/types";
+import type { ActionStatus, BrowserJob, RiskLevel, WokaiMemory, WorkspaceSnapshot, WokaiTask, WokaiDevice } from "@/lib/types";
 import { toast } from "sonner";
 import { getGoogleToken, saveGoogleToken, clearGoogleToken, tokenExpiresIn } from "@/lib/google/token";
-import { Plus } from "lucide-react";
+import { Plus, Trash } from "lucide-react";
 
 type PageKind =
   | "dashboard"
@@ -391,39 +391,225 @@ function TasksPage({ snapshot }: { snapshot: WorkspaceSnapshot }) {
 }
 
 function MemoryPage({ snapshot }: { snapshot: WorkspaceSnapshot }) {
+  const [memories, setMemories] = React.useState<WorkspaceSnapshot["memories"]>(snapshot.memories);
+  const [activeTab, setActiveTab] = React.useState("all");
+  const [showAddForm, setShowAddForm] = React.useState(false);
+  const [title, setTitle] = React.useState("");
+  const [content, setContent] = React.useState("");
+  const [type, setType] = React.useState<WokaiMemory["type"]>("context");
+  const [saving, setSaving] = React.useState(false);
+  const [deleting, setDeleting] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setMemories(snapshot.memories);
+  }, [snapshot.memories]);
+
+  const filtered = activeTab === "all"
+    ? memories
+    : memories.filter((m) => {
+        if (activeTab === "preferences") return m.type === "preference" || m.type === "context" || m.type === "skill";
+        if (activeTab === "habits") return m.type === "habit" || m.type === "relationship";
+        return m.type === activeTab;
+      });
+
+  const handleSave = async () => {
+    if (!title.trim() || !content.trim()) return;
+    setSaving(true);
+    try {
+      const { getGoogleToken } = await import("@/lib/google/token");
+      const token = getGoogleToken();
+      if (!token) {
+        toast.error("Please sign in to save memories");
+        return;
+      }
+      const res = await fetch("/api/memory", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ type, title: title.trim(), content: content.trim() })
+      });
+      if (res.ok) {
+        const { memory } = await res.json();
+        setMemories((prev) => [memory, ...prev]);
+        setTitle("");
+        setContent("");
+        setShowAddForm(false);
+        toast.success("Memory saved");
+      } else {
+        toast.error("Failed to save memory");
+      }
+    } catch {
+      toast.error("Failed to save memory");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    setDeleting(id);
+    try {
+      const { getGoogleToken } = await import("@/lib/google/token");
+      const token = getGoogleToken();
+      if (!token) return;
+      await fetch(`/api/memory?id=${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMemories((prev) => prev.filter((m) => m.id !== id));
+      toast.success("Memory deleted");
+    } catch {
+      toast.error("Failed to delete memory");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const typeLabels: Record<string, { label: string; color: string }> = {
+    preference: { label: "Preference", color: "bg-blue-500/10 text-blue-400 border-blue-500/20" },
+    habit: { label: "Habit", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
+    contact: { label: "Contact", color: "bg-violet-500/10 text-violet-400 border-violet-500/20" },
+    deadline: { label: "Deadline", color: "bg-red-500/10 text-red-400 border-red-500/20" },
+    context: { label: "Context", color: "bg-amber-500/10 text-amber-400 border-amber-500/20" },
+    skill: { label: "Skill", color: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20" },
+    relationship: { label: "Relationship", color: "bg-pink-500/10 text-pink-400 border-pink-500/20" },
+  };
+
+  const tabs = [
+    { id: "all", label: "All" },
+    { id: "preferences", label: "Preferences" },
+    { id: "habits", label: "Habits" },
+    { id: "contacts", label: "Contacts" },
+    { id: "deadline", label: "Deadlines" },
+    { id: "context", label: "Context" },
+  ];
+
   return (
-    <Tabs defaultValue="preferences">
-      <TabsList className="w-fit">
-        <TabsTrigger value="preferences">Preferences</TabsTrigger>
-        <TabsTrigger value="habits">Habits</TabsTrigger>
-        <TabsTrigger value="contacts">Contacts</TabsTrigger>
-      </TabsList>
-      {["preferences", "habits", "contacts"].map((tab) => (
-        <TabsContent key={tab} value={tab}>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {snapshot.memories
-              .filter((memory) => {
-                if (tab === "preferences") return memory.type === "preference" || memory.type === "context";
-                if (tab === "habits") return memory.type === "habit";
-                return memory.type === "contact";
-              })
-              .map((memory) => (
-                <Card key={memory.id}>
-                  <CardHeader>
-                    <CardTitle>{memory.title}</CardTitle>
-                    <CardDescription>{memory.type}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-3">
-                    <p className="text-sm leading-6 text-muted-foreground">{memory.content}</p>
-                    <Progress value={memory.confidence * 100} />
-                    <div className="text-xs text-muted-foreground">Confidence {Math.round(memory.confidence * 100)}%</div>
-                  </CardContent>
-                </Card>
-              ))}
-          </div>
-        </TabsContent>
-      ))}
-    </Tabs>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Memory Engine</h2>
+          <p className="text-sm text-muted-foreground">{memories.length} memories stored</p>
+        </div>
+        <Button size="sm" onClick={() => setShowAddForm(!showAddForm)} className="gap-1.5">
+          <Plus className="size-3.5" />
+          Add Memory
+        </Button>
+      </div>
+
+      {showAddForm && (
+        <Card className="border-dashed">
+          <CardContent className="pt-4 space-y-3">
+            <div className="flex gap-3">
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value as WokaiMemory["type"])}
+                className="text-xs rounded-md border border-border bg-background px-2 py-1.5"
+              >
+                <option value="preference">Preference</option>
+                <option value="habit">Habit</option>
+                <option value="contact">Contact</option>
+                <option value="deadline">Deadline</option>
+                <option value="context">Context</option>
+                <option value="skill">Skill</option>
+                <option value="relationship">Relationship</option>
+              </select>
+            </div>
+            <input
+              type="text"
+              placeholder="Memory title (e.g. &quot;Prefers morning meetings&quot;)"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full text-sm rounded-md border border-border bg-background px-3 py-2 placeholder:text-muted-foreground/50"
+              maxLength={80}
+            />
+            <textarea
+              placeholder="Detailed memory content..."
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="w-full text-sm rounded-md border border-border bg-background px-3 py-2 placeholder:text-muted-foreground/50 min-h-[80px]"
+              maxLength={500}
+            />
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setShowAddForm(false)}>Cancel</Button>
+              <Button size="sm" onClick={handleSave} disabled={saving || !title.trim() || !content.trim()}>
+                {saving ? "Saving..." : "Save Memory"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="flex gap-2 flex-wrap">
+        {tabs.map((tab) => (
+          <Button
+            key={tab.id}
+            variant={activeTab === tab.id ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setActiveTab(tab.id)}
+            className="text-xs"
+          >
+            {tab.label}
+            {tab.id !== "all" && (
+              <span className="ml-1.5 text-muted-foreground">
+                {memories.filter((m) => {
+                  if (tab.id === "preferences") return m.type === "preference" || m.type === "context" || m.type === "skill";
+                  if (tab.id === "habits") return m.type === "habit" || m.type === "relationship";
+                  return m.type === tab.id;
+                }).length}
+              </span>
+            )}
+          </Button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground text-sm">
+          <Brain className="size-8 mx-auto mb-3 opacity-30" />
+          No memories yet. WokAI automatically saves useful information from your conversations.
+          <br />You can also add memories manually.
+        </div>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((memory) => {
+            const meta = typeLabels[memory.type] || typeLabels.context;
+            return (
+              <Card key={memory.id} className="group relative">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-sm font-medium leading-tight">{memory.title}</CardTitle>
+                    <button
+                      onClick={() => handleDelete(memory.id)}
+                      disabled={deleting === memory.id}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-400 shrink-0"
+                    >
+                      {deleting === memory.id ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Trash className="size-3.5" />
+                      )}
+                    </button>
+                  </div>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${meta.color}`}>
+                    {meta.label}
+                  </span>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs leading-5 text-muted-foreground">{memory.content}</p>
+                  <div className="mt-2 flex items-center justify-between">
+                    <Progress value={memory.confidence * 100} className="h-1" />
+                    <span className="text-[10px] text-muted-foreground ml-2">
+                      {memory.updatedAt ? new Date(memory.updatedAt).toLocaleDateString() : ""}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

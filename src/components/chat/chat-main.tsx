@@ -24,6 +24,7 @@ import { MarkdownRenderer } from "@/components/chat/markdown-renderer";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceData } from "@/hooks/use-workspace-data";
 import { useChatSessions } from "@/hooks/use-chat-sessions";
+import { extractMemories } from "@/lib/wokai/memory-agent";
 import { cn } from "@/lib/utils";
 import type { AgentPlan } from "@/lib/types";
 import { getGoogleToken } from "@/lib/google/token";
@@ -400,6 +401,34 @@ export function ChatMain() {
       if (!result) throw new Error("No plan returned from streaming conductor.");
 
       await mergeAgentResult(result);
+
+      // Extract and persist memories from this exchange (non-blocking)
+      void (async () => {
+        try {
+          const newMemories = await extractMemories(msg, result.response);
+          if (newMemories.length > 0 && user?.uid) {
+            const { getGoogleToken } = await import("@/lib/google/token");
+            const token = getGoogleToken();
+            if (token) {
+              const db = (await import("@/lib/firebase/client")).getFirebaseDb();
+              if (db) {
+                const { setDoc, doc, serverTimestamp } = await import("firebase/firestore");
+                await Promise.all(
+                  newMemories.map((memory) =>
+                    setDoc(doc(db, "users", user.uid, "memories", memory.id), {
+                      ...memory,
+                      createdAt: memory.createdAt,
+                      updatedAt: serverTimestamp(),
+                    })
+                  )
+                );
+              }
+            }
+          }
+        } catch {
+          // Memory extraction failure is non-critical
+        }
+      })();
 
       addMessage(sessionId, {
         role: "assistant",

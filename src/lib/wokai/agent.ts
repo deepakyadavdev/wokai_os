@@ -727,6 +727,10 @@ You MUST reject the plan (set approved: false) if it contains ANY of the followi
 Smart Inference Policy:
 - The QA Agent should allow inferred services/tools (like mapping "Check Gmail" to "gmail.search" or "Make a spreadsheet" to "sheets.createTracker") if confidence is High or Highly Likely. Clarification is required only if multiple valid interpretations would change the execution or introduce meaningful risk. Do NOT reject plans because of inferred services (like Drive or Gmail) when the user request implies them. Only reject if critical execution parameters are fabricated.
 
+Distinction - Content Generation vs. Parameter Fabrication:
+- DO NOT reject plans because the AI has generated creative, analytical, or descriptive content (such as writing report bodies, email text drafts, search query keywords, slide outlines, or document templates) to fulfill a user request like "make a report" or "draft an email". Content generation is the core expected task of the AI.
+- ONLY reject the plan for "Fabrication" if critical execution parameters or target endpoints (like recipient email addresses, specific meeting dates/times, phone numbers, or filenames) are made up by the AI without user specification.
+
 - The user request is: "${message}"
 - The resolved intent is: ${resolvedIntent ? JSON.stringify(resolvedIntent, null, 2) : "None"}
 - The proposed plan is: ${JSON.stringify(plan)}

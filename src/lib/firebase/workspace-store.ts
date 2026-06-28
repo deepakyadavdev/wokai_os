@@ -14,6 +14,14 @@ import {
 import { getFirebaseDb } from "@/lib/firebase/client";
 import type { UserProfile, WokaiAction, WokaiMemory, WokaiTask } from "@/lib/types";
 
+function toISOString(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && typeof (value as { toDate?: () => Date }).toDate === "function") {
+    return (value as { toDate: () => Date }).toDate().toISOString();
+  }
+  return new Date().toISOString();
+}
+
 export function userCollection(uid: string, name: string) {
   const db = getFirebaseDb();
   return db ? collection(db, "users", uid, name) : null;
@@ -30,7 +38,21 @@ export function subscribeToUserCollection<T>(
   return onSnapshot(
     ordered,
     (snapshot) => {
-      callback(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as T));
+      const items = snapshot.docs.map((item) => {
+        const raw = item.data();
+        const normalized: Record<string, unknown> = { id: item.id, ...raw };
+        if (typeof normalized.createdAt !== "string") {
+          normalized.createdAt = toISOString(normalized.createdAt);
+        }
+        if (typeof normalized.updatedAt !== "string") {
+          normalized.updatedAt = toISOString(normalized.updatedAt);
+        }
+        if (normalized.deadline != null && typeof normalized.deadline !== "string") {
+          normalized.deadline = toISOString(normalized.deadline);
+        }
+        return normalized as T;
+      });
+      callback(items);
     },
     (error) => {
       console.warn(`[WokAI OS] Firestore subscription to ${name} failed (possibly due to security rules):`, error.message);
