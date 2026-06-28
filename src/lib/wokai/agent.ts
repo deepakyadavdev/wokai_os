@@ -66,6 +66,54 @@ function makeMemory(message: string): WokaiMemory | null {
 
 export function deterministicAgentPlan(message: string): AgentPlan {
   const lower = message.toLowerCase().trim();
+  const cleanLower = lower.replace(/[^\w\s]/g, "").trim();
+  const greetings = [
+    "hi", "hey", "hello", "greetings", "good morning", "good afternoon",
+    "good evening", "yo", "sup", "heelo", "hi there", "hello there", "hey there", "..."
+  ];
+
+  const isGreeting = greetings.includes(cleanLower) ||
+                     greetings.some(g => cleanLower.startsWith(g + " ")) ||
+                     cleanLower.replace(/\./g, "").trim() === "";
+
+  const isCapabilityQuestion =
+    /(what can you do|what are you able to do|how can you help|what tools do you have|help|who are you|what is this|options|features|commands)/i.test(cleanLower) ||
+    (cleanLower.includes("can you") && cleanLower.includes("do")) ||
+    (cleanLower.includes("what") && cleanLower.includes("do"));
+
+  const hasTaskKeywords = /email|inbox|gmail|reply|meeting|schedule|calendar|file|drive|notes|docs|sheet|slides|pitch|deck|call|phone|browser|apply|internship|website|form|device|laptop|tablet|terminal|run|exec|cmd|ls|dir|scan|due|assignment|project|bill|deadline|rescue/i.test(cleanLower);
+
+  if ((isGreeting || isCapabilityQuestion) && !hasTaskKeywords) {
+    const response = isGreeting
+      ? "Hello! I am WokAI, your AI OS companion. How can I help you manage your tasks, check emails, control devices, or schedule calendar events today?"
+      : "I can assist you with information and tasks based on your needs. For example, I can check your Gmail inbox, manage your Google Calendar events, search Google Drive files, automate browser workflows, and run terminal commands. Let me know what you'd like help with!";
+
+    return {
+      intent: "greeting",
+      riskLevel: "LOW",
+      response,
+      reasoning: [
+        "Identified user message as a simple greeting or general inquiry.",
+        "Skipped task creation and planning loop."
+      ],
+      plan: ["Awaiting user instructions"],
+      actions: [],
+      suggestedTasks: [],
+      memoryWrites: [],
+      needsApproval: false,
+      confidence_score: 1.0,
+      clarification_required: false,
+      missing_information: [],
+      unsupported_operation: false,
+      risk_level: "LOW",
+      dependency_list: [],
+      preconditions: [],
+      postconditions: [],
+      validation_status: "PASS",
+      failure_reason: null
+    };
+  }
+
   const riskLevel = detectRisk(message);
   const actions: WokaiAction[] = [
     makeAction("memory.recall", "Loaded preferences, habits, deadlines, and recent actions")
@@ -846,6 +894,19 @@ export async function generateAgentPlan(
 
   onProgress?.("routing");
   const baseline = deterministicAgentPlan(activeMessage);
+
+  // 1. Greeting Bypass
+  if (baseline.intent === "greeting") {
+    console.log("WokAI Conductor: Greeting detected. Bypassing LLM planning loop.");
+    if (isVoice) {
+      baseline.voiceData = {
+        originalTranscript: message,
+        repairedMessage: activeMessage,
+        detectedLanguage: detectedLang
+      };
+    }
+    return baseline;
+  }
 
 
 
