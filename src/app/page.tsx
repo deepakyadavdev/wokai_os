@@ -75,11 +75,100 @@ export default function LandingPage() {
         )}
       </AnimatePresence>
 
-      {/* ── SECTION 1: HERO (Glowing green blueprint diagram on right, text on left) ── */}
+      {/* ── SECTION 1: HERO (Glowing green blueprint diagram in background, text on left) ── */}
       <section id="hero" className="min-h-screen pt-28 flex items-center relative overflow-hidden bg-gradient-to-b from-[#030712] via-[#050a16] to-[#040813]">
-        {/* Abstract Green Mesh Overlay */}
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none" />
+        
+        {/* Giant Background Blueprint SVG (Large scale bleeding to the right & behind text) */}
+        <div className="absolute -right-32 sm:-right-48 lg:-right-64 top-1/2 -translate-y-1/2 w-[700px] h-[700px] sm:w-[900px] sm:h-[900px] lg:w-[1200px] lg:h-[1200px] pointer-events-none select-none z-0">
+          <svg 
+            viewBox="0 0 500 500" 
+            className="w-full h-full opacity-35 text-emerald-500/60 stroke-current fill-none stroke-[0.6] drop-shadow-[0_0_15px_rgba(16,185,129,0.12)]"
+          >
+            {/* Outermost Static Radar Rings & Scale Ticks */}
+            <circle cx="250" cy="250" r="246" />
+            <circle cx="250" cy="250" r="242" strokeDasharray="1.5, 4.5" />
+            <circle cx="250" cy="250" r="236" strokeDasharray="8, 16" />
+            <circle cx="250" cy="250" r="232" />
+            
+            {/* Fine Concentric Pitch Ticks */}
+            <circle cx="250" cy="250" r="226" strokeDasharray="4, 12" className="opacity-40" />
+            <circle cx="250" cy="250" r="220" />
+            <circle cx="250" cy="250" r="214" strokeDasharray="30, 8, 12, 8" className="opacity-50" />
 
+            {/* Static Grid Intersects */}
+            <path d="M 250 4 L 250 496 M 4 250 L 496 250" strokeDasharray="6, 12" className="opacity-30" />
+            <path d="M 76 76 L 424 424 M 76 424 L 424 76" strokeDasharray="4, 16" className="opacity-20" />
+
+            {/* ── LAYER A: Outer Slow Rotating System ── */}
+            <g className="animate-[spin_160s_linear_infinite]">
+              {/* Radial Spokes with outer node points */}
+              <line x1="250" y1="250" x2="250" y2="12" /> <circle cx="250" cy="12" r="2" fill="currentColor" />
+              <line x1="250" y1="250" x2="250" y2="488" /> <circle cx="250" cy="488" r="2" fill="currentColor" />
+              <line x1="250" y1="250" x2="12" y2="250" /> <circle cx="12" cy="250" r="2" fill="currentColor" />
+              <line x1="250" y1="250" x2="488" y2="250" /> <circle cx="488" cy="250" r="2" fill="currentColor" />
+              
+              <line x1="250" y1="250" x2="456" y2="369" /> <circle cx="456" cy="369" r="2" fill="currentColor" />
+              <line x1="250" y1="250" x2="369" y2="456" /> <circle cx="369" cy="456" r="2" fill="currentColor" />
+              <line x1="250" y1="250" x2="131" y2="456" /> <circle cx="131" cy="456" r="2" fill="currentColor" />
+              <line x1="250" y1="250" x2="44" y2="369" /> <circle cx="44" cy="369" r="2" fill="currentColor" />
+              <line x1="250" y1="250" x2="44" y2="131" /> <circle cx="44" cy="131" r="2" fill="currentColor" />
+              <line x1="250" y1="250" x2="131" y2="44" /> <circle cx="131" cy="44" r="2" fill="currentColor" />
+              <line x1="250" y1="250" x2="369" y2="44" /> <circle cx="369" cy="44" r="2" fill="currentColor" />
+              <line x1="250" y1="250" x2="456" y2="131" /> <circle cx="456" cy="131" r="2" fill="currentColor" />
+
+              {/* Sub-scale ticks & degrees values */}
+              <circle cx="250" cy="250" r="200" strokeDasharray="3, 7" />
+              <circle cx="250" cy="250" r="185" strokeDasharray="60, 20" />
+            </g>
+
+            {/* ── LAYER B: Reverse Circuit Track System ── */}
+            <g className="animate-[spin_90s_linear_infinite_reverse] opacity-80">
+              {/* Arc Tracks & Guideways */}
+              <path d="M 250 50 A 200 200 0 0 1 450 250" strokeWidth="1.5" strokeDasharray="140, 10, 40, 10" />
+              <path d="M 250 450 A 200 200 0 0 1 50 250" strokeWidth="1.5" strokeDasharray="140, 10, 40, 10" />
+              
+              {/* Outer Data Nodes */}
+              <circle cx="450" cy="250" r="4.5" fill="currentColor" className="animate-pulse" />
+              <circle cx="50" cy="250" r="4.5" fill="currentColor" className="animate-pulse" />
+              
+              {/* Orbiting Tech Rings */}
+              <circle cx="250" cy="250" r="172" strokeDasharray="100, 30, 10, 30" />
+              <circle cx="250" cy="250" r="162" strokeDasharray="6, 12" />
+            </g>
+
+            {/* ── LAYER C: Inner Fast Gear System ── */}
+            <g className="animate-[spin_45s_linear_infinite]">
+              {/* Gear style ticks */}
+              <circle cx="250" cy="250" r="144" strokeDasharray="4, 8" strokeWidth="2.5" />
+              <circle cx="250" cy="250" r="132" strokeDasharray="40, 5" />
+              
+              {/* Tech writing inside layout */}
+              <text x="250" y="125" className="text-[7px] font-mono fill-emerald-500/90 font-bold text-center tracking-widest" textAnchor="middle">WOKAI OS v2.0</text>
+              <text x="250" y="380" className="text-[7px] font-mono fill-emerald-500/90 font-bold text-center tracking-widest" textAnchor="middle">CONDUCTOR ENGINE</text>
+              
+              <circle cx="250" cy="250" r="118" strokeDasharray="20, 20" />
+              <path d="M 250 140 A 110 110 0 0 1 360 250 L 340 250 A 90 90 0 0 0 250 160 Z" className="opacity-25 fill-current" />
+              <path d="M 250 360 A 110 110 0 0 1 140 250 L 160 250 A 90 90 0 0 0 250 340 Z" className="opacity-25 fill-current" />
+            </g>
+
+            {/* ── LAYER D: Center Targeting Crosshair System ── */}
+            <g className="animate-[spin_25s_linear_infinite_reverse]">
+              <circle cx="250" cy="250" r="88" strokeDasharray="12, 12" />
+              <circle cx="250" cy="250" r="72" strokeWidth="1.2" />
+              <circle cx="250" cy="250" r="54" strokeDasharray="8, 4" />
+              <circle cx="250" cy="250" r="36" />
+              
+              {/* Center Crosshairs */}
+              <path d="M 250 200 L 250 300 M 200 250 L 300 250" strokeWidth="1.5" />
+            </g>
+
+            {/* Center Core Node */}
+            <circle cx="250" cy="250" r="16" className="fill-[#030712] stroke-emerald-400 stroke-[1.5]" />
+            <polygon points="250,240 260,250 250,260 240,250" className="fill-emerald-400 animate-pulse" />
+          </svg>
+        </div>
+
+        {/* Text Grid Container */}
         <div className="max-w-7xl mx-auto px-6 w-full grid grid-cols-1 lg:grid-cols-12 gap-12 items-center relative z-10">
           
           {/* Left Text Box */}
@@ -87,7 +176,7 @@ export default function LandingPage() {
             initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8 }}
-            className="lg:col-span-6 space-y-8 text-left"
+            className="lg:col-span-8 xl:col-span-7 space-y-8 text-left z-10 relative"
           >
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-[11px] font-bold uppercase tracking-widest">
               <Sparkles className="size-3" />
@@ -119,57 +208,8 @@ export default function LandingPage() {
             </div>
           </motion.div>
 
-          {/* Right Custom Blueprint SVG Section */}
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.8, rotate: -20 }}
-            animate={{ opacity: 1, scale: 1, rotate: 0 }}
-            transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-            className="lg:col-span-6 flex justify-center relative select-none"
-          >
-            {/* Pulsing Nodes Overlay */}
-            <div className="absolute top-1/4 right-1/4 size-3 bg-emerald-400 rounded-full animate-ping pointer-events-none" />
-            <div className="absolute bottom-1/3 left-1/4 size-2.5 bg-emerald-500 rounded-full animate-pulse pointer-events-none" />
-
-            {/* Futuristic Tech Circle Blueprint */}
-            <div className="w-[300px] h-[300px] sm:w-[450px] sm:h-[450px] md:w-[480px] md:h-[480px] relative">
-              <svg 
-                viewBox="0 0 500 500" 
-                className="w-full h-full opacity-60 text-emerald-500/80 stroke-current fill-none stroke-[0.75] animate-[spin_120s_linear_infinite]"
-              >
-                {/* Outermost Dashed Ring */}
-                <circle cx="250" cy="250" r="230" strokeDasharray="5,15,2,8" />
-                <circle cx="250" cy="250" r="222" strokeDasharray="30,8,12,6" className="opacity-40 animate-[spin_80s_linear_infinite_reverse]" />
-                
-                {/* Middle Circuit Pattern Layer */}
-                <circle cx="250" cy="250" r="190" strokeDasharray="180,30,90,40" />
-                <path d="M 250,60 A 190,190 0 0,1 440,250 L 410,250 A 160,160 0 0,0 250,90 Z" className="opacity-30" />
-                
-                {/* Complex Internal Gears & Tech Nodes */}
-                <circle cx="250" cy="250" r="150" strokeDasharray="10,5,20,5" />
-                <circle cx="250" cy="250" r="130" strokeDasharray="120,40" className="animate-[spin_40s_linear_infinite]" />
-                <circle cx="250" cy="250" r="100" strokeDasharray="5,5,10,15" />
-                
-                {/* Circuit tracks */}
-                <path d="M 250 150 L 250 100 L 200 50" />
-                <circle cx="200" cy="50" r="4" fill="currentColor" />
-                <path d="M 250 350 L 250 400 L 300 450" />
-                <circle cx="300" cy="450" r="4" fill="currentColor" />
-                
-                <path d="M 150 250 L 100 250 L 50 200" />
-                <circle cx="50" cy="200" r="4" fill="currentColor" />
-                <path d="M 350 250 L 400 250 L 450 300" />
-                <circle cx="450" cy="300" r="4" fill="currentColor" />
-
-                {/* Inner target crosshairs */}
-                <circle cx="250" cy="250" r="60" strokeDasharray="15,5" className="stroke-[1.5]" />
-                <circle cx="250" cy="250" r="30" />
-                <path d="M 250 200 L 250 300 M 200 250 L 300 250" className="stroke-emerald-400" />
-
-                {/* Cyber Center Node */}
-                <polygon points="250,238 262,250 250,262 238,250" className="fill-emerald-500/20 stroke-emerald-400 stroke-2 animate-pulse" />
-              </svg>
-            </div>
-          </motion.div>
+          {/* Spacer right column to balance grid */}
+          <div className="hidden lg:block lg:col-span-4" />
 
         </div>
       </section>
