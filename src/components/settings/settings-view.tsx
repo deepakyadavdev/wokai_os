@@ -21,6 +21,7 @@ import {
   Cpu,
   AlertCircle,
   CheckCircle2,
+  Mic
 } from 'lucide-react';
 
 import { cn, initials } from '@/lib/utils';
@@ -41,7 +42,8 @@ type SettingsCategory =
   | 'integrations'
   | 'mcp'
   | 'safety'
-  | 'data';
+  | 'data'
+  | 'voice';
 
 const NAV_ITEMS: { id: SettingsCategory; label: string; icon: React.ElementType }[] = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -49,6 +51,7 @@ const NAV_ITEMS: { id: SettingsCategory; label: string; icon: React.ElementType 
   { id: 'integrations', label: 'Integrations', icon: Plug },
   { id: 'mcp', label: 'MCP Layer', icon: Cpu },
   { id: 'safety', label: 'Safety Rules', icon: ShieldCheck },
+  { id: 'voice', label: 'Voice & Speech', icon: Mic },
   { id: 'data', label: 'Data', icon: Database },
 ];
 
@@ -614,6 +617,8 @@ export function SettingsView() {
         return <SafetyPanel />;
       case 'data':
         return <DataPanel />;
+      case 'voice':
+        return <VoicePanel />;
     }
   };
 
@@ -653,9 +658,121 @@ export function SettingsView() {
             })}
           </nav>
         </aside>
-
         {/* Right content */}
         <div className="flex-1 min-w-0">{renderPanel()}</div>
+      </div>
+    </div>
+  );
+}
+
+function VoicePanel() {
+  const [settings, setSettings] = React.useState(() => {
+    // Import helper dynamically
+    const { getSpeechSettings } = require("@/hooks/use-speech-recognition");
+    return getSpeechSettings();
+  });
+
+  const handleSave = () => {
+    const { saveSpeechSettings } = require("@/hooks/use-speech-recognition");
+    saveSpeechSettings(settings);
+    toast.success("Voice & Speech settings saved!");
+  };
+
+  const languages = [
+    { code: "en-IN", name: "English (India)" },
+    { code: "en-US", name: "English (United States)" },
+    { code: "en-GB", name: "English (United Kingdom)" },
+    { code: "hi-IN", name: "Hindi (India)" },
+    { code: "ja-JP", name: "Japanese (Japan)" },
+    { code: "es-ES", name: "Spanish (Spain)" },
+    { code: "fr-FR", name: "French (France)" },
+    { code: "de-DE", name: "German (Germany)" },
+    { code: "pt-PT", name: "Portuguese (Portugal)" },
+    { code: "it-IT", name: "Italian (Italy)" }
+  ];
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <h2 className="text-xl font-semibold mb-2">Voice & Speech Settings</h2>
+        <p className="text-sm text-muted-foreground">
+          Configure preferred speech languages and silence detection metrics for voice input.
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-border/50 bg-card/60 p-5 flex flex-col gap-4">
+        {/* Preferred Language */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-foreground">Preferred Speech Language</label>
+          <select
+            value={settings.language}
+            onChange={(e) => setSettings({ ...settings, language: e.target.value })}
+            className="rounded-lg bg-accent/40 border border-border/40 text-foreground text-xs p-2.5 outline-none focus:ring-1 focus:ring-emerald-500/50"
+          >
+            {languages.map((l) => (
+              <option key={l.code} value={l.code} className="bg-background">
+                {l.name} ({l.code})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Auto Detect Language */}
+        <div className="flex items-center justify-between gap-4 py-2 border-t border-border/30">
+          <div>
+            <p className="text-xs font-semibold text-foreground">Browser Language Detection</p>
+            <p className="text-[10px] text-muted-foreground">
+              Automatically fallback to browser locale language if manual override is not chosen.
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            checked={settings.autoDetect}
+            onChange={(e) => setSettings({ ...settings, autoDetect: e.target.checked })}
+            className="accent-emerald-500 rounded border-border"
+          />
+        </div>
+
+        {/* Auto Punctuation */}
+        <div className="flex items-center justify-between gap-4 py-2 border-t border-border/30">
+          <div>
+            <p className="text-xs font-semibold text-foreground">Auto-Punctuation</p>
+            <p className="text-[10px] text-muted-foreground">
+              Intelligently insert periods, commas, and question marks (browser compatibility dependent).
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            checked={settings.autoPunctuation}
+            onChange={(e) => setSettings({ ...settings, autoPunctuation: e.target.checked })}
+            className="accent-emerald-500 rounded border-border"
+          />
+        </div>
+
+        {/* Silence Detection Timeout */}
+        <div className="flex flex-col gap-1.5 py-2 border-t border-border/30">
+          <label className="text-xs font-semibold text-foreground">Silence Auto-Stop Threshold</label>
+          <p className="text-[10px] text-muted-foreground mb-1">
+            Amount of quiet/silence before considering speech complete and processing the input.
+          </p>
+          <select
+            value={settings.silenceTimeout}
+            onChange={(e) => setSettings({ ...settings, silenceTimeout: Number(e.target.value) })}
+            className="rounded-lg bg-accent/40 border border-border/40 text-foreground text-xs p-2.5 outline-none focus:ring-1 focus:ring-emerald-500/50"
+          >
+            <option value="500" className="bg-background">500 ms (Short - fast response)</option>
+            <option value="800" className="bg-background">800 ms (Balanced - default)</option>
+            <option value="1200" className="bg-background">1200 ms (Relaxed - slower speaking)</option>
+            <option value="1500" className="bg-background">1500 ms (Long - pausing frequently)</option>
+          </select>
+        </div>
+
+        <Button
+          onClick={handleSave}
+          className="mt-2 w-fit bg-emerald-600 hover:bg-emerald-500 text-white font-medium border-0 text-xs px-4 py-2 h-auto self-end"
+        >
+          Save Speech Settings
+        </Button>
       </div>
     </div>
   );

@@ -12,8 +12,10 @@ import {
   Phone,
   Plus,
   Bot,
-  Loader2
+  Loader2,
+  AlertCircle
 } from "lucide-react";
+import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth/auth-provider";
@@ -214,6 +216,49 @@ export function ChatMain() {
   const [currentThinkingLogs, setCurrentThinkingLogs] = React.useState<Array<{ agent: string; output: string }>>([]);
   const [expandedThinking, setExpandedThinking] = React.useState<Record<string, boolean>>({});
 
+  const {
+    isSupported,
+    isListening,
+    isProcessing,
+    transcript,
+    interimTranscript,
+    error: speechError,
+    confidence: speechConfidence,
+    audioLevel,
+    seconds: speechSeconds,
+    startListening,
+    stopListening,
+    cancelListening,
+    setError: setSpeechError
+  } = useSpeechRecognition();
+
+  const [showConfidenceConfirm, setShowConfidenceConfirm] = React.useState(false);
+  const [confidenceText, setConfidenceText] = React.useState("");
+
+  // Sync transcription live to textarea
+  React.useEffect(() => {
+    if (isListening) {
+      const fullTranscript = (transcript + " " + interimTranscript).trim();
+      if (fullTranscript) {
+        setInputValue(fullTranscript);
+        // Wait a tick for DOM update to auto-resize
+        setTimeout(resizeTextarea, 0);
+      }
+    }
+  }, [transcript, interimTranscript, isListening]);
+
+  // Handle final speech completion & confidence check
+  React.useEffect(() => {
+    if (!isListening && !isProcessing && transcript.trim()) {
+      if (speechConfidence !== null && speechConfidence < 0.6) {
+        setConfidenceText(transcript.trim());
+        setShowConfidenceConfirm(true);
+      } else {
+        void handleSubmit(transcript.trim(), true);
+      }
+    }
+  }, [isListening, isProcessing]);
+
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -242,7 +287,7 @@ export function ChatMain() {
   }
 
   /* Submit */
-  async function handleSubmit(text?: string) {
+  async function handleSubmit(text?: string, isVoiceInput = false) {
     const msg = (text ?? inputValue).trim();
     if (!msg || pending) return;
 
@@ -265,7 +310,9 @@ export function ChatMain() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           message: msg,
-          googleToken: getGoogleToken() || undefined
+          googleToken: getGoogleToken() || undefined,
+          isVoice: isVoiceInput,
+          history: messages.slice(-6).map((m) => ({ role: m.role, content: m.content }))
         })
       });
 
@@ -406,65 +453,204 @@ export function ChatMain() {
   const isWelcome = messages.length === 0;
 
   const inputCard = (
-    <div
-      className={cn(
-        "relative flex items-end gap-2.5 rounded-full border border-slate-200/90 dark:border-border/60 bg-white dark:bg-[#181d28] pl-5 pr-2 py-2 transition-all duration-200",
-        "shadow-[0_4px_20px_rgba(0,0,0,0.05)] dark:shadow-none focus-within:border-slate-300 dark:focus-within:border-emerald-500/50",
-        isWelcome ? "w-full max-w-2xl mt-4" : "w-full"
-      )}
-    >
-      <div className="flex shrink-0 items-center gap-1 pb-1">
-        {/* Pink brain icon on the left */}
-        <span className="text-lg mr-1 select-none animate-pulse" role="img" aria-label="brain">🧠</span>
-      </div>
-
-      <textarea
-        ref={textareaRef}
-        id="chat-input"
-        value={inputValue}
-        onChange={(e) => {
-          setInputValue(e.target.value);
-          resizeTextarea();
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            void handleSubmit();
-          }
-        }}
-        placeholder="What's in your mind?..."
-        rows={1}
-        disabled={pending}
-        className={cn(
-          "w-full flex-1 resize-none bg-transparent text-sm text-slate-900 dark:text-slate-100 outline-none",
-          "placeholder:text-slate-400/80 dark:placeholder:text-muted-foreground/50 disabled:opacity-60",
-          "min-h-[28px] max-h-[200px] py-1"
-        )}
-        style={{ height: "28px" }}
-      />
-
-      <div className="flex shrink-0 items-center gap-1.5 pb-0.5">
-        <button
-          type="button"
-          aria-label="Voice input"
-          className="rounded-full p-1.5 text-slate-400 dark:text-muted-foreground/60 hover:text-slate-600 dark:hover:text-foreground transition-colors"
-        >
-          <Mic className="size-4" />
-        </button>
-
-        {/* Send button styled exactly like screenshot (blue circular button with Send paper airplane) */}
-        <Button
-          id="chat-send"
-          size="icon"
-          onClick={() => void handleSubmit()}
-          disabled={pending || !inputValue.trim()}
-          className={cn(
-            "size-8 shrink-0 rounded-full bg-blue-600 text-white shadow-sm transition-all duration-150 hover:bg-blue-500",
-            "disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:bg-accent/40 dark:disabled:text-slate-500"
+    <div className={cn("flex flex-col gap-2 w-full", isWelcome ? "max-w-2xl mt-4" : "")}>
+      {/* Voice status bar / Confidence Confirm / Errors */}
+      {(isListening || isProcessing || speechError || showConfidenceConfirm) && (
+        <div className="w-full flex flex-col gap-2 transition-all duration-300">
+          {/* Permission denied guidance */}
+          {speechError && (
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400 text-xs">
+              <span className="shrink-0 size-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="flex-1 font-medium">{speechError}</span>
+              <button
+                onClick={() => setSpeechError(null)}
+                className="text-[10px] font-bold uppercase tracking-wider hover:opacity-75"
+              >
+                Dismiss
+              </button>
+            </div>
           )}
-        >
-          <Send className="size-3.5 stroke-[2.5]" />
-        </Button>
+
+          {/* Listening / Processing bar */}
+          {(isListening || isProcessing) && (
+            <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-border/60 bg-white dark:bg-[#181d28] shadow-sm text-xs">
+              <div className="relative shrink-0 flex items-center justify-center size-5">
+                {isListening ? (
+                  <>
+                    <span className="absolute inset-0 rounded-full bg-emerald-500/30 animate-ping" />
+                    <span className="size-2 rounded-full bg-emerald-500" />
+                  </>
+                ) : (
+                  <Loader2 className="size-4 animate-spin text-blue-500" />
+                )}
+              </div>
+              <div className="flex-1 flex flex-col gap-0.5">
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  {isListening ? "Listening..." : "Finalizing speech..."}
+                </span>
+                <span className="text-[10px] text-slate-400 dark:text-muted-foreground/60">
+                  {isListening ? "Speak naturally" : "WokAI is analyzing the audio..."}
+                </span>
+              </div>
+
+              {/* Small Timer */}
+              {isListening && (
+                <div className="font-mono text-slate-600 dark:text-slate-400 font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-accent/40 text-[11px]">
+                  {Math.floor(speechSeconds / 60)}:{String(speechSeconds % 60).padStart(2, '0')}
+                </div>
+              )}
+
+              {/* Waveform Visualization */}
+              {isListening && (
+                <div className="flex items-center gap-0.5 h-4 px-2">
+                  {[...Array(7)].map((_, i) => {
+                    const factor = Math.sin(i * 0.8) * 0.4 + 0.6;
+                    const height = Math.max(3, Math.floor((audioLevel / 100) * 16 * factor));
+                    return (
+                      <div
+                        key={i}
+                        className="w-0.5 rounded-full bg-emerald-500 transition-all duration-75"
+                        style={{ height: `${height}px` }}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Controls */}
+              <div className="flex items-center gap-2">
+                {isListening && (
+                  <button
+                    onClick={stopListening}
+                    className="text-[10px] font-bold text-blue-500 uppercase tracking-wider hover:opacity-75 px-2 py-1 rounded bg-blue-500/10"
+                  >
+                    Stop
+                  </button>
+                )}
+                <button
+                  onClick={cancelListening}
+                  className="text-[10px] font-bold text-slate-400 hover:text-slate-600 dark:hover:text-foreground uppercase tracking-wider px-2 py-1"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Low Confidence Confirmation Dialog */}
+          {showConfidenceConfirm && (
+            <div className="flex flex-col gap-3 p-4 rounded-2xl border border-amber-500/25 bg-amber-500/5 dark:bg-amber-500/5 text-xs shadow-md">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="size-4 text-amber-500" />
+                <span className="font-bold text-amber-700 dark:text-amber-400">Did you mean...</span>
+              </div>
+              <p className="italic text-slate-700 dark:text-slate-300 font-mono px-3 py-2 bg-slate-100/60 dark:bg-accent/20 rounded-xl border border-border/30 select-text">
+                "{confidenceText}"
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setInputValue(confidenceText);
+                    setShowConfidenceConfirm(false);
+                    setTimeout(() => textareaRef.current?.focus(), 50);
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-border text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-accent/40 font-medium"
+                >
+                  Edit Manually
+                </button>
+                <button
+                  onClick={() => {
+                    setShowConfidenceConfirm(false);
+                    setInputValue("");
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-foreground font-medium"
+                >
+                  Discard
+                </button>
+                <Button
+                  onClick={() => {
+                    setShowConfidenceConfirm(false);
+                    void handleSubmit(confidenceText, true);
+                  }}
+                  className="px-3 py-1.5 h-auto bg-amber-600 hover:bg-amber-500 text-white font-medium border-0"
+                >
+                  Accept & Send
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Main input card */}
+      <div
+        className={cn(
+          "relative flex items-end gap-2.5 rounded-full border border-slate-200/90 dark:border-border/60 bg-white dark:bg-[#181d28] pl-5 pr-2 py-2 transition-all duration-200",
+          "shadow-[0_4px_20px_rgba(0,0,0,0.05)] dark:shadow-none focus-within:border-slate-300 dark:focus-within:border-emerald-500/50",
+          "w-full"
+        )}
+      >
+        <div className="flex shrink-0 items-center gap-1 pb-1">
+          <span className="text-lg mr-1 select-none animate-pulse" role="img" aria-label="brain">🧠</span>
+        </div>
+
+        <textarea
+          ref={textareaRef}
+          id="chat-input"
+          value={inputValue}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+            resizeTextarea();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void handleSubmit();
+            }
+          }}
+          placeholder="What's in your mind?..."
+          rows={1}
+          disabled={pending}
+          className={cn(
+            "w-full flex-1 resize-none bg-transparent text-sm text-slate-900 dark:text-slate-100 outline-none",
+            "placeholder:text-slate-400/80 dark:placeholder:text-muted-foreground/50 disabled:opacity-60",
+            "min-h-[28px] max-h-[200px] py-1"
+          )}
+          style={{ height: "28px" }}
+        />
+
+        <div className="flex shrink-0 items-center gap-1.5 pb-0.5">
+          <button
+            type="button"
+            aria-label="Voice input"
+            title="Speak to WOK"
+            onClick={isListening ? stopListening : startListening}
+            className={cn(
+              "relative rounded-full p-1.5 transition-all duration-200",
+              isListening
+                ? "text-emerald-500 bg-emerald-500/10 scale-110 animate-pulse"
+                : "text-slate-400 dark:text-muted-foreground/60 hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-100 dark:hover:bg-accent/40"
+            )}
+          >
+            {isListening && (
+              <span className="absolute inset-0 rounded-full border border-emerald-500/50 animate-ping" />
+            )}
+            <Mic className="size-4" />
+          </button>
+
+          <Button
+            id="chat-send"
+            size="icon"
+            onClick={() => void handleSubmit()}
+            disabled={pending || !inputValue.trim()}
+            className={cn(
+              "size-8 shrink-0 rounded-full bg-blue-600 text-white shadow-sm transition-all duration-150 hover:bg-blue-500",
+              "disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:bg-accent/40 dark:disabled:text-slate-500"
+            )}
+          >
+            <Send className="size-3.5 stroke-[2.5]" />
+          </Button>
+        </div>
       </div>
     </div>
   );

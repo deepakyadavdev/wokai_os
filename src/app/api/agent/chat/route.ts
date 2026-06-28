@@ -7,7 +7,9 @@ export const runtime = "nodejs";
 
 const chatRequestSchema = z.object({
   message: z.string().min(1).max(4000),
-  googleToken: z.string().optional()
+  googleToken: z.string().optional(),
+  isVoice: z.boolean().optional(),
+  history: z.array(z.object({ role: z.string(), content: z.string() })).optional()
 });
 
 export async function POST(request: NextRequest) {
@@ -29,7 +31,10 @@ export async function POST(request: NextRequest) {
               encoder.encode(JSON.stringify({ status: phase, output: output || undefined }) + "\n")
             );
           },
-          parsed.data.googleToken
+          parsed.data.googleToken,
+          1,
+          parsed.data.isVoice,
+          parsed.data.history
         );
         // Introduce a tiny delay so the transition of steps is visible/pleasant if it runs super fast
         await new Promise((r) => setTimeout(r, 100));

@@ -30,3 +30,23 @@ This document records the design decisions and implementation details for the UI
 - `npm run typecheck`: Completed successfully (0 errors).
 - `npm run lint`: Completed successfully for all modified files.
 - `npm run build`: Production Next.js build completed successfully.
+
+## Voice Input System (Mic Feature)
+
+1. **Browser Speech Engine**:
+   - Integrated browser-native `webkitSpeechRecognition` / `SpeechRecognition` for low latency voice transcription.
+   - Configured with `continuous = true` and `interimResults = true` to enable live, real-time typing updates.
+2. **Settings Override & Language Support**:
+   - Created a dedicated `Voice & Speech` tab inside settings.
+   - Supports 10 distinct language locales, defaulting to English (India) (`en-IN`) and falling back to `navigator.language` on first run.
+   - Added user custom overrides for silence timeout thresholds (500ms to 1500ms) and automatic punctuation.
+3. **Amplitude-based Waveform Visualizer**:
+   - Programmed a real-time amplitude reader using browser `AudioContext` and `AnalyserNode` connected to microphone stream media tracks.
+   - Normalizes audio frequency bands into levels to render a live, high-fidelity animated waveform next to a pulsing glowing recording status overlay.
+4. **Backend Voice Intelligence Pipeline**:
+   - Added a multi-tier cleanup sequence for voice requests in `generateAgentPlan`:
+     - **Transcript Normalizer**: Regular expression mapping for common technical terms (e.g. `next js` -> `Next.js`).
+     - **Language Detection**: Calls a lightweight LLM to detect the spoken language.
+     - **Contextual Intent Repair**: Corrects recognition mistakes (e.g. homophones) using the last 6 messages of conversational history while ensuring Hindi/Hinglish (like *"Bro ek landing page bana"*) is preserved.
+5. **Low Confidence Protection**:
+   - Compares the API's transcription confidence score. If under `0.6`, blocks automatic submission and prompts the user with a *"Did you mean..."* confirmation box supporting manual edit, discard, or direct send.
