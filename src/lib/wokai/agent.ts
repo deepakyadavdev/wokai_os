@@ -614,6 +614,7 @@ Validation and Rejection Rules:
 4. Reject any payload with missing required fields or unverified/hallucinated parameters.
 5. If any validation fails, mark the action's status to "FAILED", and describe the validation error in the label.
 6. Return only validated and syntactically clean WokaiAction objects.
+7. Always preserve the "status" (e.g. NEEDS_APPROVAL) and "sensitive" (e.g. false) fields of the action object exactly as they were in the input.
 
 Return the final array of WokaiAction objects as strict JSON. Do NOT wrap it in markdown codeblocks.`;
 

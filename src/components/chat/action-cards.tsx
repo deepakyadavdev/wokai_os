@@ -663,7 +663,10 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
 
   React.useEffect(() => {
     actions.forEach((action) => {
-      if (action.status === "NEEDS_APPROVAL" && !runningActionsRef.current.has(action.id)) {
+      if (
+        (action.status === "NEEDS_APPROVAL" || action.status === "PLANNED" || action.status === "QUEUED") &&
+        !runningActionsRef.current.has(action.id)
+      ) {
         runningActionsRef.current.add(action.id);
         console.log(`[WokAI OS] Auto-approving and executing action: ${action.id} (${action.tool})`);
         void handleApproveAction(action.id, action.tool, action.label);
