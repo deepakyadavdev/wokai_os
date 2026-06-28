@@ -11,6 +11,29 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const { clientX, clientY } = e;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    
+    // Calculate offset relative to center (-0.5 to 0.5)
+    const xVal = (clientX / width) - 0.5;
+    const yVal = (clientY / height) - 0.5;
+    
+    // Tilt limit: max 12 degrees
+    setTilt({
+      x: xVal * 12,
+      y: yVal * -12,
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setTilt({ x: 0, y: 0 });
+    setIsHovered(false);
+  };
 
   return (
     <div className="min-h-screen bg-[#030712] text-zinc-100 font-sans selection:bg-[#ff2a2a]/30 selection:text-white overflow-x-hidden scroll-smooth">
@@ -76,13 +99,28 @@ export default function LandingPage() {
       </AnimatePresence>
 
       {/* ── SECTION 1: HERO (Glowing green blueprint diagram in background, text on left) ── */}
-      <section id="hero" className="min-h-screen pt-28 flex items-center relative overflow-hidden bg-gradient-to-b from-[#030712] via-[#050a16] to-[#040813]">
+      <section 
+        id="hero" 
+        className="min-h-screen pt-28 flex items-center relative overflow-hidden bg-gradient-to-b from-[#030712] via-[#050a16] to-[#040813]"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        onMouseEnter={() => setIsHovered(true)}
+      >
         
         {/* Giant Background Blueprint SVG (Large scale bleeding to the right & behind text) */}
-        <div className="absolute -right-32 sm:-right-48 lg:-right-64 top-1/2 -translate-y-1/2 w-[700px] h-[700px] sm:w-[900px] sm:h-[900px] lg:w-[1200px] lg:h-[1200px] pointer-events-none select-none z-0">
+        <div 
+          className="absolute -right-32 sm:-right-48 lg:-right-64 top-1/2 w-[700px] h-[700px] sm:w-[900px] sm:h-[900px] lg:w-[1200px] lg:h-[1200px] pointer-events-none select-none z-0"
+          style={{
+            transform: `translateY(-50%) rotateY(${tilt.x}deg) rotateX(${tilt.y}deg)`,
+            transformStyle: "preserve-3d",
+            perspective: 1000,
+            transition: "transform 0.15s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease",
+            opacity: isHovered ? 0.45 : 0.32,
+          }}
+        >
           <svg 
             viewBox="0 0 500 500" 
-            className="w-full h-full opacity-35 text-emerald-500/60 stroke-current fill-none stroke-[0.6] drop-shadow-[0_0_15px_rgba(16,185,129,0.12)]"
+            className="w-full h-full text-emerald-500/60 stroke-current fill-none stroke-[0.6] drop-shadow-[0_0_15px_rgba(16,185,129,0.12)]"
           >
             {/* Outermost Static Radar Rings & Scale Ticks */}
             <circle cx="250" cy="250" r="246" />
@@ -100,7 +138,10 @@ export default function LandingPage() {
             <path d="M 76 76 L 424 424 M 76 424 L 424 76" strokeDasharray="4, 16" className="opacity-20" />
 
             {/* ── LAYER A: Outer Slow Rotating System ── */}
-            <g className="animate-[spin_160s_linear_infinite]">
+            <g 
+              className="animate-[spin_160s_linear_infinite]"
+              style={{ animationDuration: isHovered ? "40s" : "160s", transition: "animation-duration 0.8s ease" }}
+            >
               {/* Radial Spokes with outer node points */}
               <line x1="250" y1="250" x2="250" y2="12" /> <circle cx="250" cy="12" r="2" fill="currentColor" />
               <line x1="250" y1="250" x2="250" y2="488" /> <circle cx="250" cy="488" r="2" fill="currentColor" />
@@ -122,7 +163,10 @@ export default function LandingPage() {
             </g>
 
             {/* ── LAYER B: Reverse Circuit Track System ── */}
-            <g className="animate-[spin_90s_linear_infinite_reverse] opacity-80">
+            <g 
+              className="animate-[spin_90s_linear_infinite_reverse] opacity-80"
+              style={{ animationDuration: isHovered ? "20s" : "90s", transition: "animation-duration 0.8s ease" }}
+            >
               {/* Arc Tracks & Guideways */}
               <path d="M 250 50 A 200 200 0 0 1 450 250" strokeWidth="1.5" strokeDasharray="140, 10, 40, 10" />
               <path d="M 250 450 A 200 200 0 0 1 50 250" strokeWidth="1.5" strokeDasharray="140, 10, 40, 10" />
@@ -137,7 +181,10 @@ export default function LandingPage() {
             </g>
 
             {/* ── LAYER C: Inner Fast Gear System ── */}
-            <g className="animate-[spin_45s_linear_infinite]">
+            <g 
+              className="animate-[spin_45s_linear_infinite]"
+              style={{ animationDuration: isHovered ? "10s" : "45s", transition: "animation-duration 0.8s ease" }}
+            >
               {/* Gear style ticks */}
               <circle cx="250" cy="250" r="144" strokeDasharray="4, 8" strokeWidth="2.5" />
               <circle cx="250" cy="250" r="132" strokeDasharray="40, 5" />
@@ -152,7 +199,10 @@ export default function LandingPage() {
             </g>
 
             {/* ── LAYER D: Center Targeting Crosshair System ── */}
-            <g className="animate-[spin_25s_linear_infinite_reverse]">
+            <g 
+              className="animate-[spin_25s_linear_infinite_reverse]"
+              style={{ animationDuration: isHovered ? "6s" : "25s", transition: "animation-duration 0.8s ease" }}
+            >
               <circle cx="250" cy="250" r="88" strokeDasharray="12, 12" />
               <circle cx="250" cy="250" r="72" strokeWidth="1.2" />
               <circle cx="250" cy="250" r="54" strokeDasharray="8, 4" />
