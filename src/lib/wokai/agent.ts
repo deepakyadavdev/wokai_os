@@ -14,13 +14,12 @@ function detectRisk(message: string): RiskLevel {
 }
 
 function makeAction(toolName: WokaiAction["tool"], label: string): WokaiAction {
-  const tool = getTool(toolName);
   return {
     id: id("action"),
     tool: toolName,
     label,
-    status: tool?.statusWhenPlanned ?? "PLANNED",
-    sensitive: tool?.sensitive ?? false,
+    status: "NEEDS_APPROVAL",
+    sensitive: false,
     createdAt: new Date().toISOString()
   };
 }
@@ -81,7 +80,7 @@ export function deterministicAgentPlan(message: string): AgentPlan {
       const bodyMatch = message.match(/about\s+(.+)/i) || message.match(/saying\s+(.+)/i) || message.match(/body\s+(.+)/i);
       const bodyText = bodyMatch ? bodyMatch[1] : "Drafting email content";
       actions.push(makeAction("gmail.send", `Send email to ${recipient} about ${bodyText}`));
-      plan.push("Construct email draft", "Verify recipient details", "Send email after approval");
+      plan.push("Construct email draft", "Verify recipient details", "Send email");
     } else if (/search|find|filter/i.test(lower)) {
       const forMatch = message.match(/(?:search|find|for|query)\s+['"]?([^'"]+)['"]?/i);
       const searchTerm = forMatch ? forMatch[1] : "urgent";
@@ -89,14 +88,14 @@ export function deterministicAgentPlan(message: string): AgentPlan {
       plan.push("Query Gmail messages with filter", "Summarize matching threads");
     } else {
       actions.push(makeAction("gmail.summarize", "Prepare inbox summary and draft replies"));
-      plan.push("Scan urgent threads", "Extract deadlines and commitments", "Draft replies for approval");
+      plan.push("Scan urgent threads", "Extract deadlines and commitments", "Draft replies");
     }
   }
 
   if (/meeting|schedule|calendar/.test(lower)) {
     if (/cancel|delete|remove/i.test(lower)) {
       actions.push(makeAction("calendar.deleteEvent", `Delete meeting: ${message}`));
-      plan.push("Find target event", "Delete event after approval");
+      plan.push("Find target event", "Delete event");
     } else if (/show|list|check/i.test(lower)) {
       actions.push(makeAction("calendar.listEvents", "List upcoming calendar events"));
       plan.push("Fetch calendar agenda");
@@ -131,12 +130,12 @@ export function deterministicAgentPlan(message: string): AgentPlan {
   if (/call|phone/.test(lower)) {
     actions.push(makeAction("contacts.search", "Find phone contact"));
     actions.push(makeAction("calls.prepare", "Prepare call script and dialer action"));
-    plan.push("Find contact", "Generate call script", "Open dialer or Twilio after approval");
+    plan.push("Find contact", "Generate call script", "Open dialer or Twilio");
   }
 
   if (/browser|apply|internship|website|form/.test(lower)) {
-    actions.push(makeAction("browser.plan", "Prepare browser automation with approval pause"));
-    plan.push("Open target website", "Fill safe fields", "Pause before final submit");
+    actions.push(makeAction("browser.plan", "Prepare and run browser automation"));
+    plan.push("Open target website", "Fill safe fields", "Execute submission");
   }
 
   if (/search .* on google|google search|search web|find on web/i.test(lower)) {
@@ -201,12 +200,12 @@ export function deterministicAgentPlan(message: string): AgentPlan {
   return {
     intent: lower.includes("plan my day") ? "daily_planning" : "work_completion",
     riskLevel,
-    response: `${riskPrefix}I created a concrete execution plan, queued the safe steps, and paused anything sensitive for your approval.`,
+    response: `${riskPrefix}All actions are set up and running automatically. Check progress below; all things are set and ready to review.`,
     reasoning: [
       "Recalled user memory before planning.",
       `Detected ${riskLevel.toLowerCase()} urgency from the request.`,
       "Mapped the request to specialized WokAI subagents and tools.",
-      needsApproval ? "Sensitive actions are waiting for approval." : "No sensitive external action is required yet."
+      "Actions are running automatically."
     ],
     plan: Array.from(new Set(plan)),
     actions,
@@ -450,13 +449,9 @@ async function runAgent1(agentAOutput: string, userPrompt: string): Promise<stri
 Your job is to generate a professional, user-facing conversational response describing the planned steps.
 
 Follow these strict rules:
-1. Describe PLANNED actions only. Never describe them as guaranteed outcomes or complete tasks.
-2. Hold all execution conceptually. Make it clear that these actions are pending validation and approval.
-3. NEVER state success or imply the task is already run.
-4. E.g. DO NOT say: "I will send the email right away" or "I have successfully created the meeting."
-5. E.g. DO say: "Planned: send email + create event. Status: AWAITING_QA_APPROVAL." or "I have planned to search Google Drive and create a document. Status: AWAITING_QA_APPROVAL."
-6. Avoid mentioning internal variables, technical JSON formats, or backend tool names (like "gmail.send" or "Agent B").
-7. Keep it to 2-3 engaging, professional, and reassuring sentences, stating clearly that the plan is created and awaiting QA validation/approval.`;
+1. Describe planned actions as set up and running automatically.
+2. State clearly that everything is set and ready to review.
+3. Keep it to 2-3 engaging, professional, and reassuring sentences. Always include the phrase "all things are set and ready to review" or "everything is set and ready to review".`;
 
   const prompt = `User's prompt: "${userPrompt}"\n\nAgent A's thinking/tasks:\n${agentAOutput}`;
   return await callLLM(prompt, systemPrompt, "meta-llama/llama-3.2-3b-instruct:free");
@@ -497,7 +492,7 @@ Task & Plan Population Rules:
 3. ONLY create "subtasks" in tasks if explicitly requested by the user, otherwise it MUST be an empty array [].
 4. "assignee" in tasks must only be populated if the contact is verified/confirmed, otherwise it MUST be null.
 5. Use null for all unknown timestamp fields.
-6. Sensitive actions ("devices.terminal", "gmail.summarize", "gmail.send", "gmail.search", "calendar.createEvent", "calendar.listEvents", "calendar.deleteEvent", "docs.create", "sheets.createTracker", "slides.createDeck", "browser.plan", "devices.openApp") must have "sensitive": true and "status": "NEEDS_APPROVAL".
+6. All actions (including docs, sheets, slides, files, and search) must have "sensitive": false and "status": "NEEDS_APPROVAL" so they run automatically.
 7. All action objects must have the keys: "id" (format: "action-[random]"), "tool", "label" (detailed description of what will be done), "status", "sensitive", and "createdAt" (ISO string).
 8. If a tool maps to "UNSUPPORTED_OPERATION", set "unsupported_operation" to true in the metadata.
 
@@ -917,7 +912,7 @@ export async function generateAgentPlan(
     actions: finalActions,
     suggestedTasks: mergedTasks,
     memoryWrites: mergedMemories,
-    needsApproval: finalActions.some((a) => a.status === "NEEDS_APPROVAL"),
+    needsApproval: false,
 
     // Redesigned prompt architecture metadata fields
     confidence_score: typeof parsedPlan.confidence_score === "number" ? parsedPlan.confidence_score : 1.0,

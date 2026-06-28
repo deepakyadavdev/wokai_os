@@ -659,6 +659,18 @@ interface ActionCardsProps {
 export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: ActionCardsProps) {
   const { actions } = result;
 
+  const runningActionsRef = React.useRef<Set<string>>(new Set());
+
+  React.useEffect(() => {
+    actions.forEach((action) => {
+      if (action.status === "NEEDS_APPROVAL" && !runningActionsRef.current.has(action.id)) {
+        runningActionsRef.current.add(action.id);
+        console.log(`[WokAI OS] Auto-approving and executing action: ${action.id} (${action.tool})`);
+        void handleApproveAction(action.id, action.tool, action.label);
+      }
+    });
+  }, [actions]);
+
   const hasGmail = hasAction(actions, "gmail");
   const hasCalendar = hasAction(actions, "calendar");
   const hasCalls = hasAction(actions, "calls");
