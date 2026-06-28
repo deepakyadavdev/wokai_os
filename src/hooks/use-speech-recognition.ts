@@ -61,11 +61,16 @@ export function useSpeechRecognition() {
   });
   const [isListening, setIsListening] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState(false);
+
+  const setProcessing = React.useCallback((val: boolean) => {
+    isProcessingRef.current = val;
+    setIsProcessing(val);
+  }, []);
   const [transcript, setTranscript] = React.useState("");
   const [interimTranscript, setInterimTranscript] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [confidence, setConfidence] = React.useState<number | null>(null);
-  
+
   // Waveform visualization data
   const [audioLevel, setAudioLevel] = React.useState(0);
   // Timer state for ChatGPT voice style UI
@@ -78,6 +83,15 @@ export function useSpeechRecognition() {
   const analyserRef = React.useRef<AnalyserNode | null>(null);
   const micStreamRef = React.useRef<MediaStream | null>(null);
   const animationFrameRef = React.useRef<number | null>(null);
+  const userStoppedRef = React.useRef(false);
+  const restartCountRef = React.useRef(0);
+  const isProcessingRef = React.useRef(false);
+  const isListeningRef = React.useRef(false);
+
+  const setListening = React.useCallback((val: boolean) => {
+    isListeningRef.current = val;
+    setIsListening(val);
+  }, []);
 
   // 1. Hoisted Cleanup Functions
   function cleanupTimers() {
@@ -101,8 +115,9 @@ export function useSpeechRecognition() {
       micStreamRef.current = null;
     }
     if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-      void audioContextRef.current.close();
+      void audioContextRef.current.close().catch(() => {});
       audioContextRef.current = null;
+      analyserRef.current = null;
     }
     setAudioLevel(0);
   }
@@ -111,7 +126,7 @@ export function useSpeechRecognition() {
   const startAudioMonitoring = React.useCallback(async () => {
     try {
       cleanupAudio();
-      
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -119,7 +134,7 @@ export function useSpeechRecognition() {
           autoGainControl: true,
         },
       });
-      
+
       micStreamRef.current = stream;
 
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -138,14 +153,12 @@ export function useSpeechRecognition() {
       const updateVolume = () => {
         if (!analyserRef.current) return;
         analyserRef.current.getByteFrequencyData(dataArray);
-        
-        // Calculate average volume level
+
         let total = 0;
         for (let i = 0; i < bufferLength; i++) {
           total += dataArray[i];
         }
         const average = total / bufferLength;
-        // Normalize between 0 and 100
         setAudioLevel(Math.min(100, Math.floor((average / 255) * 150)));
         animationFrameRef.current = requestAnimationFrame(updateVolume);
       };
@@ -153,24 +166,16 @@ export function useSpeechRecognition() {
       updateVolume();
     } catch (err) {
       console.warn("Could not start real audio analysis node, falling back to simulated wave:", err);
-      // Fallback: simulate volume level changes
       let simulatedDir = 1;
       const interval = setInterval(() => {
         setAudioLevel((prev) => {
           let next = prev + Math.floor(Math.random() * 20 - 10) * simulatedDir;
-          if (next > 80) {
-            next = 80;
-            simulatedDir = -1;
-          }
-          if (next < 5) {
-            next = 5;
-            simulatedDir = 1;
-          }
+          if (next > 80) { next = 80; simulatedDir = -1; }
+          if (next < 5) { next = 5; simulatedDir = 1; }
           return next;
         });
       }, 100);
-      
-      // Store interval as audio context dummy tracking
+
       (audioContextRef as any).current = {
         close: () => {
           clearInterval(interval);
@@ -183,40 +188,48 @@ export function useSpeechRecognition() {
   // 3. Initialize SpeechRecognition on mount
   React.useEffect(() => {
     return () => {
+      userStoppedRef.current = true;
       cleanupAudio();
       cleanupTimers();
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch {}
+      }
     };
   }, []);
 
-  // 4. Stop Listening callback
+  // 4. Stop Listening callback — user-initiated stop
   const stopListening = React.useCallback(() => {
+    userStoppedRef.current = true;
     cleanupTimers();
-    cleanupAudio();
-    
+    // Don't cleanup audio yet — keep the visualizer running briefly during processing
+
     if (recognitionRef.current) {
-      setIsProcessing(true);
       try {
         recognitionRef.current.stop();
       } catch (err) {
         console.warn("Error stopping recognition:", err);
       }
     }
-    
+
+    setProcessing(true);
     // Simulate finishing step for UX
     setTimeout(() => {
-      setIsProcessing(false);
+      setProcessing(false);
+      cleanupAudio();
     }, 600);
-  }, []);
+  }, [setProcessing]);
 
-  // 5. Cancel Listening callback
+  // 5. Cancel Listening callback — user-initiated cancel
   const cancelListening = React.useCallback(() => {
+    userStoppedRef.current = true;
     cleanupTimers();
     cleanupAudio();
     setIsListening(false);
-    setIsProcessing(false);
+    setProcessing(false);
     setTranscript("");
     setInterimTranscript("");
-    
+    setSeconds(0);
+
     if (recognitionRef.current) {
       try {
         recognitionRef.current.abort();
@@ -224,10 +237,12 @@ export function useSpeechRecognition() {
         console.warn("Error aborting recognition:", err);
       }
     }
-  }, []);
+  }, [setProcessing]);
 
   // 6. Start Listening callback
   const startListening = React.useCallback(async () => {
+    userStoppedRef.current = false;
+    restartCountRef.current = 0;
     setError(null);
     setTranscript("");
     setInterimTranscript("");
@@ -245,51 +260,50 @@ export function useSpeechRecognition() {
     }
 
     try {
-      // Trigger media stream permissions and start monitoring
       await startAudioMonitoring();
 
       const settings = getSpeechSettings();
       const recognition = new SpeechRecognition();
-      
+
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = settings.language;
-      
-      // Auto-punctuation is browser specific, but let's declare it
+
       if ("audioLanguages" in recognition) {
-        // Supported in some Chromium versions
         (recognition as any).punctuation = settings.autoPunctuation;
       }
 
       recognitionRef.current = recognition;
-      setIsListening(true);
-      setIsProcessing(false);
+      setListening(true);
+      setProcessing(false);
 
       // Start elapsed timer
       timerIntervalRef.current = setInterval(() => {
         setSeconds((prev) => prev + 1);
       }, 1000);
 
-      // Silence detection reset handler
+      // Silence detection — only auto-stop on genuine silence (default: 2500ms)
+      const silenceTimeout = Math.max(settings.silenceTimeout, 2500);
       const resetSilenceTimer = () => {
         if (silenceTimerRef.current) {
           clearTimeout(silenceTimerRef.current);
         }
         silenceTimerRef.current = setTimeout(() => {
-          console.log(`SpeechRecognition: Silence detected for ${settings.silenceTimeout}ms. Auto-stopping.`);
-          stopListening();
-        }, settings.silenceTimeout);
+          if (!userStoppedRef.current) {
+            console.log(`SpeechRecognition: Silence detected for ${silenceTimeout}ms. Auto-stopping.`);
+            stopListening();
+          }
+        }, silenceTimeout);
       };
 
-      resetSilenceTimer();
-
       recognition.onstart = () => {
-        setIsListening(true);
+        setListening(true);
+        resetSilenceTimer();
       };
 
       recognition.onresult = (event: any) => {
         resetSilenceTimer();
-        
+
         let finalText = "";
         let interimText = "";
         let finalConfidence = 0;
@@ -321,11 +335,14 @@ export function useSpeechRecognition() {
         console.error("Speech recognition error:", event);
         cleanupTimers();
         cleanupAudio();
-        setIsListening(false);
-        setIsProcessing(false);
+        setListening(false);
+        setProcessing(false);
 
         if (event.error === "not-allowed") {
           setError("Microphone access is disabled. Please enable microphone permissions in your browser settings.");
+        } else if (event.error === "no-speech") {
+          setTranscript("");
+          setInterimTranscript("");
         } else {
           setError(`Voice recognition error: ${event.error}`);
         }
@@ -334,7 +351,21 @@ export function useSpeechRecognition() {
       recognition.onend = () => {
         cleanupTimers();
         cleanupAudio();
-        setIsListening(false);
+        setListening(false);
+
+        if (!userStoppedRef.current && transcript.trim() && restartCountRef.current < 3) {
+          restartCountRef.current += 1;
+          console.log(`SpeechRecognition: Auto-restarting (attempt ${restartCountRef.current}/3)...`);
+          setTimeout(() => {
+            if (!userStoppedRef.current && !isListeningRef.current && recognitionRef.current === recognition) {
+              try {
+                recognition.start();
+              } catch {
+                console.log("SpeechRecognition: Could not restart, session ended.");
+              }
+            }
+          }, 200);
+        }
       };
 
       recognition.start();
@@ -342,11 +373,11 @@ export function useSpeechRecognition() {
       console.error("Mic access denied or error:", err);
       cleanupTimers();
       cleanupAudio();
-      setIsListening(false);
-      setIsProcessing(false);
+      setListening(false);
+      setProcessing(false);
       setError("Microphone access is disabled. Please enable microphone permissions in your browser settings.");
     }
-  }, [stopListening, startAudioMonitoring]);
+  }, [stopListening, startAudioMonitoring, setProcessing, setListening]);
 
   return {
     isSupported,

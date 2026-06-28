@@ -248,9 +248,15 @@ export function ChatMain() {
     }
   }, [transcript, interimTranscript, isListening]);
 
-  // Handle final speech completion & confidence check
+  // Handle final speech completion — submit once on the listening→stopped transition
+  const prevListeningRef = React.useRef(false);
+  const submittedRef = React.useRef(false);
   React.useEffect(() => {
-    if (!isListening && !isProcessing && transcript.trim()) {
+    const wasListening = prevListeningRef.current;
+    prevListeningRef.current = isListening;
+
+    if (wasListening && !isListening && !isProcessing && transcript.trim() && !submittedRef.current) {
+      submittedRef.current = true;
       if (speechConfidence !== null && speechConfidence < 0.6) {
         setConfidenceText(transcript.trim());
         setShowConfidenceConfirm(true);
@@ -258,7 +264,10 @@ export function ChatMain() {
         void handleSubmit(transcript.trim(), true);
       }
     }
-  }, [isListening, isProcessing]);
+    if (!isListening && !isProcessing) {
+      submittedRef.current = false;
+    }
+  }, [isListening, isProcessing, transcript, speechConfidence]);
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
