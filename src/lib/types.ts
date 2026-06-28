@@ -50,12 +50,13 @@ export interface WokaiTask {
   id: string;
   title: string;
   description: string;
-  deadline: string;
-  priority: RiskLevel;
+  deadline: string | null;
+  priority: RiskLevel | null;
   status: "todo" | "in_progress" | "blocked" | "done";
   progress: number;
   subtasks: string[];
   source: "chat" | "email" | "calendar" | "manual" | "demo";
+  assignee?: string | null;
 }
 
 export interface WokaiMemory {
@@ -139,4 +140,21 @@ export interface AgentPlan {
   suggestedTasks: WokaiTask[];
   memoryWrites: WokaiMemory[];
   needsApproval: boolean;
+
+  // Prompt Architecture Redesign Metadata Fields
+  confidence_score: number; // float 0.0 - 1.0
+  clarification_required: boolean;
+  missing_information: string[];
+  unsupported_operation: boolean;
+  risk_level: RiskLevel | null;
+  dependency_list: string[];
+  preconditions: string[];
+  postconditions: string[];
+  validation_status: "PASS" | "FAIL" | "PENDING";
+  failure_reason: string | null;
+  voiceData?: {
+    originalTranscript: string;
+    repairedMessage: string;
+    detectedLanguage: string;
+  };
 }

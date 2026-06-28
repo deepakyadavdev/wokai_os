@@ -277,10 +277,10 @@ function TaskCard({ task }: { task: WokaiTask }) {
           <h3 className="font-medium">{task.title}</h3>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">{task.description}</p>
         </div>
-        <RiskBadge level={task.priority} />
+        <RiskBadge level={task.priority || "LOW"} />
       </div>
       <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-        <span>Due {formatRelativeTime(task.deadline)}</span>
+        <span>{task.deadline ? `Due ${formatRelativeTime(task.deadline)}` : "No deadline"}</span>
         <span>{task.progress}%</span>
       </div>
       <Progress className="mt-2" value={task.progress} />
@@ -1249,7 +1249,11 @@ function DevicesPage({ snapshot: initialSnapshot }: { snapshot: WorkspaceSnapsho
 function LifeSaverPage({ snapshot }: { snapshot: WorkspaceSnapshot }) {
   const tasks = snapshot.tasks
     .filter((task) => task.priority === "HIGH" || task.priority === "CRITICAL")
-    .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+    .sort((a, b) => {
+      const timeA = a.deadline ? new Date(a.deadline).getTime() : Infinity;
+      const timeB = b.deadline ? new Date(b.deadline).getTime() : Infinity;
+      return timeA - timeB;
+    });
   return (
     <div className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
       <Card className="border-danger/40 bg-danger/10">

@@ -59,17 +59,19 @@ function TaskCard({ task }: { task: WokaiTask }) {
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1.5">
-            <RiskBadge level={task.priority} />
+            <RiskBadge level={task.priority || "LOW"} />
             <h3 className="font-semibold text-foreground truncate">{task.title}</h3>
           </div>
           <p className="text-sm text-muted-foreground line-clamp-2">{task.description}</p>
         </div>
-        <div className="text-right text-xs text-muted-foreground shrink-0">
-          <div className="flex items-center gap-1 justify-end">
-            <Clock size={12} />
-            <span>Due {formatRelativeTime(task.deadline)}</span>
+        {task.deadline && (
+          <div className="text-right text-xs text-muted-foreground shrink-0">
+            <div className="flex items-center gap-1 justify-end">
+              <Clock size={12} />
+              <span>Due {formatRelativeTime(task.deadline)}</span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Progress bar */}

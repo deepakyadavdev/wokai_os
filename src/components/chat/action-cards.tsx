@@ -582,7 +582,7 @@ function RescueCard({ result }: { result: AgentPlan }) {
         iconClass={isUrgent ? "text-red-400" : "text-emerald-400"}
       />
       <div className="mb-2">
-        <RiskBadge level={task.priority} />
+        <RiskBadge level={task.priority || "LOW"} />
       </div>
       <p className="mb-2 text-sm font-medium">{task.title}</p>
       <div className="flex flex-wrap gap-1.5">
