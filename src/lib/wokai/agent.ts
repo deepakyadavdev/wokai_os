@@ -314,18 +314,20 @@ export async function callLLM(
       headers["X-Title"] = "WokAI OS";
     }
 
+    const useStream = !isGoogleEndpoint;
+
     const res = await fetch(baseUrl, {
       method: "POST",
       headers,
       body: JSON.stringify({
         model,
         messages,
-        stream: true
+        stream: useStream
       })
     });
 
     if (res.ok) {
-      if (res.body) {
+      if (useStream && res.body) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let fullContent = "";
@@ -372,12 +374,11 @@ export async function callLLM(
         if (fullContent.trim()) {
           return fullContent.trim();
         }
-      }
-
-      // Fallback: If streaming body was unavailable, try standard non-stream parse
-      const data = await res.json().catch(() => null);
-      if (data && data.choices?.[0]?.message?.content) {
-        return data.choices[0].message.content.trim();
+      } else {
+        const data = await res.json().catch(() => null);
+        if (data && data.choices?.[0]?.message?.content) {
+          return data.choices[0].message.content.trim();
+        }
       }
     }
     const errText = await res.text().catch(() => "");
