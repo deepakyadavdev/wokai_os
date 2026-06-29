@@ -247,10 +247,12 @@ export async function callLLM(
   systemPrompt?: string,
   preferredModel?: string
 ): Promise<string> {
-  let apiKey = (process.env.LLM_API_KEY || process.env.OPENROUTER_API_KEY || "").trim();
+  let apiKey = (process.env.LLM_API_KEY || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY || "").trim();
   apiKey = apiKey.replace(/^["']|["']$/g, "").trim();
 
-  let baseUrl = (process.env.LLM_BASE_URL || "https://openrouter.ai/api/v1/chat/completions").trim();
+  const isUsingGeminiDirectly = !!process.env.GEMINI_API_KEY && !process.env.LLM_API_KEY && !process.env.OPENROUTER_API_KEY;
+
+  let baseUrl = (process.env.LLM_BASE_URL || (isUsingGeminiDirectly ? "https://generativelanguage.googleapis.com/v1beta/openai" : "https://openrouter.ai/api/v1/chat/completions")).trim();
   baseUrl = baseUrl.replace(/^["']|["']$/g, "").trim();
   
   if (baseUrl) {
@@ -263,9 +265,18 @@ export async function callLLM(
     }
   }
 
+  const isGoogleEndpoint = baseUrl.includes("generativelanguage.googleapis.com");
+
   let model = (process.env.LLM_MODEL || "").trim().replace(/^["']|["']$/g, "");
-  if (!model) {
-    model = preferredModel || "meta-llama/llama-3.3-70b-instruct:free";
+  if (isGoogleEndpoint) {
+    // Google AI Studio endpoint only supports gemini models
+    if (!model || !model.toLowerCase().includes("gemini")) {
+      model = "gemini-1.5-flash";
+    }
+  } else {
+    if (!model) {
+      model = preferredModel || "meta-llama/llama-3.3-70b-instruct:free";
+    }
   }
 
   if (!apiKey) {
