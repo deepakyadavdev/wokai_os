@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from "react";
 import { 
@@ -11,34 +11,11 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
-  const [isHovered, setIsHovered] = useState(false);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const { clientX, clientY } = e;
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    
-    // Calculate offset relative to center (-0.5 to 0.5)
-    const xVal = (clientX / width) - 0.5;
-    const yVal = (clientY / height) - 0.5;
-    
-    // Tilt limit: max 12 degrees
-    setTilt({
-      x: xVal * 12,
-      y: yVal * -12,
-    });
-  };
-
-  const handleMouseLeave = () => {
-    setTilt({ x: 0, y: 0 });
-    setIsHovered(false);
-  };
 
   return (
     <div className="min-h-screen bg-[#030712] text-zinc-100 font-sans selection:bg-[#ff2a2a]/30 selection:text-white overflow-x-hidden scroll-smooth">
       
-      {/* ── FIXED TRANSPARENT NAVBAR ── */}
+      {/* â”€â”€ FIXED TRANSPARENT NAVBAR â”€â”€ */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-black/45 backdrop-blur-md border-b border-zinc-900/60 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -98,151 +75,239 @@ export default function LandingPage() {
         )}
       </AnimatePresence>
 
-      {/* ── SECTION 1: HERO (Glowing green blueprint diagram in background, text on left) ── */}
-      <section 
-        id="hero" 
+      {/* â”€â”€ SECTION 1: HERO â”€â”€ */}
+      <section
+        id="hero"
         className="min-h-screen pt-28 flex items-center relative overflow-hidden bg-gradient-to-b from-[#030712] via-[#050a16] to-[#040813]"
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        onMouseEnter={() => setIsHovered(true)}
       >
-        
-        {/* Giant Background Blueprint SVG (Large scale bleeding to the right & behind text) */}
-        <div 
-          className="absolute -right-32 sm:-right-48 lg:-right-64 top-1/2 w-[700px] h-[700px] sm:w-[900px] sm:h-[900px] lg:w-[1200px] lg:h-[1200px] pointer-events-none select-none z-0"
-          style={{
-            transform: `translateY(-50%) rotateY(${tilt.x}deg) rotateX(${tilt.y}deg)`,
-            transformStyle: "preserve-3d",
-            perspective: 1000,
-            transition: "transform 0.15s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease",
-            opacity: isHovered ? 0.45 : 0.32,
-          }}
-        >
-          <svg 
-            viewBox="0 0 500 500" 
-            className="w-full h-full text-emerald-500/60 stroke-current fill-none stroke-[0.6] drop-shadow-[0_0_15px_rgba(16,185,129,0.12)]"
+        {/* â”€â”€ GIANT CIRCUIT CIRCLE â€” RIGHT SIDE, STATIC â”€â”€ */}
+
+        {/* Ambient glow behind circle */}
+        <div className="pointer-events-none select-none absolute right-[-10vw] top-1/2 -translate-y-1/2 w-[90vh] h-[90vh] rounded-full bg-emerald-500/10 blur-[100px] z-0" />
+        <div className="pointer-events-none select-none absolute right-[-5vw] top-1/2 -translate-y-1/2 w-[60vh] h-[60vh] rounded-full bg-emerald-400/12 blur-[60px] z-0" />
+
+        {/* The SVG â€” fixed to right, massive */}
+        <div className="pointer-events-none select-none absolute right-[-22vw] top-1/2 -translate-y-1/2 w-[90vh] h-[90vh] z-0">
+          <svg
+            viewBox="0 0 600 600"
+            width="100%"
+            height="100%"
+            fill="none"
+            stroke="#10b981"
+            strokeWidth="0.8"
+            style={{ filter: "drop-shadow(0 0 18px rgba(16,185,129,0.55)) drop-shadow(0 0 60px rgba(16,185,129,0.22))", opacity: 0.88 }}
           >
-            {/* Outermost Static Radar Rings & Scale Ticks */}
-            <circle cx="250" cy="250" r="246" />
-            <circle cx="250" cy="250" r="242" strokeDasharray="1.5, 4.5" />
-            <circle cx="250" cy="250" r="236" strokeDasharray="8, 16" />
-            <circle cx="250" cy="250" r="232" />
-            
-            {/* Fine Concentric Pitch Ticks */}
-            <circle cx="250" cy="250" r="226" strokeDasharray="4, 12" className="opacity-40" />
-            <circle cx="250" cy="250" r="220" />
-            <circle cx="250" cy="250" r="214" strokeDasharray="30, 8, 12, 8" className="opacity-50" />
+            <defs>
+              <radialGradient id="rg1" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#10b981" stopOpacity="0.18" />
+                <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+              </radialGradient>
+            </defs>
 
-            {/* Static Grid Intersects */}
-            <path d="M 250 4 L 250 496 M 4 250 L 496 250" strokeDasharray="6, 12" className="opacity-30" />
-            <path d="M 76 76 L 424 424 M 76 424 L 424 76" strokeDasharray="4, 16" className="opacity-20" />
+            {/* â”€â”€ OUTERMOST STATIC RINGS â”€â”€ */}
+            <circle cx="300" cy="300" r="295" strokeOpacity="0.50" />
+            <circle cx="300" cy="300" r="291" strokeDasharray="2,5" strokeOpacity="0.30" />
+            <circle cx="300" cy="300" r="285" strokeDasharray="10,18" strokeOpacity="0.45" />
+            <circle cx="300" cy="300" r="279" strokeOpacity="0.60" strokeWidth="1.2" />
+            <circle cx="300" cy="300" r="272" strokeDasharray="30,8,6,8" strokeOpacity="0.38" />
+            <circle cx="300" cy="300" r="265" strokeDasharray="3,8" strokeOpacity="0.28" />
 
-            {/* ── LAYER A: Outer Slow Rotating System ── */}
-            <g 
-              className="animate-[spin_160s_linear_infinite]"
-              style={{ animationDuration: isHovered ? "40s" : "160s", transition: "animation-duration 0.8s ease" }}
-            >
-              {/* Radial Spokes with outer node points */}
-              <line x1="250" y1="250" x2="250" y2="12" /> <circle cx="250" cy="12" r="2" fill="currentColor" />
-              <line x1="250" y1="250" x2="250" y2="488" /> <circle cx="250" cy="488" r="2" fill="currentColor" />
-              <line x1="250" y1="250" x2="12" y2="250" /> <circle cx="12" cy="250" r="2" fill="currentColor" />
-              <line x1="250" y1="250" x2="488" y2="250" /> <circle cx="488" cy="250" r="2" fill="currentColor" />
-              
-              <line x1="250" y1="250" x2="456" y2="369" /> <circle cx="456" cy="369" r="2" fill="currentColor" />
-              <line x1="250" y1="250" x2="369" y2="456" /> <circle cx="369" cy="456" r="2" fill="currentColor" />
-              <line x1="250" y1="250" x2="131" y2="456" /> <circle cx="131" cy="456" r="2" fill="currentColor" />
-              <line x1="250" y1="250" x2="44" y2="369" /> <circle cx="44" cy="369" r="2" fill="currentColor" />
-              <line x1="250" y1="250" x2="44" y2="131" /> <circle cx="44" cy="131" r="2" fill="currentColor" />
-              <line x1="250" y1="250" x2="131" y2="44" /> <circle cx="131" cy="44" r="2" fill="currentColor" />
-              <line x1="250" y1="250" x2="369" y2="44" /> <circle cx="369" cy="44" r="2" fill="currentColor" />
-              <line x1="250" y1="250" x2="456" y2="131" /> <circle cx="456" cy="131" r="2" fill="currentColor" />
+            {/* 72 tick marks on outer ring */}
+            {Array.from({length: 72}).map((_, i) => {
+              const a = (i * 5 * Math.PI) / 180;
+              const isMajor = i % 6 === 0;
+              const r1 = isMajor ? 263 : 268;
+              return (
+                <line key={`t${i}`}
+                  x1={300 + r1 * Math.cos(a)} y1={300 + r1 * Math.sin(a)}
+                  x2={300 + 279 * Math.cos(a)} y2={300 + 279 * Math.sin(a)}
+                  strokeWidth={isMajor ? 1.6 : 0.7}
+                  strokeOpacity={isMajor ? 0.85 : 0.40}
+                />
+              );
+            })}
 
-              {/* Sub-scale ticks & degrees values */}
-              <circle cx="250" cy="250" r="200" strokeDasharray="3, 7" />
-              <circle cx="250" cy="250" r="185" strokeDasharray="60, 20" />
+            {/* â”€â”€ LAYER 1: slow CW â€” outer spoke wheel â”€â”€ */}
+            <g style={{ transformOrigin: "300px 300px", animation: "spin 130s linear infinite" }}>
+              {Array.from({length: 16}).map((_, i) => {
+                const a = (i * 22.5 * Math.PI) / 180;
+                return (
+                  <g key={`sp${i}`}>
+                    <line x1="300" y1="300" x2={300 + 260 * Math.cos(a)} y2={300 + 260 * Math.sin(a)} strokeOpacity="0.20" />
+                    <circle cx={300 + 265 * Math.cos(a)} cy={300 + 265 * Math.sin(a)} r="3.5" fill="#10b981" stroke="none" fillOpacity="0.80" />
+                    <circle cx={300 + 254 * Math.cos(a)} cy={300 + 254 * Math.sin(a)} r="1.5" fill="#10b981" stroke="none" fillOpacity="0.55" />
+                  </g>
+                );
+              })}
+              <circle cx="300" cy="300" r="242" strokeDasharray="70,20,16,20" strokeOpacity="0.55" strokeWidth="1.3" />
+              <circle cx="300" cy="300" r="232" strokeDasharray="4,12" strokeOpacity="0.32" />
+              {/* Cardinal data nodes */}
+              <circle cx="300" cy="38" r="8" fill="none" stroke="#10b981" strokeWidth="1.5" strokeOpacity="0.80" />
+              <circle cx="300" cy="38" r="3" fill="#10b981" fillOpacity="0.9" stroke="none" />
+              <circle cx="562" cy="300" r="6" fill="none" stroke="#10b981" strokeWidth="1.5" strokeOpacity="0.70" />
+              <circle cx="562" cy="300" r="2.5" fill="#10b981" fillOpacity="0.9" stroke="none" />
+              <circle cx="38" cy="300" r="6" fill="none" stroke="#10b981" strokeWidth="1.5" strokeOpacity="0.70" />
+              <circle cx="38" cy="300" r="2.5" fill="#10b981" fillOpacity="0.9" stroke="none" />
+              <circle cx="300" cy="562" r="8" fill="none" stroke="#10b981" strokeWidth="1.5" strokeOpacity="0.80" />
+              <circle cx="300" cy="562" r="3" fill="#10b981" fillOpacity="0.9" stroke="none" />
+              {/* Monospace labels */}
+              <text x="300" y="30" textAnchor="middle" fill="#10b981" fillOpacity="0.80" fontSize="8" fontFamily="monospace" fontWeight="bold" letterSpacing="2">WOKAIÂ·OSÂ·v2</text>
+              <text x="300" y="579" textAnchor="middle" fill="#10b981" fillOpacity="0.80" fontSize="8" fontFamily="monospace" fontWeight="bold" letterSpacing="2">CONDUCTORÂ·SYS</text>
             </g>
 
-            {/* ── LAYER B: Reverse Circuit Track System ── */}
-            <g 
-              className="animate-[spin_90s_linear_infinite_reverse] opacity-80"
-              style={{ animationDuration: isHovered ? "20s" : "90s", transition: "animation-duration 0.8s ease" }}
-            >
-              {/* Arc Tracks & Guideways */}
-              <path d="M 250 50 A 200 200 0 0 1 450 250" strokeWidth="1.5" strokeDasharray="140, 10, 40, 10" />
-              <path d="M 250 450 A 200 200 0 0 1 50 250" strokeWidth="1.5" strokeDasharray="140, 10, 40, 10" />
-              
-              {/* Outer Data Nodes */}
-              <circle cx="450" cy="250" r="4.5" fill="currentColor" className="animate-pulse" />
-              <circle cx="50" cy="250" r="4.5" fill="currentColor" className="animate-pulse" />
-              
-              {/* Orbiting Tech Rings */}
-              <circle cx="250" cy="250" r="172" strokeDasharray="100, 30, 10, 30" />
-              <circle cx="250" cy="250" r="162" strokeDasharray="6, 12" />
+            {/* â”€â”€ LAYER 2: slow CCW â€” arc tracks + 8 circuit nodes â”€â”€ */}
+            <g style={{ transformOrigin: "300px 300px", animation: "spin 95s linear infinite reverse" }}>
+              <circle cx="300" cy="300" r="215" strokeDasharray="100,16,10,16" strokeOpacity="0.58" strokeWidth="1.5" />
+              <circle cx="300" cy="300" r="205" strokeDasharray="5,14" strokeOpacity="0.35" />
+              <circle cx="300" cy="300" r="196" strokeDasharray="180,30" strokeOpacity="0.48" strokeWidth="1.1" />
+              {Array.from({length: 8}).map((_, i) => {
+                const a = (i * 45 * Math.PI) / 180;
+                return (
+                  <g key={`cn${i}`}>
+                    <rect
+                      x={300 + 215 * Math.cos(a) - 6} y={300 + 215 * Math.sin(a) - 6}
+                      width="12" height="12"
+                      fill="#030712" stroke="#10b981" strokeWidth="1.5"
+                      transform={`rotate(${i * 45}, ${300 + 215 * Math.cos(a)}, ${300 + 215 * Math.sin(a)})`}
+                    />
+                    <circle cx={300 + 215 * Math.cos(a)} cy={300 + 215 * Math.sin(a)} r="2.5" fill="#10b981" stroke="none" />
+                  </g>
+                );
+              })}
+              <path d="M 300 85 A 215 215 0 0 1 515 300" strokeWidth="2" strokeDasharray="100,10,28,10" strokeOpacity="0.68" />
+              <path d="M 300 515 A 215 215 0 0 1 85 300" strokeWidth="2" strokeDasharray="100,10,28,10" strokeOpacity="0.68" />
             </g>
 
-            {/* ── LAYER C: Inner Fast Gear System ── */}
-            <g 
-              className="animate-[spin_45s_linear_infinite]"
-              style={{ animationDuration: isHovered ? "10s" : "45s", transition: "animation-duration 0.8s ease" }}
-            >
-              {/* Gear style ticks */}
-              <circle cx="250" cy="250" r="144" strokeDasharray="4, 8" strokeWidth="2.5" />
-              <circle cx="250" cy="250" r="132" strokeDasharray="40, 5" />
-              
-              {/* Tech writing inside layout */}
-              <text x="250" y="125" className="text-[7px] font-mono fill-emerald-500/90 font-bold text-center tracking-widest" textAnchor="middle">WOKAI OS v2.0</text>
-              <text x="250" y="380" className="text-[7px] font-mono fill-emerald-500/90 font-bold text-center tracking-widest" textAnchor="middle">CONDUCTOR ENGINE</text>
-              
-              <circle cx="250" cy="250" r="118" strokeDasharray="20, 20" />
-              <path d="M 250 140 A 110 110 0 0 1 360 250 L 340 250 A 90 90 0 0 0 250 160 Z" className="opacity-25 fill-current" />
-              <path d="M 250 360 A 110 110 0 0 1 140 250 L 160 250 A 90 90 0 0 0 250 340 Z" className="opacity-25 fill-current" />
+            {/* â”€â”€ LAYER 3: medium CW â€” gear teeth ring â”€â”€ */}
+            <g style={{ transformOrigin: "300px 300px", animation: "spin 62s linear infinite" }}>
+              <circle cx="300" cy="300" r="176" strokeDasharray="6,11" strokeWidth="3.2" strokeOpacity="0.58" />
+              <circle cx="300" cy="300" r="164" strokeDasharray="45,7" strokeOpacity="0.48" />
+              <circle cx="300" cy="300" r="154" strokeDasharray="7,7" strokeOpacity="0.42" />
+              {/* Sector highlights */}
+              <path d="M 300 124 A 176 176 0 0 1 476 300 L 458 300 A 158 158 0 0 0 300 142 Z" fill="#10b981" fillOpacity="0.08" stroke="none" />
+              <path d="M 300 476 A 176 176 0 0 1 124 300 L 142 300 A 158 158 0 0 0 300 458 Z" fill="#10b981" fillOpacity="0.08" stroke="none" />
+              <text x="300" y="118" textAnchor="middle" fill="#10b981" fillOpacity="0.72" fontSize="7" fontFamily="monospace" letterSpacing="3">MULTIÂ·AGENTÂ·ENGINE</text>
+              <text x="300" y="491" textAnchor="middle" fill="#10b981" fillOpacity="0.72" fontSize="7" fontFamily="monospace" letterSpacing="3">DIRECTÂ·EXECUTION</text>
+              {/* 24 perimeter dots */}
+              {Array.from({length: 24}).map((_, i) => {
+                const a = (i * 15 * Math.PI) / 180;
+                return <circle key={`pd${i}`} cx={300 + 164 * Math.cos(a)} cy={300 + 164 * Math.sin(a)} r="1.4" fill="#10b981" fillOpacity="0.65" stroke="none" />;
+              })}
             </g>
 
-            {/* ── LAYER D: Center Targeting Crosshair System ── */}
-            <g 
-              className="animate-[spin_25s_linear_infinite_reverse]"
-              style={{ animationDuration: isHovered ? "6s" : "25s", transition: "animation-duration 0.8s ease" }}
-            >
-              <circle cx="250" cy="250" r="88" strokeDasharray="12, 12" />
-              <circle cx="250" cy="250" r="72" strokeWidth="1.2" />
-              <circle cx="250" cy="250" r="54" strokeDasharray="8, 4" />
-              <circle cx="250" cy="250" r="36" />
-              
-              {/* Center Crosshairs */}
-              <path d="M 250 200 L 250 300 M 200 250 L 300 250" strokeWidth="1.5" />
+            {/* â”€â”€ LAYER 4: medium CCW â€” inner circuit tracks â”€â”€ */}
+            <g style={{ transformOrigin: "300px 300px", animation: "spin 45s linear infinite reverse" }}>
+              <circle cx="300" cy="300" r="138" strokeDasharray="12,12" strokeWidth="1.6" strokeOpacity="0.55" />
+              <circle cx="300" cy="300" r="128" strokeOpacity="0.70" strokeWidth="1.3" />
+              <circle cx="300" cy="300" r="118" strokeDasharray="3,8" strokeOpacity="0.38" />
+              {/* 4 thick arc segments */}
+              <path d="M 300 172 A 128 128 0 0 1 428 300" strokeWidth="2.8" strokeDasharray="88,8,22,8" strokeOpacity="0.75" />
+              <path d="M 300 428 A 128 128 0 0 1 172 300" strokeWidth="2.8" strokeDasharray="88,8,22,8" strokeOpacity="0.75" />
+              {/* End-cap nodes */}
+              {[[300,172],[428,300],[300,428],[172,300]].map(([cx,cy],i) => (
+                <g key={`ec${i}`}>
+                  <circle cx={cx} cy={cy} r="7" fill="#030712" stroke="#10b981" strokeWidth="2" />
+                  <circle cx={cx} cy={cy} r="3" fill="#10b981" stroke="none" />
+                </g>
+              ))}
+              {/* Small rectangular panels at 45-degree positions */}
+              {Array.from({length: 4}).map((_, i) => {
+                const a = ((i * 90 + 45) * Math.PI) / 180;
+                const cx = 300 + 128 * Math.cos(a);
+                const cy = 300 + 128 * Math.sin(a);
+                return (
+                  <g key={`rp${i}`} transform={`rotate(${i * 90 + 45}, ${cx}, ${cy})`}>
+                    <rect x={cx - 9} y={cy - 5} width="18" height="10" fill="#030712" stroke="#10b981" strokeWidth="1.2" />
+                    <rect x={cx - 5} y={cy - 2} width="10" height="4" fill="#10b981" fillOpacity="0.25" stroke="none" />
+                  </g>
+                );
+              })}
             </g>
 
-            {/* Center Core Node */}
-            <circle cx="250" cy="250" r="16" className="fill-[#030712] stroke-emerald-400 stroke-[1.5]" />
-            <polygon points="250,240 260,250 250,260 240,250" className="fill-emerald-400 animate-pulse" />
+            {/* â”€â”€ LAYER 5: fast CW â€” inner targeting ring â”€â”€ */}
+            <g style={{ transformOrigin: "300px 300px", animation: "spin 28s linear infinite" }}>
+              <circle cx="300" cy="300" r="100" strokeDasharray="16,10" strokeWidth="1.8" strokeOpacity="0.65" />
+              <circle cx="300" cy="300" r="90" strokeDasharray="55,7" strokeOpacity="0.58" />
+              <circle cx="300" cy="300" r="80" strokeDasharray="5,5" strokeOpacity="0.48" />
+              {/* Corner L-brackets */}
+              <path d="M 268 202 L 250 202 L 250 220" strokeWidth="2.2" strokeOpacity="0.85" />
+              <path d="M 332 202 L 350 202 L 350 220" strokeWidth="2.2" strokeOpacity="0.85" />
+              <path d="M 268 398 L 250 398 L 250 380" strokeWidth="2.2" strokeOpacity="0.85" />
+              <path d="M 332 398 L 350 398 L 350 380" strokeWidth="2.2" strokeOpacity="0.85" />
+              {/* 12 marker dots */}
+              {Array.from({length: 12}).map((_, i) => {
+                const a = (i * 30 * Math.PI) / 180;
+                return <circle key={`md${i}`} cx={300 + 90 * Math.cos(a)} cy={300 + 90 * Math.sin(a)} r="2.2" fill="#10b981" fillOpacity="0.75" stroke="none" />;
+              })}
+            </g>
+
+            {/* â”€â”€ LAYER 6: fast CCW â€” crosshair â”€â”€ */}
+            <g style={{ transformOrigin: "300px 300px", animation: "spin 18s linear infinite reverse" }}>
+              <circle cx="300" cy="300" r="66" strokeDasharray="14,14" strokeOpacity="0.70" />
+              <circle cx="300" cy="300" r="56" strokeOpacity="0.80" strokeWidth="1.4" />
+              <circle cx="300" cy="300" r="44" strokeDasharray="8,5" strokeOpacity="0.60" />
+              <line x1="300" y1="236" x2="300" y2="364" strokeWidth="1.8" strokeOpacity="0.58" />
+              <line x1="236" y1="300" x2="364" y2="300" strokeWidth="1.8" strokeOpacity="0.58" />
+              <line x1="290" y1="246" x2="310" y2="246" strokeOpacity="0.75" />
+              <line x1="290" y1="354" x2="310" y2="354" strokeOpacity="0.75" />
+              <line x1="246" y1="290" x2="246" y2="310" strokeOpacity="0.75" />
+              <line x1="354" y1="290" x2="354" y2="310" strokeOpacity="0.75" />
+              {/* Inner 6-dot ring */}
+              {Array.from({length: 6}).map((_, i) => {
+                const a = (i * 60 * Math.PI) / 180;
+                return <circle key={`c6${i}`} cx={300 + 56 * Math.cos(a)} cy={300 + 56 * Math.sin(a)} r="2" fill="#10b981" fillOpacity="0.80" stroke="none" />;
+              })}
+            </g>
+
+            {/* â”€â”€ STATIC: Inner complex rectangular panels â”€â”€ */}
+            {/* Top panel */}
+            <rect x="278" y="246" width="44" height="20" rx="2" fill="#030712" stroke="#10b981" strokeWidth="1" strokeOpacity="0.65" />
+            <rect x="284" y="251" width="14" height="10" rx="1" fill="#10b981" fillOpacity="0.20" stroke="none" />
+            <rect x="302" y="251" width="14" height="10" rx="1" fill="#10b981" fillOpacity="0.15" stroke="none" />
+            {/* Bottom panel */}
+            <rect x="278" y="334" width="44" height="20" rx="2" fill="#030712" stroke="#10b981" strokeWidth="1" strokeOpacity="0.65" />
+            <rect x="284" y="339" width="14" height="10" rx="1" fill="#10b981" fillOpacity="0.20" stroke="none" />
+            <rect x="302" y="339" width="14" height="10" rx="1" fill="#10b981" fillOpacity="0.15" stroke="none" />
+
+            {/* â”€â”€ CORE CENTER NODE â”€â”€ */}
+            <circle cx="300" cy="300" r="32" fill="url(#rg1)" stroke="none" />
+            <circle cx="300" cy="300" r="24" fill="#030712" stroke="#10b981" strokeWidth="2.2" strokeOpacity="0.95" />
+            <circle cx="300" cy="300" r="16" stroke="#10b981" strokeWidth="1.2" strokeOpacity="0.65" />
+            <polygon points="300,289 313,300 300,311 287,300" fill="#10b981" fillOpacity="0.95" stroke="none" />
+            <polygon points="300,294 308,300 300,306 292,300" fill="#030712" stroke="none" />
           </svg>
         </div>
 
-        {/* Text Grid Container */}
+        {/* Spin keyframe */}
+        <style>{`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+          }
+        `}</style>
+
+        {/* â”€â”€ TEXT CONTENT â”€â”€ */}
         <div className="max-w-7xl mx-auto px-6 w-full grid grid-cols-1 lg:grid-cols-12 gap-12 items-center relative z-10">
-          
-          {/* Left Text Box */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8 }}
-            className="lg:col-span-8 xl:col-span-7 space-y-8 text-left z-10 relative"
+            className="lg:col-span-7 xl:col-span-6 space-y-8 text-left z-10 relative"
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-[11px] font-bold uppercase tracking-widest">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-[11px] font-bold uppercase tracking-widest backdrop-blur-sm">
               <Sparkles className="size-3" />
               <span>Direct execution companion</span>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-[70px] font-extrabold leading-[1.05] tracking-tight text-white font-sans">
+            <h1 className="text-4xl sm:text-5xl lg:text-[68px] font-extrabold leading-[1.05] tracking-tight text-white font-sans drop-shadow-[0_2px_32px_rgba(0,0,0,0.9)]">
               Execute, test,<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-[#ff2a2a] animate-pulse">innovate, repeat.</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-[#ff2a2a]">innovate, repeat.</span>
             </h1>
 
-            <p className="text-zinc-400 text-sm sm:text-base font-light leading-relaxed max-w-lg">
-              The future of workspace operation is here. WokAI OS is an autonomous companion that translates natural language statements into precise API commands across Gmail, Drive, Calendar, local devices, and automated Playwright browser workflows.
+            <p className="text-zinc-300 text-sm sm:text-base font-light leading-relaxed max-w-lg drop-shadow-[0_1px_8px_rgba(0,0,0,0.95)]">
+              The future of workspace operation is here. WokAI OS is an autonomous companion that translates natural language into precise API commands across Gmail, Drive, Calendar, local devices, and automated browser workflows.
             </p>
 
-            {/* Action buttons */}
             <div className="flex flex-wrap items-center gap-4 pt-2">
               <Link href="/chat">
                 <button className="group inline-flex items-center gap-3 bg-white text-zinc-950 px-7 py-4 rounded-full text-xs font-bold uppercase tracking-widest shadow-lg hover:shadow-xl hover:bg-zinc-200 transition-all duration-200">
@@ -251,20 +316,20 @@ export default function LandingPage() {
                 </button>
               </Link>
               <a href="#conductor">
-                <button className="inline-flex items-center gap-2 border border-zinc-800 hover:border-zinc-700 px-6 py-4 rounded-full text-xs font-bold uppercase tracking-widest transition-colors">
+                <button className="inline-flex items-center gap-2 border border-zinc-700 hover:border-zinc-500 bg-black/30 backdrop-blur-sm px-6 py-4 rounded-full text-xs font-bold uppercase tracking-widest transition-colors">
                   <span>Tour our System</span>
                 </button>
               </a>
             </div>
           </motion.div>
 
-          {/* Spacer right column to balance grid */}
-          <div className="hidden lg:block lg:col-span-4" />
-
+          <div className="hidden lg:block lg:col-span-5" />
         </div>
       </section>
 
-      {/* ── SECTION 2: THE STORYTELLING (Chatbots vs Actionable AI) ── */}
+
+
+      {/* â”€â”€ SECTION 2: THE STORYTELLING (Chatbots vs Actionable AI) â”€â”€ */}
       <section id="story" className="py-24 bg-[#050a16] border-y border-zinc-900/60 relative overflow-hidden">
         <div className="absolute left-1/4 top-1/3 w-[500px] h-[500px] bg-red-500/5 rounded-full blur-[100px] pointer-events-none" />
 
@@ -298,7 +363,7 @@ export default function LandingPage() {
                 </p>
               </div>
               <div className="mt-8 border-t border-zinc-900 pt-6 flex items-center justify-between text-xs text-zinc-500 font-mono">
-                <span>STAGE 01 — THE CHATBOT FATIGUE</span>
+                <span>STAGE 01 â€” THE CHATBOT FATIGUE</span>
                 <span className="text-red-500 font-bold uppercase">REJECTED</span>
               </div>
             </motion.div>
@@ -323,7 +388,7 @@ export default function LandingPage() {
                 </p>
               </div>
               <div className="mt-8 border-t border-zinc-900 pt-6 flex items-center justify-between text-xs text-zinc-500 font-mono">
-                <span>STAGE 02 — WOKAI OPERATING SYSTEM</span>
+                <span>STAGE 02 â€” WOKAI OPERATING SYSTEM</span>
                 <span className="text-[#ff2a2a] font-bold uppercase">ACTIVE</span>
               </div>
             </motion.div>
@@ -332,7 +397,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── SECTION 3: CONDUCTOR ARCHITECTURE (Agent A to Agent 5 Flow) ── */}
+      {/* â”€â”€ SECTION 3: CONDUCTOR ARCHITECTURE (Agent A to Agent 5 Flow) â”€â”€ */}
       <section id="conductor" className="py-24 bg-[#030712] relative overflow-hidden">
         <div className="absolute right-1/4 top-1/4 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none" />
 
@@ -423,7 +488,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── SECTION 4: CAPABILITIES / INTEGRATIONS ── */}
+      {/* â”€â”€ SECTION 4: CAPABILITIES / INTEGRATIONS â”€â”€ */}
       <section id="integrations" className="py-24 bg-[#050a16] border-t border-zinc-900/60 relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,42,42,0.02),transparent_60%)] pointer-events-none" />
 
@@ -543,7 +608,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── SECTION 5: CALL TO ACTION / FOOTER ── */}
+      {/* â”€â”€ SECTION 5: CALL TO ACTION / FOOTER â”€â”€ */}
       <section className="py-28 bg-gradient-to-t from-black via-[#040814] to-[#050a16] text-center relative overflow-hidden">
         <div className="absolute inset-0 bg-[#ff2a2a]/5 animate-pulse pointer-events-none" />
 
@@ -566,7 +631,7 @@ export default function LandingPage() {
 
         <div className="max-w-7xl mx-auto px-6 border-t border-zinc-900 mt-28 pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-500 gap-4">
           <div className="flex items-center gap-1.5 font-mono">
-            <span>© {new Date().getFullYear()} WokAI OS. All rights reserved.</span>
+            <span>Â© {new Date().getFullYear()} WokAI OS. All rights reserved.</span>
           </div>
 
           {/* Social Links */}
