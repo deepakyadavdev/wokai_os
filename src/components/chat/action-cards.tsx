@@ -132,10 +132,50 @@ function ContentPreview({ content, title = "Generated Content Preview" }: { cont
   );
 }
 
-function ActionOutputView({ action, borderColor = "border-muted/30" }: { action: WokaiAction; borderColor?: string }) {
-  const [showRaw, setShowRaw] = React.useState(false);
+function GoogleLoginButton() {
+  const handleClick = async () => {
+    try {
+      const res = await fetch("/api/google/auth-url");
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        toast.error("Google OAuth is not configured properly in .env");
+      }
+    } catch {
+      toast.error("Error connecting to Google OAuth");
+    }
+  };
 
-  if (!action.output && !action.summary) return null;
+  return (
+    <button
+      onClick={handleClick}
+      className="mt-2 flex items-center gap-2 px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md hover:shadow-lg transition-all cursor-pointer"
+    >
+      <svg className="size-4 fill-current" viewBox="0 0 24 24">
+        <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C6.721,2,2,6.721,2,12.545S6.721,23.09,12.545,23.09c6.627,0,11.09-4.656,11.09-11.09c0-0.771-0.076-1.52-0.203-2.242H12.545z"/>
+      </svg>
+      Sign in with Google Account
+    </button>
+  );
+}
+
+function ActionOutputView({ action, borderColor = "border-muted/30" }: { action: WokaiAction; borderColor?: string }) {
+  return <OutputDetails action={action} />;
+}
+
+function OutputDetails({ action }: { action: WokaiAction }) {
+  const [showRaw, setShowRaw] = React.useState(false);
+  const borderColor =
+    action.status === "COMPLETED"
+      ? "border-emerald-500/20"
+      : action.status === "FAILED"
+        ? "border-red-500/20"
+        : "border-border/30";
+
+  const isTokenMissing = Boolean(
+    action.output && /Google access token|sign in again with Google|OAuth/i.test(action.output)
+  );
 
   return (
     <div className="mt-3 space-y-2">
@@ -152,9 +192,10 @@ function ActionOutputView({ action, borderColor = "border-muted/30" }: { action:
 
       {/* If there is no summary yet, but there is raw output, we fallback to showing raw output */}
       {!action.summary && action.output && (
-        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-sm">
-          <div className="font-semibold text-amber-400 text-xs mb-1 font-sans uppercase tracking-wider">Raw API Output</div>
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-sm flex flex-col gap-1.5">
+          <div className="font-semibold text-amber-400 text-xs font-sans uppercase tracking-wider">Raw API Output</div>
           <pre className="text-zinc-300 text-xs font-mono whitespace-pre-wrap bg-black/35 p-2 rounded leading-relaxed overflow-x-auto max-h-60">{action.output}</pre>
+          {isTokenMissing && <GoogleLoginButton />}
         </div>
       )}
 
@@ -175,6 +216,7 @@ function ActionOutputView({ action, borderColor = "border-muted/30" }: { action:
               <div>
                 <div className="font-semibold text-zinc-400 text-[10px] mb-1 font-mono uppercase tracking-wider">Raw API Output</div>
                 <pre className="text-zinc-300 font-mono text-xs whitespace-pre-wrap leading-relaxed overflow-x-auto bg-black/25 p-2 rounded max-h-60 border border-border/10">{action.output}</pre>
+                {isTokenMissing && <GoogleLoginButton />}
               </div>
             </div>
           )}

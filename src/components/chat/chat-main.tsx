@@ -527,16 +527,34 @@ export function ChatMain() {
     e.target.value = "";
   }
 
+  const handleGoogleSignIn = async () => {
+    if (googleAuthUrl) {
+      window.location.href = googleAuthUrl;
+      return;
+    }
+    try {
+      const res = await fetch("/api/google/auth-url");
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        toast.error("Google OAuth is not configured properly in .env");
+      }
+    } catch {
+      toast.error("Error connecting to Google OAuth");
+    }
+  };
+
   const isWelcome = messages.length === 0;
 
   const inputCard = (
     <div className={cn("flex flex-col gap-2 w-full", isWelcome ? "max-w-2xl mt-4" : "")}>
       {/* Google OAuth Login Status Bar */}
-      <div className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl border border-slate-200 dark:border-border/60 bg-slate-50/80 dark:bg-[#121620]/80 backdrop-blur-sm text-xs">
+      <div className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-border/60 bg-slate-50/90 dark:bg-[#121620]/90 backdrop-blur-sm text-xs shadow-sm">
         <div className="flex items-center gap-2">
           {googleTokenState ? (
             <>
-              <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="size-2.5 rounded-full bg-emerald-500 animate-pulse" />
               <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                 Google Account Connected
               </span>
@@ -546,8 +564,8 @@ export function ChatMain() {
             </>
           ) : (
             <>
-              <span className="size-2 rounded-full bg-amber-500" />
-              <span className="font-medium text-slate-600 dark:text-slate-300">
+              <span className="size-2.5 rounded-full bg-amber-500 animate-pulse" />
+              <span className="font-semibold text-slate-700 dark:text-slate-200">
                 Google Account Not Connected
               </span>
             </>
@@ -561,22 +579,20 @@ export function ChatMain() {
               setGoogleTokenState(null);
               toast.info("Google Account disconnected.");
             }}
-            className="text-[10px] font-bold text-slate-500 hover:text-red-500 uppercase tracking-wider px-2 py-0.5 rounded hover:bg-red-500/10 transition-colors"
+            className="text-[10px] font-bold text-slate-500 hover:text-red-500 uppercase tracking-wider px-2.5 py-1 rounded-lg hover:bg-red-500/10 transition-colors"
           >
             Sign Out
           </button>
-        ) : googleAuthUrl ? (
-          <a
-            href={googleAuthUrl}
-            className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-[11px] rounded-lg shadow-sm transition-all"
+        ) : (
+          <button
+            onClick={handleGoogleSignIn}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md hover:shadow-lg transition-all cursor-pointer active:scale-95"
           >
             <svg className="size-3.5 fill-current" viewBox="0 0 24 24">
               <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C6.721,2,2,6.721,2,12.545S6.721,23.09,12.545,23.09c6.627,0,11.09-4.656,11.09-11.09c0-0.771-0.076-1.52-0.203-2.242H12.545z"/>
             </svg>
             Sign in with Google
-          </a>
-        ) : (
-          <span className="text-[10px] text-muted-foreground italic">Google OAuth Ready</span>
+          </button>
         )}
       </div>
 
