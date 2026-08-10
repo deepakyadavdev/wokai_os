@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState } from "react";
 import { 
@@ -408,10 +408,10 @@ export default function LandingPage() {
               Multi-Agent Orchestration
             </div>
             <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight text-white leading-tight">
-              The Agent Conductor Flow
+              The 8-Agent Conductor Flow
             </h2>
             <p className="text-zinc-400 font-light text-sm sm:text-base leading-relaxed">
-              Every request you issue flows through an structured, deterministic assembly line of specialized subagents, ending at direct validation check by Agent 5.
+              Every request flows through a deterministic 8-agent workflow: YOUGYE, TIVERE, VICHAR, DRISTHI, KRIYA, SAHAYATA, MULYE, and SAMPARN.
             </p>
           </div>
 
@@ -422,63 +422,63 @@ export default function LandingPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
               
-              {/* Agent A & B */}
+              {/* Yougye & Tivere */}
               <motion.div 
                 whileHover={{ scale: 1.02 }}
                 className="p-6 rounded-2xl bg-zinc-950/70 border border-zinc-900 space-y-4"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono text-emerald-400 font-bold tracking-widest">01 / RESOLUTION</span>
+                  <span className="text-[10px] font-mono text-emerald-400 font-bold tracking-widest">01 / INGESTION & ACK</span>
                   <Cpu className="size-4 text-emerald-400" />
                 </div>
-                <h4 className="text-lg font-bold text-white">Agent A & B</h4>
+                <h4 className="text-lg font-bold text-white">YOUGYE & TIVERE</h4>
                 <p className="text-zinc-450 text-xs leading-relaxed font-light">
-                  Deciphers the target user intent, checks for missing execution elements, and maps goals directly to relevant tools.
+                  YOUGYE verifies context sufficiency with memory state. TIVERE dispatches instant user acknowledgement.
                 </p>
               </motion.div>
 
-              {/* Agent 1 & 2 */}
+              {/* Vichar & Drishthi */}
               <motion.div 
                 whileHover={{ scale: 1.02 }}
                 className="p-6 rounded-2xl bg-zinc-950/70 border border-zinc-900 space-y-4"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono text-red-400 font-bold tracking-widest">02 / PLAN SYNTHESIS</span>
+                  <span className="text-[10px] font-mono text-red-400 font-bold tracking-widest">02 / DECOMPOSITION & TOOLS</span>
                   <Layers className="size-4 text-[#ff2a2a]" />
                 </div>
-                <h4 className="text-lg font-bold text-white">Agent 1 & 2</h4>
+                <h4 className="text-lg font-bold text-white">VICHAR & DRISTHI</h4>
                 <p className="text-zinc-450 text-xs leading-relaxed font-light">
-                  Generates the client-facing plan description and serializes the execution actions into concrete JSON execution blocks.
+                  VICHAR breaks the goal into ranked subtasks. DRISTHI maps subtasks to GCP APIs and synthesizes execution context.
                 </p>
               </motion.div>
 
-              {/* Agent 3 & 4 */}
+              {/* Kriya & Sahayata */}
               <motion.div 
                 whileHover={{ scale: 1.02 }}
                 className="p-6 rounded-2xl bg-zinc-950/70 border border-zinc-900 space-y-4"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono text-emerald-400 font-bold tracking-widest">03 / PARAMETER BINDING</span>
+                  <span className="text-[10px] font-mono text-emerald-400 font-bold tracking-widest">03 / CONTENT & EXECUTION</span>
                   <Code className="size-4 text-emerald-400" />
                 </div>
-                <h4 className="text-lg font-bold text-white">Agent 3 & 4</h4>
+                <h4 className="text-lg font-bold text-white">KRIYA & SAHAYATA</h4>
                 <p className="text-zinc-450 text-xs leading-relaxed font-light">
-                  Generates the detailed payload contents (e.g. email body texts, scraper selectors, spreadsheets structures) and binds variables.
+                  SAHAYATA generates content payloads (document body, email text) while KRIYA executes GCP Serverless APIs.
                 </p>
               </motion.div>
 
-              {/* Agent 5 (QA) */}
+              {/* Mulye & Samparn */}
               <motion.div 
                 whileHover={{ scale: 1.02 }}
                 className="p-6 rounded-2xl bg-gradient-to-br from-zinc-950 to-red-950/30 border border-red-500/30 space-y-4"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono text-red-500 font-bold tracking-widest">04 / QA AUDITING</span>
+                  <span className="text-[10px] font-mono text-red-500 font-bold tracking-widest">04 / AUDIT & SYNTHESIS</span>
                   <ShieldCheck className="size-4 text-red-500" />
                 </div>
-                <h4 className="text-lg font-bold text-white">Agent 5 (Evaluator)</h4>
+                <h4 className="text-lg font-bold text-white">MULYE & SAMPARN</h4>
                 <p className="text-zinc-300 text-xs leading-relaxed font-light">
-                  Validates safety criteria. Audits for execution gap fabrication (invented emails, arbitrary times), giving clear bypass to content generation tasks.
+                  MULYE audits subtask execution and reports progress. SAMPARN synthesizes the comprehensive final report.
                 </p>
               </motion.div>
 

@@ -1,0 +1,13 @@
+node_modules
+.next
+.vercel
+.git
+.npm-cache
+desktop-app
+desktop-build
+wokai-companion.exe
+playwright-profile
+*.exe
+*.zip
+*.log
+*.tsbuildinfo

@@ -27,12 +27,6 @@ export type WokaiToolName =
   | "sheets.createTracker"
   | "slides.createDeck"
   | "contacts.search"
-  | "calls.prepare"
-  | "browser.plan"
-  | "devices.queueCommand"
-  | "devices.openApp"
-  | "devices.terminal"
-  | "devices.fileAccess"
   | "notifications.create"
   | "maps.estimateTravel"
   | "maps.searchPlaces"
@@ -158,4 +152,102 @@ export interface AgentPlan {
     repairedMessage: string;
     detectedLanguage: string;
   };
+
+  // 8-Agent Workflow Execution Summary
+  eightAgentOutput?: {
+    yougye: YougyeResult;
+    tivere?: TivereResult;
+    vichar?: VicharPlan;
+    subtasksCompleted?: Array<{
+      subtask: VicharSubtask;
+      drishthi: DrishthiStatement;
+      sahayata: SahayataPayload;
+      kriya: KriyaResult;
+      mulye: MulyeReport;
+    }>;
+    samparn?: SamparnSummary;
+  };
+}
+
+export type EightAgentName =
+  | "YOUGYE"
+  | "TIVERE"
+  | "VICHAR"
+  | "DRISTHI"
+  | "KRIYA"
+  | "SAHAYATA"
+  | "MULYE"
+  | "SAMPARN";
+
+export interface YougyeMemoryState {
+  originalPrompt: string;
+  questionsAsked: string[];
+  answersReceived: Record<string, string>;
+  refinedPrompt?: string;
+}
+
+export interface YougyeResult {
+  isSufficient: boolean;
+  refinedPrompt?: string;
+  questions?: string[];
+  missingInformation?: string[];
+  memoryState?: YougyeMemoryState;
+  reasoning: string;
+}
+
+export interface TivereResult {
+  ackMessage: string;
+  dispatchedAt: string;
+}
+
+export interface VicharSubtask {
+  id: string;
+  rank: number;
+  title: string;
+  description: string;
+  status: "pending" | "in_progress" | "completed" | "failed";
+}
+
+export interface VicharPlan {
+  originalPrompt: string;
+  subtasks: VicharSubtask[];
+  totalTasks: number;
+  completedTasks: number;
+}
+
+export interface DrishthiStatement {
+  subtaskId: string;
+  subtaskTitle: string;
+  selectedTools: WokaiToolName[];
+  enrichedStatement: string;
+  toolParameters: Record<string, any>;
+}
+
+export interface SahayataPayload {
+  subtaskId: string;
+  content: string;
+  drafts?: Record<string, string>;
+}
+
+export interface KriyaResult {
+  subtaskId: string;
+  executedApi: string;
+  status: "SUCCESS" | "FAILED" | "PENDING_APPROVAL";
+  apiResponse: any;
+  actionCreated?: WokaiAction;
+}
+
+export interface MulyeReport {
+  subtaskId: string;
+  success: boolean;
+  reportSummary: string;
+  userUpdateMessage: string;
+}
+
+export interface SamparnSummary {
+  finalTitle: string;
+  comprehensiveSummary: string;
+  completedSubtaskSummaries: string[];
+  finalOutputPresentation: string;
+  recommendedNextSteps?: string[];
 }

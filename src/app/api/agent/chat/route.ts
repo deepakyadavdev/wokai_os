@@ -4,6 +4,7 @@ import { z } from "zod";
 import { generateAgentPlan } from "@/lib/wokai/agent";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const chatRequestSchema = z.object({
   message: z.string().min(1).max(4000),

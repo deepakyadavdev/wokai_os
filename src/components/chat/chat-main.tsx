@@ -27,7 +27,7 @@ import { useChatSessions } from "@/hooks/use-chat-sessions";
 import { extractMemories } from "@/lib/wokai/memory-agent";
 import { cn } from "@/lib/utils";
 import type { AgentPlan } from "@/lib/types";
-import { getGoogleToken } from "@/lib/google/token";
+import { getGoogleToken, saveGoogleToken, clearGoogleToken } from "@/lib/google/token";
 
 /* ─────────────────────────── Android/Robot head SVG ─────────────────────────── */
 function AndroidBotIcon({ className }: { className?: string }) {
@@ -69,28 +69,26 @@ function WaveSymbol() {
 
 const PHASE_ORDER = [
   "routing",
-  "agentA",
-  "agent1",
-  "agentB",
-  "agent2",
-  "agent4",
-  "agent3",
-  "agent#",
-  "agent5",
-  "api"
+  "yougye",
+  "tivere",
+  "vichar",
+  "drishthi",
+  "kriya",
+  "sahayata",
+  "mulye",
+  "samparn"
 ];
 
 const PHASE_DETAILS: Record<string, string> = {
-  routing: "Routing request & preparing workspace",
-  agentA: "Agent A: Human worker thinking",
-  agent1: "Agent 1: Structuring reply",
-  agentB: "Agent B: Comparing steps with tools",
-  agent2: "Agent 2: Finalizing action plan",
-  agent4: "Agent 4: Generating content drafts",
-  agent3: "Agent 3: Preparing API execution layers",
-  "agent#": "Agent #: Matching reply with actions",
-  agent5: "Agent 5: Quality assurance review",
-  api: "Conductor: Preparing API layers"
+  routing: "Routing request & initializing 8-Agent Pipeline...",
+  yougye: "Agent 1 (YOUGYE): Evaluating prompt context & memory",
+  tivere: "Agent 2 (TIVERE): Fast acknowledgement dispatched",
+  vichar: "Agent 3 (VICHAR): Decomposing goal into ranked subtasks",
+  drishthi: "Agent 4 (DRISTHI): Mapping GCP tools & synthesizing execution context",
+  kriya: "Agent 5 (KRIYA): Executing GCP / Vercel Serverless APIs",
+  sahayata: "Agent 6 (SAHAYATA): Generating content payloads",
+  mulye: "Agent 7 (MULYE): Verifying execution outputs & progress report",
+  samparn: "Agent 8 (SAMPARN): Synthesizing final presentation report"
 };
 
 function ThinkingIndicator({ status }: { status: string }) {
@@ -108,31 +106,37 @@ function ThinkingIndicator({ status }: { status: string }) {
       <div className="flex items-center justify-between border-b border-slate-100 dark:border-border/40 pb-1.5 mb-1 w-full gap-8">
         <span className="text-xs font-semibold text-slate-800 dark:text-foreground/80 tracking-wide">Work Conductor Execution Log</span>
         <span className="flex items-center gap-1">
-          {[0, 1, 2].map((i) => (
-            <motion.span
-              key={i}
-              className="block h-1.5 w-1.5 rounded-full bg-emerald-500"
-              animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.1, 0.8] }}
-              transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
-            />
-          ))}
+          <Loader2 className="h-3 w-3 animate-spin text-blue-600 dark:text-blue-400" />
+          <span className="text-[10px] font-medium text-slate-500 dark:text-muted-foreground uppercase tracking-wider">Processing</span>
         </span>
       </div>
-      <div className="flex flex-col gap-1.5 text-xs font-mono text-slate-500 dark:text-muted-foreground min-w-[280px]">
-        {visiblePhases.map((phaseId, index) => {
-          const isDone = index < activeIndex;
-          const label = PHASE_DETAILS[phaseId] || phaseId;
+
+      <div className="flex flex-col gap-1.5">
+        {visiblePhases.map((phase, idx) => {
+          const isCurrent = phase === status;
+          const detail = PHASE_DETAILS[phase] || phase;
+
           return (
-            <div key={phaseId} className="flex items-center gap-2">
-              {isDone ? (
-                <span className="text-emerald-500 font-bold">✓</span>
-              ) : (
-                <Loader2 className="h-3 w-3 animate-spin text-amber-500" />
+            <motion.div
+              key={phase}
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.15, delay: idx * 0.03 }}
+              className={cn(
+                "flex items-center gap-2 text-xs py-0.5 font-sans",
+                isCurrent ? "text-blue-600 dark:text-blue-400 font-medium" : "text-slate-500 dark:text-muted-foreground/80"
               )}
-              <span className={isDone ? "text-slate-400 dark:text-muted-foreground/75" : "text-amber-500 font-medium animate-pulse"}>
-                {label}... {isDone ? "Done" : "Thinking"}
-              </span>
-            </div>
+            >
+              {isCurrent ? (
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                </span>
+              ) : (
+                <span className="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-slate-700 ml-0.5 mr-0.5" />
+              )}
+              <span>{detail}</span>
+            </motion.div>
           );
         })}
       </div>
@@ -163,24 +167,24 @@ function ClientOnlyTime({ iso }: { iso: string }) {
 
 function getFriendlyAgentName(status: string): string {
   switch (status) {
-    case "agentA_done":
-      return "Agent A: Human Worker Thinker";
-    case "agent1_done":
-      return "Agent 1: Worthful Conversational Responder";
-    case "agentB_done":
-      return "Agent B: Tool Mapper and Adaptor";
-    case "agent2_done":
-      return "Agent 2: Structured Plan Generator";
-    case "agent4_done":
-      return "Agent 4: Content Generator";
-    case "agent3_done":
-      return "Agent 3: API Handler";
-    case "agent#_done":
-      return "Agent #: Plan Summarizer";
-    case "agent5_done":
-      return "Agent 5: Quality Assurance & Evaluator";
+    case "yougye":
+      return "Agent 1 (YOUGYE): Context & Memory Check";
+    case "tivere":
+      return "Agent 2 (TIVERE): Fast Reply";
+    case "vichar":
+      return "Agent 3 (VICHAR): Task Breakdown & Ranking";
+    case "drishthi":
+      return "Agent 4 (DRISTHI): Tool Selector & Synthesizer";
+    case "kriya":
+      return "Agent 5 (KRIYA): GCP / Serverless API Execution";
+    case "sahayata":
+      return "Agent 6 (SAHAYATA): Content & Payload Generator";
+    case "mulye":
+      return "Agent 7 (MULYE): Progress & Verification Report";
+    case "samparn":
+      return "Agent 8 (SAMPARN): Final Presentation Synthesizer";
     default:
-      return "Agent Conductor Sub-Process";
+      return "8-Agent Pipeline Sub-Process";
   }
 }
 
@@ -217,6 +221,30 @@ export function ChatMain() {
   const [currentThinkingLogs, setCurrentThinkingLogs] = React.useState<Array<{ agent: string; output: string }>>([]);
   const thinkingLogsRef = React.useRef<Array<{ agent: string; output: string }>>([]);
   const [expandedThinking, setExpandedThinking] = React.useState<Record<string, boolean>>({});
+
+  const [googleTokenState, setGoogleTokenState] = React.useState<string | null>(null);
+  const [googleAuthUrl, setGoogleAuthUrl] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const accessToken = params.get("access_token");
+    const expiresIn = params.get("expires_in");
+    if (accessToken) {
+      saveGoogleToken(accessToken, expiresIn ? Number(expiresIn) : 3600);
+      setGoogleTokenState(accessToken);
+      toast.success("Google Account successfully connected!");
+      window.history.replaceState({}, "", window.location.pathname);
+    } else {
+      setGoogleTokenState(getGoogleToken());
+    }
+
+    fetch("/api/google/auth-url")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.configured && data.url) setGoogleAuthUrl(data.url);
+      })
+      .catch(() => {});
+  }, []);
 
   const {
     isSupported,
@@ -503,6 +531,55 @@ export function ChatMain() {
 
   const inputCard = (
     <div className={cn("flex flex-col gap-2 w-full", isWelcome ? "max-w-2xl mt-4" : "")}>
+      {/* Google OAuth Login Status Bar */}
+      <div className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl border border-slate-200 dark:border-border/60 bg-slate-50/80 dark:bg-[#121620]/80 backdrop-blur-sm text-xs">
+        <div className="flex items-center gap-2">
+          {googleTokenState ? (
+            <>
+              <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                Google Account Connected
+              </span>
+              <span className="text-[10px] text-muted-foreground hidden sm:inline">
+                (Docs, Sheets, Slides, Drive, Gmail, Calendar active)
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="size-2 rounded-full bg-amber-500" />
+              <span className="font-medium text-slate-600 dark:text-slate-300">
+                Google Account Not Connected
+              </span>
+            </>
+          )}
+        </div>
+
+        {googleTokenState ? (
+          <button
+            onClick={() => {
+              clearGoogleToken();
+              setGoogleTokenState(null);
+              toast.info("Google Account disconnected.");
+            }}
+            className="text-[10px] font-bold text-slate-500 hover:text-red-500 uppercase tracking-wider px-2 py-0.5 rounded hover:bg-red-500/10 transition-colors"
+          >
+            Sign Out
+          </button>
+        ) : googleAuthUrl ? (
+          <a
+            href={googleAuthUrl}
+            className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-[11px] rounded-lg shadow-sm transition-all"
+          >
+            <svg className="size-3.5 fill-current" viewBox="0 0 24 24">
+              <path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C6.721,2,2,6.721,2,12.545S6.721,23.09,12.545,23.09c6.627,0,11.09-4.656,11.09-11.09c0-0.771-0.076-1.52-0.203-2.242H12.545z"/>
+            </svg>
+            Sign in with Google
+          </a>
+        ) : (
+          <span className="text-[10px] text-muted-foreground italic">Google OAuth Ready</span>
+        )}
+      </div>
+
       {/* Voice status bar / Confidence Confirm / Errors */}
       {(isListening || isProcessing || speechError || showConfidenceConfirm) && (
         <div className="w-full flex flex-col gap-2 transition-all duration-300">

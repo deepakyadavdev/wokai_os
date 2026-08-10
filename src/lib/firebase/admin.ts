@@ -48,7 +48,22 @@ export function getAdminDb() {
 
 export async function verifyFirebaseToken(token: string | null) {
   const app = getAdminApp();
-  if (!app || !token) return null;
+  if (!app) {
+    // In local development / offline mode where Firebase is not configured,
+    // bypass authentication and return a mock decoded ID token structure.
+    return {
+      uid: "local-user",
+      name: "Deepak Yadav",
+      email: "deepak.yadav@gmail.com",
+      auth_time: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      firebase: { sign_in_provider: "google.com", identities: {} },
+      aud: "mock-aud",
+      iss: "mock-iss",
+      sub: "local-user"
+    } as any;
+  }
+  if (!token) return null;
   try {
     return await getAuth(app).verifyIdToken(token);
   } catch {

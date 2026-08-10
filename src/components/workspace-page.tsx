@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { GpuHeartbeatCard } from "@/components/gpu-heartbeat-card";
 
 import {
   Bell,
@@ -1470,17 +1471,14 @@ function LifeSaverPage({ snapshot }: { snapshot: WorkspaceSnapshot }) {
 function BrowserAgentPage({ snapshot }: { snapshot: WorkspaceSnapshot }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      {snapshot.browserJobs.map((job) => (
-        <BrowserJobCard key={job.id} job={job} />
-      ))}
       <Card>
         <CardHeader>
-          <CardTitle>Local Agent Adapter</CardTitle>
-          <CardDescription>Use `BROWSER_AGENT_MODE=local` and `LOCAL_BROWSER_AGENT_URL` for a Playwright worker.</CardDescription>
+          <CardTitle>Web GCP API Agent System</CardTitle>
+          <CardDescription>Fully web-based 8-Agent Workflow powered by GCP APIs & Vercel Serverless Functions.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
-          <p>Vercel serverless cannot safely run full browser sessions long term, so WokAI keeps a job model and can hand off to a local worker.</p>
-          <Badge variant="warning">Pause before submit/pay/send/upload</Badge>
+          <p>WokAI OS uses direct Google Cloud Platform APIs (Docs, Gmail, Drive, Calendar, Sheets, Slides) executing on Vercel Serverless functions for fast, deterministic web automation.</p>
+          <Badge variant="signal">8-Agent Architecture Active</Badge>
         </CardContent>
       </Card>
     </div>
@@ -1528,6 +1526,7 @@ function SettingsPage({
   return (
     <div className="flex flex-col gap-5">
       <GoogleTokenManager />
+      <GpuHeartbeatCard />
       <div className="grid gap-4 lg:grid-cols-[1fr_0.85fr]">
         <Card>
           <CardHeader>

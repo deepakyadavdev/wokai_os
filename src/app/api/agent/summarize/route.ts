@@ -25,12 +25,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const summary = await generateAgentHashExecutionSummary(
-      parsed.data.tool,
-      parsed.data.label,
-      parsed.data.output,
-      geminiKey,
-      parsed.data.googleToken,
-      parsed.data.agent1Output
+      parsed.data.label || parsed.data.tool,
+      [parsed.data.output]
     );
     return NextResponse.json({ summary });
   } catch (err: any) {

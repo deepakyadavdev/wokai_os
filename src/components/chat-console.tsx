@@ -23,28 +23,26 @@ interface Message {
 
 const PHASE_ORDER = [
   "routing",
-  "agentA",
-  "agent1",
-  "agentB",
-  "agent2",
-  "agent4",
-  "agent3",
-  "agent#",
-  "agent5",
-  "api"
+  "yougye",
+  "tivere",
+  "vichar",
+  "drishthi",
+  "kriya",
+  "sahayata",
+  "mulye",
+  "samparn"
 ];
 
 const PHASE_DETAILS: Record<string, string> = {
-  routing: "Routing request & preparing workspace",
-  agentA: "Agent A: Human worker thinking",
-  agent1: "Agent 1: Structuring reply",
-  agentB: "Agent B: Comparing steps with tools",
-  agent2: "Agent 2: Finalizing action plan",
-  agent4: "Agent 4: Generating content drafts",
-  agent3: "Agent 3: Preparing API execution layers",
-  "agent#": "Agent #: Matching reply with actions",
-  agent5: "Agent 5: Quality assurance review",
-  api: "Conductor: Preparing API layers"
+  routing: "Routing request & initializing 8-Agent Pipeline...",
+  yougye: "Agent 1 (YOUGYE): Evaluating prompt context & memory",
+  tivere: "Agent 2 (TIVERE): Fast acknowledgement dispatched",
+  vichar: "Agent 3 (VICHAR): Decomposing goal into ranked subtasks",
+  drishthi: "Agent 4 (DRISTHI): Mapping GCP tools & synthesizing execution context",
+  kriya: "Agent 5 (KRIYA): Executing GCP / Vercel Serverless APIs",
+  sahayata: "Agent 6 (SAHAYATA): Generating content payloads",
+  mulye: "Agent 7 (MULYE): Verifying execution outputs & progress report",
+  samparn: "Agent 8 (SAMPARN): Synthesizing final presentation report"
 };
 
 const examples = [

@@ -1,0 +1,45 @@
+hey see i wanna make wok ai work now , so what major things i want is to implement these 
+1- delete all te subagents workflow , we are going to rebuild it DELETE FULLY THE SUBAGENTS WORKFLOW 
+2-  add the workflow given below after delting the old one FIRST DELETE OLD ONE , UPDATE ME DELETED THAN ADD AND MAKE THIS NEW ONE 
+total 8 agents 
+yougye,tivere,vichar,drishthi,kriya,sahayta,mulye,samparn
+NOW WE WILL DISCUSS THEM ALL
+YOUGYE- it mainly works as a agent that decide whether information given by user is sufficient or not  , WE WILL TALK ABOUT IT LATER IN THIS FILE 
+TIVERE-  this agent works fast and just reply the prompt of user, like ' okay i will break this into subtask and work on it' ,, just small and fast reply to tell user work has been started
+VICHAR - this agent also get the same promp that tivere got , vichar work in parallel to tivere , mainly it does like it break task into subtask and rank the subtask that it makes , and it also see  which task is completed which is not ( this decision of completion of task is done with help of mulye agent we will discuss later in mulye part) , so it mainly break tasks and give them rank , like user-' create docs file on topic ai and send it to my friend via email his email is xyz@gmail.com' , so vichar should do something like- ' here is breakdown #1 firstly create a docs file and fill about ai in it and store urll of it , # send the url of docs fil to xyz@gmail.com '    AND AFTER MULYE REPLY'#1 is done' it thinks aaun for what is done and whar is left NOW THE MAIN ROLE OF VICHAR  not just breaking task and givin them rank , after giving rank it sends a statement of subtask to next againt dristhiFOR EACH SUBTASK VICHAR SEND STATEMNT ONES like for the example there were 2 task #1 create file , #2 semd it to xy , soo firstly vichar will send #1 to dristhi and after it got #1 is completed from mulye , it send next part #2 to dristhi .   SO VICHAR DOES 3 MAIN THINGS - 1, BRAKING TASK // 2- RANKING TASK // 3- SENDING TASK ONE BYU ONE TO DRISTHI AFTER COMPLETION OF A TASK.
+DRISTHI - this agent mainly uses statemnt of task given by vichar , to find out which tools we have to complete task andc reate a new stetemnt to pass it next to KRIYA AND SAHAYTA AGENT ,,, mainly dristhi will have a list of all tools we have to work with that can help in completion of task , so it sees task and the tools , select best tools from list and forward the new statemnt that describes the task and the tools to work with to complete those task 
+KRIYA- this agent work with SAHAYTA agent , what it does is - it uses dristhi's statemnt and run api's to do work and run them on to complete task ( apis to run will be GCP API and it will run on vercel serverless functions AND the modles will work on LIGHTNING AI GPU OR GOOGLE COLLAB GPU - NIVIDIA T4  we will discuss it later in this file only)  so like user said ' crate docs on ai , so kriya does run api to create a docs and the content to fill in it is given by sahayata agent ,, it uses sahayata agent created content and run apis  and does complete task 
+SAHAYATA- this agent run parallel with kriya agent and it uses dristhi agents statement to analyse the task and create content for it , like user said create docs for me on ai , so sahayata agent will create content for that docs file and send that content to kriya agent ,, else the creation of files and all are left to kriya agent 
+MULYE- this agent takes the output produced by the kriya agent and the output came by the apis that kriya agent ran , after getting output of both kriya agent and the api that kriya ran , mulye make a simple report to update  it to VICHAR AGENT at the very beginig of this workflow , there vichar understand the report and marks the task completed , so the main role of mulye agent is just to read the output of kriya agent and apis , and just update the vichar agent about it ALSO IT UPDATE THE SAME THING TO USER THAT THIS HAS BEEN DONE SO USER CAN SEE TASK BEEN COMPLETED 
+SAMPARN- this agent work only when the vichar agent thinks all the task are completed , once vichar agent thinks that all subtasks are completed succesfully , it tells the completion of the task and the list of the task to samparn agent , and after getting the information from vichar agent , this samparn agent make a big summary of all the task done and the final output it present it to user 
+
+
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+NOW THE YOUGYE AGENT
+YOUGYE - it thinks the information provided by user is sufficient to pass to vichar or not , 
+if not- ask information from user itself 
+information got- run a new session from vichar , where yougye redine prompt with information got and give it to vichar
+
+it makes simple question to aks information , and when user gives answer he writes answer with questions and redifne prompt to work well and send prompt with question and answer attached to vichar , or it repaeat this question answer process until he thinks information is sufficient
+now majoe thiungs to tackle here 
+we don't have any memoery in wok so if user say 'create a report' YOUGYE identify it corercetly not information like which topic to create report on so it need a memory where he can store the user prompt , make question , saves thwm to in memory , than ask those questionb to user , once he gets repply frpom user , he again edit memory to add answer , than again use that memory to make a new redined polished prompt that clearly staes vichar what to do
+
+
+
+
+--------------------------------------------------------------------
+-----------------------------------------------------------------------
+NOW ABOUT SERVER AND ALL
+the ai model will run here will be something like opensource model about 7-8b parameter 
+KRIYA model would be integrated like that it would use vercel serverless functions to run apis , and the server needed to run api would be vercel serverlewss functions 
+and the server for the model to run will be GOOGLE COLLAB ( IN TESTING) AND LIGHTNING AI ( IN PRODUCTION)  WE WILL USE GPU NIVIDA T4 ON BOTH COLLAB AND LIGHTNIG 
+
+-------------------------------------------------------------------------
+-------------------------------------------------------------------------
+
+NOW YTOU GOT ALL THE INFORMATION REGARDING NEW WORKFLOW 
+delete old ones and start making and inplementing it
+ALSO we are gonna make it fully web based no terminal or platwright for browser automation now , we just will use GCP api to do task so delte everything related to terminal , browser automation also delted everypart connected to desktop app , ,
+we just need only web version of api 
+SO CLEAR THE FULL GIT REPO JUST KEEP STUFF THAT BELONGS TO THE WEBSITE OF WOK AI  

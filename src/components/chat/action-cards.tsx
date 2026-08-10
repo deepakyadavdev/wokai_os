@@ -2017,35 +2017,7 @@ export function ActionCards({ result, onUpdateActionStatus, onUpdatePlan }: Acti
             />
           );
         }
-        if (action.tool === "browser.plan") {
-          return (
-            <BrowserCard
-              key={action.id}
-              result={result}
-              action={action}
-              onApprove={() => handleApproveAction(action.id, action.tool, action.label)}
-              onReject={() => handleRejectAction(action.id)}
-            />
-          );
-        }
-        if (action.tool === "devices.terminal") {
-          return (
-            <TerminalCard
-              key={action.id}
-              action={action}
-              onApprove={() => handleApproveAction(action.id, action.tool, action.label)}
-            />
-          );
-        }
-        if (action.tool === "devices.openApp") {
-          return (
-            <AppLauncherCard
-              key={action.id}
-              action={action}
-              onApprove={() => handleApproveAction(action.id, action.tool, action.label)}
-            />
-          );
-        }
+
         if (action.tool.startsWith("maps")) {
           return (
             <MapsCard

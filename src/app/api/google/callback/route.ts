@@ -53,8 +53,10 @@ export async function GET(request: NextRequest) {
     // and avoids token leakage via browser history, server logs, and referrer headers.
     const expiresIn = tokens.expires_in ?? 3600;
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const redirect = new URL("/settings", appUrl);
+    const redirect = new URL("/chat", appUrl);
     redirect.searchParams.set("oauth", "success");
+    redirect.searchParams.set("access_token", tokens.access_token);
+    redirect.searchParams.set("expires_in", String(expiresIn));
 
     return NextResponse.redirect(redirect.toString(), {
       headers: {

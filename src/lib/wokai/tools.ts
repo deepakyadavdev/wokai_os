@@ -141,54 +141,6 @@ export const toolRegistry: ToolDefinition[] = [
     inputSchema: z.object({ name: z.string() })
   },
   {
-    name: "calls.prepare",
-    description: "Prepare a safe phone call script, tel link, or Twilio request.",
-    subagent: "CallAgent",
-    sensitive: true,
-    statusWhenPlanned: "NEEDS_APPROVAL",
-    inputSchema: z.object({ contact: z.string(), message: z.string() })
-  },
-  {
-    name: "browser.plan",
-    description: "Plan browser automation and pause before final submit.",
-    subagent: "BrowserAgent",
-    sensitive: true,
-    statusWhenPlanned: "NEEDS_APPROVAL",
-    inputSchema: z.object({ goal: z.string() })
-  },
-  {
-    name: "devices.queueCommand",
-    description: "Queue a cross-device command until target device is online.",
-    subagent: "DeviceAgent",
-    sensitive: true,
-    statusWhenPlanned: "QUEUED",
-    inputSchema: z.object({ deviceId: z.string(), command: z.string() })
-  },
-  {
-    name: "devices.openApp",
-    description: "Launch an application (e.g. VS Code, browser, terminal) on the target device.",
-    subagent: "DeviceAgent",
-    sensitive: false,
-    statusWhenPlanned: "COMPLETED",
-    inputSchema: z.object({ deviceId: z.string(), appName: z.string() })
-  },
-  {
-    name: "devices.terminal",
-    description: "Execute a command line interface instruction in the target device's shell.",
-    subagent: "DeviceAgent",
-    sensitive: true,
-    statusWhenPlanned: "NEEDS_APPROVAL",
-    inputSchema: z.object({ deviceId: z.string(), command: z.string() })
-  },
-  {
-    name: "devices.fileAccess",
-    description: "Scan local approved directories and retrieve matching files.",
-    subagent: "DeviceAgent",
-    sensitive: false,
-    statusWhenPlanned: "COMPLETED",
-    inputSchema: z.object({ deviceId: z.string(), path: z.string(), pattern: z.string().optional() })
-  },
-  {
     name: "notifications.create",
     description: "Create an in-app notification or escalation alert.",
     subagent: "NotificationAgent",

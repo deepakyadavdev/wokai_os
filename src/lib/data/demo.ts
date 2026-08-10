@@ -75,13 +75,13 @@ export const demoActions: WokaiAction[] = [
     output: "3 urgent threads detected. Draft replies are ready."
   },
   {
-    id: "act-browser",
-    tool: "browser.plan",
-    label: "Prepared internship browser workflow",
-    status: "QUEUED",
+    id: "act-docs",
+    tool: "docs.create",
+    label: "Prepared project documentation",
+    status: "COMPLETED",
     sensitive: true,
     createdAt: new Date(now - 6 * 60e3).toISOString(),
-    output: "Paused before final submit."
+    output: "Document draft created via GCP Docs API."
   }
 ];
 
