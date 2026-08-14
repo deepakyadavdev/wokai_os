@@ -571,6 +571,58 @@ function getTopicSpecificSlides(topic: string, promptLower: string, count: numbe
   return slides.join("\n\n");
 }
 
+function getTopicSpecificSheet(topic: string, promptLower: string, count: number): string {
+  const isStudent = /student|class|roll|school|college|marks|grade|attendance|student tracker/i.test(topic + " " + promptLower);
+  const isFinance = /finance|expense|budget|sales|revenue|invoice|cost|account/i.test(topic + " " + promptLower);
+
+  if (isStudent) {
+    const studentNames = [
+      "Aarav Sharma", "Ananya Verma", "Rohan Patel", "Priya Singh", "Ishaan Gupta",
+      "Diya Roy", "Kabir Malhotra", "Sneha Joshi", "Aditya Kumar", "Meera Nair",
+      "Arjun Reddy", "Riya Kapoor", "Devansh Mehta", "Tanvi Saxena", "Vivaan Chopra",
+      "Sanya Bhatt", "Siddharth Rao", "Kavya Menon", "Yash Vardhan", "Pooja Hegde",
+      "Nikhil Deshmukh", "Shruti Iyer", "Alok Pandey", "Neelam Das", "Harsh Vardhan"
+    ];
+
+    const rows: string[] = ["Roll No, Student Name, Class, Section, Attendance %, Marks (%), Grade, Status"];
+    for (let i = 1; i <= count; i++) {
+      const rollNo = 100 + i;
+      const name = studentNames[(i - 1) % studentNames.length];
+      const section = i % 3 === 1 ? "Section A" : i % 3 === 2 ? "Section B" : "Section C";
+      const attendance = Math.min(100, 80 + ((i * 3) % 20));
+      const marks = Math.min(100, 75 + ((i * 7) % 24));
+      const grade = marks >= 90 ? "A+" : marks >= 80 ? "A" : marks >= 70 ? "B+" : "B";
+      const status = marks >= 60 ? "Passed" : "Needs Review";
+
+      rows.push(`${rollNo}, ${name}, Class 10, ${section}, ${attendance}%, ${marks}%, ${grade}, ${status}`);
+    }
+    return rows.join("\n");
+  }
+
+  if (isFinance) {
+    const categories = ["Software Subscriptions", "Cloud Infrastructure", "Office Equipment", "Marketing Campaign", "Travel & Logistics", "Legal & Compliance", "Team Payroll"];
+    const rows: string[] = ["Transaction ID, Expense Category, Item Description, Amount ($), Payment Method, Status, Date"];
+    for (let i = 1; i <= count; i++) {
+      const txId = `TXN-${1000 + i}`;
+      const category = categories[(i - 1) % categories.length];
+      const amount = (i * 145.5).toFixed(2);
+      const method = i % 2 === 0 ? "Corporate Card" : "Bank Transfer";
+      const status = i % 4 === 0 ? "Pending Approval" : "Cleared";
+
+      rows.push(`${txId}, ${category}, ${topic} - ${category} allocation, $${amount}, ${method}, ${status}, 2026-08-${String(1 + (i % 28)).padStart(2, "0")}`);
+    }
+    return rows.join("\n");
+  }
+
+  const rows: string[] = ["ID, Module Focus, Task Description, Status, Priority, Assigned Owner, Target Date"];
+  for (let i = 1; i <= count; i++) {
+    const status = i % 3 === 1 ? "Completed" : i % 3 === 2 ? "In Progress" : "Pending";
+    const priority = i % 4 === 0 ? "CRITICAL" : i % 2 === 0 ? "HIGH" : "MEDIUM";
+    rows.push(`${i}, ${topic} - Task ${i}, Implementation of ${topic.toLowerCase()} milestone ${i}, ${status}, ${priority}, Deepak Yadav, 2026-08-${String(10 + (i % 20)).padStart(2, "0")}`);
+  }
+  return rows.join("\n");
+}
+
 function buildRichContent(drishthi: DrishthiStatement, fullPrompt: string): string {
   const tool = (drishthi.selectedTools[0] || "") as string;
   const promptLower = fullPrompt.toLowerCase();
@@ -590,14 +642,7 @@ function buildRichContent(drishthi: DrishthiStatement, fullPrompt: string): stri
 
   // 2. Google Sheets / Spreadsheet / Tracker
   if (tool === "sheets.createTracker" || tool.includes("sheet") || promptLower.includes("spreadsheet") || promptLower.includes("tracker") || promptLower.includes("excel")) {
-    const rows: string[] = ["ID, Topic Focus, Action Description, Status, Risk Level, Assigned Owner, Target Date"];
-    for (let i = 1; i <= requestedCount; i++) {
-      const topicName = sectionsList[(i - 1) % sectionsList.length];
-      const status = i % 3 === 1 ? "Completed" : i % 3 === 2 ? "In Progress" : "Pending";
-      const priority = i % 4 === 0 ? "CRITICAL" : i % 2 === 0 ? "HIGH" : "MEDIUM";
-      rows.push(`${i}, ${topic} - ${topicName}, Detailed investigation into ${topicName.toLowerCase()}, ${status}, ${priority}, Deepak Yadav, 2026-08-${String(15 + (i % 15)).padStart(2, "0")}`);
-    }
-    return rows.join("\n");
+    return getTopicSpecificSheet(topic, promptLower, requestedCount);
   }
 
   // 3. Google Docs / Document File
