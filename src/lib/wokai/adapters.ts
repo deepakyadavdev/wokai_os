@@ -159,9 +159,11 @@ export async function executeAdapterAction(action: any, googleToken?: string) {
   // 5. Gmail API (Send Message)
   if (toolName === "gmail.send") {
     if (activeToken) {
-      const emailMatch = label.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+      const fullTextToMatch = `${label} ${content}`;
+      const emailMatch = fullTextToMatch.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
       const recipient = emailMatch ? emailMatch[1] : "user@example.com";
-      const res = await sendGmailMessage(activeToken, recipient, label, content);
+      const subject = label.length > 60 ? label.slice(0, 57) + "..." : label;
+      const res = await sendGmailMessage(activeToken, recipient, subject, content);
       return { status: res.status, output: res.output };
     }
     return {

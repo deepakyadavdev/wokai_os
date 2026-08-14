@@ -186,10 +186,6 @@ export async function runTivere(userPrompt: string): Promise<TivereResult> {
   const shortSnippet = userPrompt.length > 50 ? userPrompt.slice(0, 50) + "..." : userPrompt;
   return {
     ackMessage: `⚡ **Tivere Fast-Ack**: Received task "${shortSnippet}...". Initializing subtask breakdown and parallel execution now!`,
-    dispatchedAt: new Date().toISOString()
-  };
-}
-
 /* ============================================================================
  * AGENT 3: VICHAR (Task Breakdown, Ranking & Dispatching Agent)
  * ============================================================================ */
@@ -199,9 +195,9 @@ You are VICHAR, the Task Breakdown, Ranking & Dispatching Agent of WokAI.
 Decompose the user prompt into subtasks required for execution.
 
 CRITICAL RULES:
-1. For single, direct user requests (e.g. searching for a file, reading emails, sending an email, checking calendar, creating a document), return EXACTLY 1 subtask.
-2. NEVER invent meta-subtasks like "Identify credentials", "Authenticate user", "Check access", "Verify permissions", or "Review output".
-3. Only create multiple subtasks if the user explicitly requests distinct sequential actions.
+1. If the user prompt contains MULTIPLE sequential actions (e.g. "create a document AND email it", "create slides AND send email", "make a sheet AND share it"), return EXACTLY the corresponding sequential subtasks (Subtask 1: Create Document/Slides/Sheet, Subtask 2: Send Email).
+2. For single, direct user requests, return EXACTLY 1 subtask.
+3. NEVER invent meta-subtasks like "Identify credentials", "Authenticate user", "Check access", "Verify permissions", or "Review output".
 
 User Goal: "${userPrompt}"
 
@@ -247,13 +243,67 @@ Output strictly valid JSON:
   }
 
   const promptLower = userPrompt.toLowerCase();
+  const isMultiAction = /and email|and send|and share|and mail|then email|then send|then share|and attach|and schedule|then schedule/i.test(promptLower);
+
+  const hasDoc = /doc|docs|document|write doc|create doc|make doc|build doc/i.test(promptLower);
+  const hasSlides = /slide|slides|presentation|ppt|deck|powerpoint/i.test(promptLower);
+  const hasSheet = /sheet|sheets|tracker|excel|spreadsheet|csv/i.test(promptLower);
+  const hasEmail = /email|mail|send|share/i.test(promptLower);
+
+  if (isMultiAction) {
+    const multiSubtasks: VicharSubtask[] = [];
+    if (hasDoc) {
+      multiSubtasks.push({
+        id: helperId("subtask"),
+        rank: 1,
+        title: `Create Google Doc for "${userPrompt}"`,
+        description: "Create and populate Google Doc with topic content",
+        status: "pending"
+      });
+    } else if (hasSlides) {
+      multiSubtasks.push({
+        id: helperId("subtask"),
+        rank: 1,
+        title: `Create Google Slides Deck for "${userPrompt}"`,
+        description: "Create and populate Google Slides presentation deck",
+        status: "pending"
+      });
+    } else if (hasSheet) {
+      multiSubtasks.push({
+        id: helperId("subtask"),
+        rank: 1,
+        title: `Create Google Sheet for "${userPrompt}"`,
+        description: "Create and populate Google Sheet with data",
+        status: "pending"
+      });
+    }
+
+    if (hasEmail) {
+      multiSubtasks.push({
+        id: helperId("subtask"),
+        rank: multiSubtasks.length + 1,
+        title: `Send Email via Gmail API: "${userPrompt}"`,
+        description: "Send email with created asset link to target recipient",
+        status: "pending"
+      });
+    }
+
+    if (multiSubtasks.length > 0) {
+      return {
+        originalPrompt: userPrompt,
+        subtasks: multiSubtasks,
+        totalTasks: multiSubtasks.length,
+        completedTasks: 0
+      };
+    }
+  }
 
   let defaultToolTitle = `Execute action for: ${userPrompt}`;
-  if (/doc|docs|document|write doc|create doc|make doc|build doc/i.test(promptLower)) {
+  if (hasDoc) {
     defaultToolTitle = `Create Google Doc for "${userPrompt}"`;
-  } else if (/slide|slides|presentation|ppt|deck|powerpoint/i.test(promptLower)) {
+  } else if (hasSlides) {
     defaultToolTitle = `Create Google Slides Deck for "${userPrompt}"`;
-  } else if (/sheet|sheets|tracker|excel|spreadsheet|csv/i.test(promptLower)) {
+  } else if (hasSheet) {
     defaultToolTitle = `Create Google Sheet for "${userPrompt}"`;
   } else if (/send email|compose email|send mail|mail to|email to/i.test(promptLower)) {
     defaultToolTitle = `Send Email via Gmail API: "${userPrompt}"`;
@@ -274,7 +324,7 @@ Output strictly valid JSON:
         id: helperId("subtask"),
         rank: 1,
         title: defaultToolTitle,
-        description: `Execute action for: ${userPrompt}`,
+        description: `Perform primary execution for ${userPrompt}`,
         status: "pending"
       }
     ],
@@ -285,8 +335,6 @@ Output strictly valid JSON:
 
 /* ============================================================================
  * AGENT 4: DRISTHI (Tool Selection & Statement Enrichment Agent)
- * ============================================================================ */
-export async function runDrishthi(
   subtask: VicharSubtask,
   fullPrompt: string
 ): Promise<DrishthiStatement> {
@@ -643,6 +691,11 @@ function buildRichContent(drishthi: DrishthiStatement, fullPrompt: string): stri
   // 2. Google Sheets / Spreadsheet / Tracker
   if (tool === "sheets.createTracker" || tool.includes("sheet") || promptLower.includes("spreadsheet") || promptLower.includes("tracker") || promptLower.includes("excel")) {
     return getTopicSpecificSheet(topic, promptLower, requestedCount);
+  }
+
+  // 3. Gmail Send / Email Sharing
+  if (tool === "gmail.send") {
+    return `Hello,\n\nPlease find the generated report and asset details for "${topic}" attached below.\n\nSummary:\n- Prompt: ${fullPrompt}\n- Status: Completed via WokAI OS\n\nBest regards,\nWokAI OS`;
   }
 
   // 3. Google Docs / Document File
