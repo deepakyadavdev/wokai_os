@@ -1,12 +1,8 @@
 import { z } from "zod";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { WokaiMemory } from "@/lib/types";
-import { cleanJson } from "@/lib/wokai/8agents";
+import { callModelServer, cleanJson } from "@/lib/wokai/8agents";
 
 const MEMORY_TYPES = ["preference", "habit", "contact", "deadline", "context", "skill", "relationship"] as const;
-
-const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
-const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 const EXTRACT_SCHEMA = z.object({
   memories: z.array(
@@ -29,11 +25,8 @@ const RECALL_SCHEMA = z.object({
 });
 
 async function callLLM(prompt: string, systemPrompt: string): Promise<string> {
-  if (!genAI) return "";
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const res = await model.generateContent(`${systemPrompt}\n\n${prompt}`);
-    return res.response.text();
+    return await callModelServer(`${systemPrompt}\n\n${prompt}`);
   } catch (e) {
     console.warn("LLM memory call failed:", e);
     return "";

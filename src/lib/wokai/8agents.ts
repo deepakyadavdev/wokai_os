@@ -85,32 +85,6 @@ export async function callModelServer(promptText: string): Promise<string> {
     }
   }
 
-  // 3. Try Gemini REST API if GEMINI_API_KEY is configured
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (geminiKey) {
-    try {
-      const model = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }]
-          }),
-          signal: AbortSignal.timeout(15000)
-        }
-      );
-      if (response.ok) {
-        const data = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text;
-      }
-    } catch {
-      // Ignore
-    }
-  }
-
   return "";
 }
 
