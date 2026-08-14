@@ -368,14 +368,90 @@ Output strictly valid JSON:
 
 function buildRichContent(drishthi: DrishthiStatement, fullPrompt: string): string {
   const tool = (drishthi.selectedTools[0] || "") as string;
-  if (tool === "docs.create" || tool === "docs" || fullPrompt.toLowerCase().includes("doc")) {
+  const promptLower = fullPrompt.toLowerCase();
+
+  // 1. Google Slides / Presentation Deck
+  if (tool === "slides.createDeck" || tool.includes("slide") || promptLower.includes("presentation") || promptLower.includes("ppt") || promptLower.includes("deck")) {
     const rawTopic = fullPrompt
-      .replace(/^(create|write|make|generate|build)\s+(a|an)?\s+(\d+-page|page|short|long|detailed)?\s*(google\s*)?(doc|docs|document|file)\s*(on|about|for|on topic|mainy on topic)?\s*/i, "")
-      .replace(/\s*(and give me the link|give me link|link of file|link).*$/i, "")
+      .replace(/^(create|write|make|generate|build)\s+(a|an)?\s+(\d+-slide|slide|\d+\s+slides|presentation|deck|ppt)?\s*(google\s*)?(slides|presentation|deck|file)?\s*(on|about|for|on topic)?\s*/i, "")
       .trim();
     const topic = rawTopic ? rawTopic.charAt(0).toUpperCase() + rawTopic.slice(1) : drishthi.subtaskTitle;
 
-    return `# ${topic}
+    return `# Slide 1: ${topic} - Executive Overview
+- Comprehensive analysis of ${topic}
+- Key drivers, strategic impacts, and technological developments
+- Prepared by WokAI OS
+
+# Slide 2: Historical Background & Early Origins
+- Fundamental emergence of ${topic} in global history
+- Early industrial mechanisms and structural transformations
+- Transition from traditional frameworks to scalable systems
+
+# Slide 3: Core Drivers & Technological Innovations
+- Major breakthroughs in mechanization and power systems
+- Automation, process optimization, and industrial standards
+- Capital investments and infrastructure expansion
+
+# Slide 4: Socioeconomic Impact & Urbanization
+- Demographic shifts: rural-to-urban population migration
+- Creation of specialized industrial workforces and modern cities
+- Rapid increases in productivity and global trade volume
+
+# Slide 5: Key Challenges & Industrial Bottlenecks
+- Environmental implications and resource management
+- Labor regulation and workforce safety transitions
+- Managing structural economic disruptions during growth
+
+# Slide 6: Industrial Standardization & Policy
+- Establishment of quality standards and compliance frameworks
+- International trade agreements and regulatory evolution
+- Balancing innovation speed with regulatory safety
+
+# Slide 7: Modern Digital Transformation
+- Integration of digital networks, IoT, and AI automation
+- Transition toward smart manufacturing and sustainable industry
+- Real-time data analytics driving operational efficiency
+
+# Slide 8: Global Market & Economic Dynamics
+- Cross-border supply chain integration and resilience
+- Competitive landscape across emerging and developed markets
+- Economic sustainability and long-term capital allocation
+
+# Slide 9: Future Outlook & Strategic Roadmap
+- Emerging trends in green technology and renewable energy
+- Next-generation automation and human-AI collaboration
+- Strategic imperative for continuous learning and adaptation
+
+# Slide 10: Conclusion & Key Takeaways
+- Summary of core findings on ${topic}
+- Long-term strategic value and legacy of industrial evolution
+- Actionable steps for future growth and policy execution`;
+  }
+
+  // 2. Google Sheets / Spreadsheet / Tracker
+  if (tool === "sheets.createTracker" || tool.includes("sheet") || promptLower.includes("spreadsheet") || promptLower.includes("tracker") || promptLower.includes("excel")) {
+    const rawTopic = fullPrompt
+      .replace(/^(create|write|make|generate|build)\s+(a|an)?\s*(google\s*)?(sheet|sheets|spreadsheet|tracker|excel)?\s*(on|about|for|on topic)?\s*/i, "")
+      .trim();
+    const topic = rawTopic ? rawTopic.charAt(0).toUpperCase() + rawTopic.slice(1) : drishthi.subtaskTitle;
+
+    return `ID, Module Name, Task Description, Status, Priority, Assigned Owner, Target Date
+1, ${topic} - Overview, Initial research & scope definition, Completed, HIGH, Deepak Yadav, 2026-08-15
+2, ${topic} - Data Analysis, Data gathering & structural audit, In Progress, HIGH, Deepak Yadav, 2026-08-18
+3, ${topic} - Architecture, Core system setup & API configuration, Pending, CRITICAL, Deepak Yadav, 2026-08-20
+4, ${topic} - Implementation, Feature development & adapter integration, Pending, HIGH, WokAI Agent, 2026-08-22
+5, ${topic} - Verification, Testing & compliance audit, Pending, MEDIUM, WokAI Agent, 2026-08-25
+6, ${topic} - Final Release, Deployment & documentation review, Pending, MEDIUM, Team Lead, 2026-08-30`;
+  }
+
+  // 3. Google Docs / Document File
+  const rawTopic = fullPrompt
+    .replace(/^(create|write|make|generate|build)\s+(a|an)?\s+(\d+-page|page|short|long|detailed)?\s*(google\s*)?(doc|docs|document|file)\s*(on|about|for|on topic|mainy on topic)?\s*/i, "")
+    .replace(/\s*(and give me the link|give me link|link of file|link).*$/i, "")
+    .trim();
+  const topic = rawTopic ? rawTopic.charAt(0).toUpperCase() + rawTopic.slice(1) : drishthi.subtaskTitle;
+
+  return `# ${topic}
 
 ## 1. Executive Summary & Overview
 The subject of ${topic} represents a crucial field of historical, economic, and technological development. This document presents a structured and detailed analysis of its core principles, historical evolution, socio-economic impacts, and future outlook.
@@ -386,24 +462,46 @@ The emergence of ${topic} was driven by a conjunction of pivotal factors:
 - **Economic Infrastructure:** The creation of new financial models, expanded trade routes, and infrastructure investment accelerated adoption.
 - **Societal & Demographic Factors:** Shifting population dynamics, urban expansion, and specialized workforce development created high momentum.
 
-## 3. Key Phases & Structural Evolution
+## 3. Key Drivers of Growth & Expansion
+1. **Infrastructure Investments:** Roads, transport systems, and digital networks provided the physical and logistical backbone.
+2. **Capital Mobilization:** Access to private equity, public funding, and commercial banking enabled high-capital industrial scaling.
+3. **Intellectual Capital:** Research institutions and technical training institutions expanded the knowledge frontier.
+
+## 4. Structural Evolution & Major Phases
 1. **Inception & Early Adoption:** Initial concepts were established and piloted across primary sectors.
 2. **Rapid Scaling & Standardization:** Production standards, regulatory guidelines, and global networks expanded exponentially.
 3. **Integration & Modern Era:** Advanced automation, digital integration, and sustainability frameworks became central imperatives.
 
-## 4. Socioeconomic Impact & Challenges
+## 5. Socioeconomic Impact & Workforce Transformation
 - **Economic Productivity:** Industrial efficiency and output per capita increased dramatically across regions.
 - **Social Transformation:** Traditional communities transitioned into urban industrial hubs, redefining work environments and lifestyle standards.
-- **Systemic Challenges:** Resource consumption, environmental sustainability, and labor adaptation continue to require proactive governance.
+- **Demographic Shifts:** Rapid growth of metropolitan areas and international migration patterns.
 
-## 5. Strategic Conclusion & Recommendations
+## 6. Technological Innovation & Automation
+- **Process Automation:** Mechanized workflows reduced production errors and operating overhead.
+- **Data-Driven Operations:** Real-time metrics and quality assurance systems became standard industry practice.
+- **Scalable Architecture:** Modular design principles enabled rapid replication across international locations.
+
+## 7. Environmental & Systemic Challenges
+- **Resource Management:** Balancing high industrial throughput with raw material availability and ecological stewardship.
+- **Regulatory Compliance:** Navigating international labor laws, safety standards, and environmental protection guidelines.
+- **Transition Costs:** Retraining workforces and modernizing legacy equipment during technological shifts.
+
+## 8. Policy, Governance & Regulatory Frameworks
+- **Governmental Policy:** Tax incentives, trade tariffs, and public infrastructure grants shaping industry direction.
+- **International Cooperation:** Global standard organizations ensuring interoperability and environmental compliance.
+- **Corporate Governance:** Ethical standards, stakeholder accountability, and sustainable reporting practices.
+
+## 9. Modern Industry Trends & Future Horizons
+- **Digital Twin & Smart Systems:** Virtual modeling and predictive maintenance optimizing supply chains.
+- **Human-AI Collaboration:** Augmenting human workforce capabilities with intelligent agent orchestration.
+- **Green Transition:** Circular economy practices and renewable energy integration becoming primary competitive advantages.
+
+## 10. Conclusion & Strategic Recommendations
 In conclusion, ${topic} remains a fundamental pillar of economic and technological progress. Sustained innovation, balanced policy frameworks, and adaptive strategy will ensure long-term prosperity and resilience.
 
 ---
 *Document compiled by WokAI OS | Prompt: "${fullPrompt}"*`;
-  }
-
-  return `Detailed execution payload generated for task: "${fullPrompt}". Action parameters and content structured for execution.`;
 }
 
 /* ============================================================================

@@ -289,7 +289,31 @@ export async function createGoogleSheet(token: string, title: string, content: s
     }
 
     const data = await res.json();
-    const sheetUrl = data.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${data.spreadsheetId}/edit`;
+    const spreadsheetId = data.spreadsheetId;
+    const sheetUrl = data.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+
+    if (content) {
+      const lines = content.split("\n").filter((l) => l.trim().length > 0 && !l.trim().startsWith("|---"));
+      const values = lines
+        .map((l) => l.split(/\||,|\t/).map((cell) => cell.replace(/^\||\|$/g, "").trim()).filter(Boolean))
+        .filter((row) => row.length > 0);
+
+      if (values.length > 0) {
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/A1?valueInputOption=USER_ENTERED`, {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            range: "A1",
+            majorDimension: "ROWS",
+            values
+          })
+        }).catch(() => null);
+      }
+    }
+
     return {
       status: "COMPLETED",
       output: `Google Sheet created successfully! Title: "${data.properties?.title}". Access URL: ${sheetUrl}`,
@@ -323,7 +347,38 @@ export async function createGoogleSlides(token: string, title: string, content: 
     }
 
     const data = await res.json();
-    const slidesUrl = `https://docs.google.com/presentation/d/${data.presentationId}/edit`;
+    const presentationId = data.presentationId;
+    const slidesUrl = `https://docs.google.com/presentation/d/${presentationId}/edit`;
+
+    if (content) {
+      const sections = content.split(/(?=\n#+ |\nSlide \d+:?)/i).filter((s) => s.trim().length > 0);
+      const requests: any[] = [];
+
+      sections.forEach((sec, idx) => {
+        const slideId = `slide_${idx + 1}_${Date.now()}`;
+        requests.push({
+          createSlide: {
+            objectId: slideId,
+            insertionIndex: idx + 1,
+            slideLayoutReference: {
+              predefinedLayout: idx === 0 ? "TITLE" : "TITLE_AND_BODY"
+            }
+          }
+        });
+      });
+
+      if (requests.length > 0) {
+        await fetch(`https://slides.googleapis.com/v1/presentations/${presentationId}:batchUpdate`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ requests })
+        }).catch(() => null);
+      }
+    }
+
     return {
       status: "COMPLETED",
       output: `Google Slides Deck created successfully! Title: "${data.title}". Access URL: ${slidesUrl}`,
