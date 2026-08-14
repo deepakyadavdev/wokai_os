@@ -387,12 +387,13 @@ Output strictly valid JSON:
     }
   } catch (e) {
     console.warn("DRISTHI Agent fallback:", e);
-  }
-
-  const textToMatch = `${subtask.title} ${subtask.description} ${fullPrompt}`.toLowerCase();
+  }  // Match ONLY subtask title and description (DO NOT match fullPrompt here, because fullPrompt contains words from ALL subtasks!)
+  const textToMatch = `${subtask.title} ${subtask.description}`.toLowerCase();
 
   let toolName: WokaiToolName = "docs.create";
-  if (/doc|docs|document|write doc|create doc|make doc|build doc/i.test(textToMatch)) {
+  if (/send email|compose email|send mail|mail to|email to|gmail\.send|email|gmail|mail/i.test(textToMatch)) {
+    toolName = "gmail.send";
+  } else if (/doc|docs|document|write doc|create doc|make doc|build doc/i.test(textToMatch)) {
     toolName = "docs.create";
   } else if (/slide|slides|presentation|ppt|deck|powerpoint/i.test(textToMatch)) {
     toolName = "slides.createDeck";
@@ -402,10 +403,6 @@ Output strictly valid JSON:
     toolName = "calendar.createEvent";
   } else if (/calendar\.list|list events|upcoming events|get events|check calendar|show calendar|calendar|agenda|what's on my calendar/i.test(textToMatch)) {
     toolName = "calendar.listEvents";
-  } else if (/gmail\.send|send email|compose email|send mail/i.test(textToMatch)) {
-    toolName = "gmail.send";
-  } else if (/gmail|email|inbox|search mail|find mail|summarize email|read mail/i.test(textToMatch)) {
-    toolName = "gmail.search";
   } else if (/contact|people|find phone|find email of/i.test(textToMatch)) {
     toolName = "contacts.search";
   } else if (/drive|search file|find file|in my drive|proposol|proposal|look for file|where is file/i.test(textToMatch)) {
@@ -521,104 +518,84 @@ function getTopicSpecificSlides(topic: string, promptLower: string, count: numbe
     { title: "Public Health Consequences & Disease Risks", bullets: [
       "Air and water pollution cause over 9 million premature deaths globally every year.",
       "Contaminated drinking water spreads waterborne diseases and toxic heavy metal poisoning.",
-      "Vulnerable populations in developing regions suffer disproportionately high environmental risks."
+      "Vulnerable communities face disproportionate environmental risks and health burdens."
     ]},
-    { title: "Global Economic Impact & Ecosystem Degradation", bullets: [
-      "Environmental degradation costs the global economy trillions of dollars in healthcare and lost productivity.",
-      "Damage to fisheries, agriculture, and eco-tourism impacts livelihoods across developing nations.",
-      "Climate-induced extreme weather events disrupt infrastructure and global supply chains."
+    { title: "Global Economic Impact & Ecosystem Cost", bullets: [
+      "Pollution damages agricultural yields, fisheries, forestry, and tourism industries.",
+      "Healthcare costs from pollution-related chronic diseases run into trillions of dollars globally.",
+      "Ecosystem service loss degrades clean air, water purification, and natural climate regulation."
     ]},
     { title: "Policy Governance & Sustainable Solutions", bullets: [
-      "Enforcing strict industrial emission limits and implementing international climate treaties (Paris Agreement).",
-      "Transitioning from fossil fuels to solar, wind, and clean renewable energy systems.",
-      "Promoting circular economy practices, plastic recycling, and reforestation initiatives."
+      "Enforcing strict environmental protection policies, carbon pricing, and emission caps.",
+      "Accelerating global transition to renewable solar, wind, and zero-emission energy infrastructure.",
+      "Promoting circular economic models, recycling mandates, and industrial waste reduction."
     ]}
   ];
 
   const aiSlides = [
-    { title: "Overview of Artificial Intelligence", bullets: [
-      "Artificial Intelligence (AI) simulates human cognitive capabilities using advanced machine learning models.",
-      "Encompasses natural language processing, computer vision, robotics, and generative AI systems.",
-      "Transforming global industries by automating complex workflows and accelerating decision-making."
+    { title: "Executive Overview of Artificial Intelligence", bullets: [
+      "Artificial Intelligence transforms global industries through machine learning, automation, and predictive analytics.",
+      "Drives cognitive computing capabilities across enterprise operations, healthcare, and software development.",
+      "Combines neural networks, massive data compute, and algorithmic optimization to solve complex tasks."
     ]},
-    { title: "Machine Learning & Neural Networks", bullets: [
-      "Machine Learning algorithms learn from vast empirical datasets to identify non-linear patterns.",
-      "Deep Neural Networks process unstructured data including text, images, video, and audio streams.",
-      "High-performance GPU clusters enable training multi-billion parameter foundation models."
+    { title: "Foundational Machine Learning Architectures", bullets: [
+      "Supervised, unsupervised, and reinforcement learning paradigms power modern AI models.",
+      "Deep neural networks analyze multi-dimensional data arrays with high statistical precision.",
+      "Transformer models revolutionize natural language processing and multimodal vision tasks."
+    ]},
+    { title: "Data Infrastructure & High-Performance Computing", bullets: [
+      "Scalable cloud GPU/TPU clusters provide computational throughput required for model training.",
+      "Massive data pipelines curate, clean, and vectorize unstructured enterprise knowledge.",
+      "Distributed training frameworks accelerate convergence for billion-parameter model architectures."
     ]},
     { title: "Enterprise Automation & Workflow Optimization", bullets: [
-      "Automating repetitive administrative tasks, customer support, and software code generation.",
-      "Enhancing enterprise resource planning, real-time data analytics, and operational efficiency.",
-      "Reducing human error while scaling organizational productivity across global teams."
+      "Automates repetitive manual workflows, data entry, customer support, and document parsing.",
+      "Enhances decision-making with real-time predictive analytics and business intelligence.",
+      "Streamlines software engineering, automated code generation, and quality assurance testing."
     ]},
-    { title: "Healthcare & Diagnostic Innovations", bullets: [
-      "AI-driven diagnostic models analyze medical imagery with high precision for early disease detection.",
-      "Accelerating drug discovery pipelines by predicting protein structures and molecular interactions.",
-      "Personalized treatment plans tailored to patient genetic profiles and clinical histories."
+    { title: "Ethical AI, Bias Mitigation & Algorithmic Safety", bullets: [
+      "Ensuring fairness, transparency, and accountability in algorithmic decision-making models.",
+      "Detecting and mitigating training data bias to prevent discriminatory AI outputs.",
+      "Establishing robust safety guardrails against hallucination, misdirection, and data leaks."
     ]},
-    { title: "Ethical Considerations & Algorithmic Safety", bullets: [
-      "Mitigating training data bias to ensure fair and equitable AI deployment across demographics.",
-      "Preventing model hallucinations and ensuring verifiable transparency in critical decision systems.",
-      "Establishing robust privacy safeguards to protect user data and intellectual property."
+    { title: "Human-AI Collaboration & Workforce Transformation", bullets: [
+      "AI functions as an intelligent copilot, augmenting human creativity and operational speed.",
+      "Reshaping job roles toward high-value strategic planning, oversight, and domain expertise.",
+      "Requires continuous workforce upskilling and adaptative organizational culture shifts."
     ]},
-    { title: "Job Market Evolution & Workforce Upskilling", bullets: [
-      "Shift toward human-AI collaboration where AI augments human expertise rather than replacing it.",
-      "Emergence of new specialized career fields in prompt engineering, AI safety, and data governance.",
-      "Imperative for continuous workforce training to keep pace with rapid technological shifts."
+    { title: "Cybersecurity, Privacy & Data Governance", bullets: [
+      "Protecting proprietary enterprise data and user privacy within model training boundaries.",
+      "Defending against adversarial prompt injection, model inversion, and data poisoning attacks.",
+      "Implementing strict zero-trust data access policies and encryption standards."
     ]},
-    { title: "Cybersecurity & Threat Detection", bullets: [
-      "Real-time threat monitoring and autonomous detection of network security breaches.",
-      "Combating AI-generated phishing, deepfakes, and synthetic social engineering attacks.",
-      "Securing machine learning pipelines against adversarial attacks and data poisoning."
+    { title: "Global AI Regulation & Compliance Frameworks", bullets: [
+      "Governments introduce comprehensive regulatory standards like the EU AI Act and NIST frameworks.",
+      "Mandating risk classification, auditability, and safety testing for high-risk AI deployments.",
+      "Balancing rapid technological innovation with public safety and ethical compliance."
     ]},
-    { title: "Global Regulatory Compliance & Governance", bullets: [
-      "Development of comprehensive AI regulations such as the EU AI Act and international standards.",
-      "Mandating risk assessments, auditing mechanisms, and clear accountability for high-risk applications.",
-      "Fostering open governance frameworks to align AI development with human values."
+    { title: "Frontier Innovations & Next-Gen Autonomous Agents", bullets: [
+      "Autonomous multi-agent systems collaborate in parallel to execute end-to-end tasks.",
+      "Reasoning models integrate tool execution, API orchestration, and self-correction loops.",
+      "Neuromorphic computing and quantum machine learning open new computational horizons."
     ]},
-    { title: "Frontier Innovations & Next-Gen Architecture", bullets: [
-      "Multimodal foundation models capable of reasoning across text, code, audio, and spatial inputs.",
-      "Neuromorphic computing and quantum machine learning unlocking exponential speedups.",
-      "Autonomous agent swarms executing multi-step problem solving in complex environments."
-    ]},
-    { title: "Strategic Roadmap for Safe AI Adoption", bullets: [
-      "Establish clear enterprise governance and ethical alignment principles prior to deployment.",
-      "Invest in robust data infrastructure, secure APIs, and continuous model evaluation.",
-      "Foster cross-functional collaboration between engineering, legal, and operational leadership."
+    { title: "Strategic Roadmap for Enterprise AI Integration", bullets: [
+      "Identify high-ROI enterprise use cases with clear success metrics and execution scope.",
+      "Build modular, secure AI architecture connected via robust API infrastructure.",
+      "Iterate continuously based on empirical performance monitoring and user feedback."
     ]}
   ];
 
-  const genericSlideTopics = [
-    "Executive Overview", "Historical Context", "Core Mechanics & Principles",
-    "Key Drivers & Growth Factors", "Socioeconomic Impact", "Technological Developments",
-    "Challenges & Systemic Risks", "Regulatory & Policy Frameworks", "Market Trends & Benchmark Analysis",
-    "Future Strategic Outlook"
-  ];
+  const slidesToUse = isPollution ? pollutionSlides : isAi ? aiSlides : null;
 
   const slides: string[] = [];
   for (let i = 1; i <= count; i++) {
-    let slideData = { title: "", bullets: [] as string[] };
-
-    if (isPollution) {
-      slideData = pollutionSlides[(i - 1) % pollutionSlides.length];
-    } else if (isAi) {
-      slideData = aiSlides[(i - 1) % aiSlides.length];
+    if (slidesToUse && slidesToUse[i - 1]) {
+      const s = slidesToUse[i - 1];
+      const bulletText = s.bullets.map((b) => `- ${b}`).join("\n");
+      slides.push(`# Slide ${i}: ${s.title}\n${bulletText}`);
     } else {
-      const topicName = genericSlideTopics[(i - 1) % genericSlideTopics.length];
-      slideData = {
-        title: `${topicName}`,
-        bullets: [
-          `Detailed examination of ${topicName.toLowerCase()} in relation to ${topic}.`,
-          `Analysis of primary operational drivers, empirical observations, and structural impacts.`,
-          `Strategic takeaways and actionable execution principles compiled for ${topic}.`
-        ]
-      };
+      slides.push(`# Slide ${i}: ${topic} - Key Dimension ${i}\n- Essential strategic analysis regarding ${topic.toLowerCase()} milestone ${i}.\n- Critical operational factors and data insights driving ${topic.toLowerCase()}.\n- Strategic recommendations for sustainable long-term implementation.`);
     }
-
-    slides.push(`# Slide ${i}: ${topic} - ${slideData.title}
-- ${slideData.bullets[0]}
-- ${slideData.bullets[1]}
-- ${slideData.bullets[2]}`);
   }
 
   return slides.join("\n\n");
@@ -676,10 +653,42 @@ function getTopicSpecificSheet(topic: string, promptLower: string, count: number
   return rows.join("\n");
 }
 
-function buildRichContent(drishthi: DrishthiStatement, fullPrompt: string): string {
+function buildRichContent(
+  drishthi: DrishthiStatement,
+  fullPrompt: string,
+  previousLogs: Array<{ subtask: VicharSubtask; drishthi: DrishthiStatement; sahayata: SahayataPayload; kriya: KriyaResult }> = []
+): string {
   const tool = (drishthi.selectedTools[0] || "") as string;
   const promptLower = fullPrompt.toLowerCase();
   const requestedCount = extractRequestedCount(fullPrompt, 10);
+
+  // 1. Gmail Send Email Message Payload
+  if (tool === "gmail.send" || drishthi.subtaskTitle.toLowerCase().includes("email")) {
+    const emailMatch = fullPrompt.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+    const recipient = emailMatch ? emailMatch[1] : "sugreevyadav464@gmail.com";
+
+    // Extract created document/slides/sheet link from previous subtask logs
+    let assetLink = "";
+    for (const log of previousLogs) {
+      if (log.kriya?.actionCreated?.url) {
+        assetLink = log.kriya.actionCreated.url;
+        break;
+      }
+    }
+
+    // Extract custom message intent from prompt (e.g. "saying in the mail that...")
+    let customNote = "";
+    const noteMatch = fullPrompt.match(/saying\s+(in\s+the\s+mail\s+that\s+)?(.*)$/i);
+    if (noteMatch) {
+      customNote = noteMatch[2].trim();
+    }
+
+    const messageBody = customNote
+      ? `Hi,\n\n${customNote}\n\nLink to document:\n${assetLink || "https://docs.google.com/document"}\n\nBest regards,\nWokAI OS`
+      : `Hi,\n\nI have created the requested document and am sharing the link with you:\n\n${assetLink || "https://docs.google.com/document"}\n\nPlease review and let me know your feedback.\n\nBest regards,\nWokAI OS`;
+
+    return messageBody;
+  }
 
   const rawTopic = fullPrompt
     .replace(/^(create|write|make|generate|build)\s+(a|an)?\s+(\d+-page|\d+-slide|page|slide|short|long|detailed)?\s*(google\s*)?(doc|docs|document|slides|presentation|deck|sheet|tracker|file)\s*(on|about|for|on topic|mainy on topic)?\s*/i, "")
@@ -688,22 +697,17 @@ function buildRichContent(drishthi: DrishthiStatement, fullPrompt: string): stri
   const topic = rawTopic ? rawTopic.charAt(0).toUpperCase() + rawTopic.slice(1) : drishthi.subtaskTitle;
   const sectionsList = getTopicSpecificSections(topic, promptLower);
 
-  // 1. Google Slides / Presentation Deck
+  // 2. Google Slides / Presentation Deck
   if (tool === "slides.createDeck" || tool.includes("slide") || promptLower.includes("presentation") || promptLower.includes("ppt") || promptLower.includes("deck")) {
     return getTopicSpecificSlides(topic, promptLower, requestedCount);
   }
 
-  // 2. Google Sheets / Spreadsheet / Tracker
+  // 3. Google Sheets / Spreadsheet / Tracker
   if (tool === "sheets.createTracker" || tool.includes("sheet") || promptLower.includes("spreadsheet") || promptLower.includes("tracker") || promptLower.includes("excel")) {
     return getTopicSpecificSheet(topic, promptLower, requestedCount);
   }
 
-  // 3. Gmail Send / Email Sharing
-  if (tool === "gmail.send") {
-    return `Hello,\n\nPlease find the generated report and asset details for "${topic}" attached below.\n\nSummary:\n- Prompt: ${fullPrompt}\n- Status: Completed via WokAI OS\n\nBest regards,\nWokAI OS`;
-  }
-
-  // 3. Google Docs / Document File
+  // 4. Google Docs / Document File
   const docSections: string[] = [`# Detailed Report on ${topic}\n\n*Comprehensive ${requestedCount}-Section Analysis Generated by WokAI OS*\n`];
   for (let i = 1; i <= requestedCount; i++) {
     const topicName = sectionsList[(i - 1) % sectionsList.length];
@@ -728,10 +732,28 @@ To effectively manage the challenges posed by ${topicName.toLowerCase()}, stakeh
  * ============================================================================ */
 export async function runSahayata(
   drishthi: DrishthiStatement,
-  fullPrompt: string
+  fullPrompt: string,
+  previousLogs: Array<{ subtask: VicharSubtask; drishthi: DrishthiStatement; sahayata: SahayataPayload; kriya: KriyaResult }> = []
 ): Promise<SahayataPayload> {
+  const tool = (drishthi.selectedTools[0] || "") as string;
   const requestedCount = extractRequestedCount(fullPrompt, 10);
   const isSlides = drishthi.selectedTools.includes("slides.createDeck") || fullPrompt.toLowerCase().includes("ppt") || fullPrompt.toLowerCase().includes("slide");
+
+  if (tool === "gmail.send" || drishthi.subtaskTitle.toLowerCase().includes("email")) {
+    const messageBody = buildRichContent(drishthi, fullPrompt, previousLogs);
+    const emailMatch = fullPrompt.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+    const recipient = emailMatch ? emailMatch[1] : "sugreevyadav464@gmail.com";
+
+    return {
+      subtaskId: drishthi.subtaskId,
+      content: messageBody,
+      drafts: {
+        to: recipient,
+        body: messageBody,
+        subject: `Document Review: ${drishthi.subtaskTitle}`
+      }
+    };
+  }
 
   try {
     const promptText = `

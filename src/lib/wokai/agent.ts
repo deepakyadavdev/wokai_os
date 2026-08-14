@@ -103,7 +103,7 @@ export async function generateAgentPlan(
     onPhaseChange?.("drishthi_done", `DRISTHI Agent: Mapped to tools [${drishthiRes.selectedTools.join(", ")}]`);
 
     onPhaseChange?.("sahayata", `SAHAYATA Agent: Generating content payload for "${st.title}"...`);
-    const sahayataRes = await runSahayata(drishthiRes, refinedPrompt);
+    const sahayataRes = await runSahayata(drishthiRes, refinedPrompt, subtaskLogs);
     onPhaseChange?.("sahayata_done", `SAHAYATA Agent: Payload ready (${sahayataRes.content.length} chars).`);
 
     onPhaseChange?.("kriya", `KRIYA Agent: Executing GCP action for "${st.title}"...`);
