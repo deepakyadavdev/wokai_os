@@ -653,6 +653,124 @@ function getTopicSpecificSheet(topic: string, promptLower: string, count: number
   return rows.join("\n");
 }
 
+function getTopicSpecificDocSections(topic: string, promptLower: string, count: number): string[] {
+  const isIndia = /india|indian|development of india|economy of india|bharat/i.test(topic + " " + promptLower);
+  const isPollution = /pollut|environment|emiss|waste|climate|smog|toxic/i.test(topic + " " + promptLower);
+  const isAi = /ai|artificial intelligence|machine learning|robot|technology|digital/i.test(topic + " " + promptLower);
+
+  if (isIndia) {
+    const indiaSections = [
+      {
+        title: "Economic Growth & Digital Infrastructure Expansion",
+        content: "India has emerged as one of the fastest-growing major economies globally, driven by rapid digital transformation and robust domestic consumption. The Unified Payments Interface (UPI) processes billions of digital transactions monthly, establishing India as a pioneer in digital public infrastructure. Coupled with expanding IT service exports and fintech adoption, digital connectivity has democratized financial access across both urban and rural demographics."
+      },
+      {
+        title: "Manufacturing Expansion & Make in India Initiatives",
+        content: "Under the 'Make in India' flagship initiative and Production-Linked Incentive (PLI) schemes, India is strengthening its global manufacturing competitiveness. High-tech manufacturing sectors including smartphone assembly, semiconductor fabrication, electronics, and automotive engineering have expanded significantly, attracting foreign direct investment (FDI) and establishing strategic supply chain resilience."
+      },
+      {
+        title: "Renewable Energy Transition & National Green Missions",
+        content: "India is accelerating its transition toward clean energy, targeting 500 GW of non-fossil power capacity by 2030. Large-scale solar parks in Rajasthan and Gujarat, alongside wind power corridors, lead the renewable expansion. The National Green Hydrogen Mission aims to transform India into a global hub for green hydrogen production and export, mitigating carbon intensity across heavy industries."
+      },
+      {
+        title: "Transport Infrastructure Modernization & Logistics Hubs",
+        content: "Infra-driven development under PM Gati Shakti has revolutionized India's transport network. High-speed expressways, modern freight corridors, and the indigenous Vande Bharat semi-high-speed trains have significantly compressed transit times. Port modernization and airport expansion under the UDAN regional connectivity scheme are optimizing national logistics efficiency."
+      },
+      {
+        title: "Space Exploration Milestones & Scientific Leadership",
+        content: "The Indian Space Research Organisation (ISRO) achieved historic international milestones with the successful lunar south pole landing of Chandrayaan-3 and the solar observation mission Aditya-L1. Future missions including Gaganyaan (human spaceflight) and Shukrayaan (Venus orbiter) showcase India's cost-effective, high-precision aerospace engineering capabilities."
+      },
+      {
+        title: "Rural Development, Agritech & Agricultural Resilience",
+        content: "Agriculture remains a vital pillar of the Indian economy, supporting over 40% of the national workforce. Digital initiatives like e-NAM (National Agriculture Market), micro-irrigation schemes, and PM-KISAN direct income transfers provide stability to farmers. Agritech startups are deploying drone technology, satellite crop monitoring, and AI soil sensors to enhance crop yields."
+      },
+      {
+        title: "Universal Healthcare Access & Ayushman Bharat Scheme",
+        content: "The Ayushman Bharat Pradhan Mantri Jan Arogya Yojana provides health insurance coverage to over 500 million citizens, representing the world's largest government-funded healthcare program. Primary healthcare centers (Health and Wellness Centers) and indigenous pharmaceutical manufacturing strengthen domestic health security and vaccine production capacity."
+      },
+      {
+        title: "Education Reform & Skill India Mission",
+        content: "The National Education Policy (NEP) modernizes India's education ecosystem by promoting multidisciplinary learning, coding literacy, and vocational training. The Skill India mission collaborates with industry partners to train millions of youth in emerging technologies like AI, robotics, data analytics, and renewable energy management."
+      },
+      {
+        title: "Financial Inclusion & Direct Benefit Transfer Infrastructure",
+        content: "The PM Jan Dhan Yojana has opened over 500 million bank accounts for unbanked citizens. Paired with Aadhaar biometric verification and mobile access (JAM Trinity), government subsidies and welfare benefits are transferred directly to beneficiaries' bank accounts, eliminating leakages and empowering micro-entrepreneurs."
+      },
+      {
+        title: "Global Leadership, Diplomacy & Strategic Partnerships",
+        content: "India's presidency of the G20 demonstrated its diplomatic leadership in advocating for the Global South, climate finance, and multilateral reform. Strategic partnerships in the Quad, I2U2, and bilateral economic agreements position India as an indispensable economic anchor and geopolitical stabilizer in the Indo-Pacific region."
+      }
+    ];
+
+    return indiaSections.slice(0, count).map((s, idx) => `## ${idx + 1}. ${s.title}\n${s.content}`);
+  }
+
+  if (isPollution) {
+    const pollutionSections = [
+      {
+        title: "Overview of Environmental Pollution & Global Ecosystem Risks",
+        content: "Environmental pollution represents one of the most critical threats to global biodiversity, human health, and ecological balance. Toxic airborne particulates, industrial chemical discharges, agricultural runoff, and synthetic plastics contaminate atmospheric and aquatic systems, demanding coordinated international policy regulation."
+      },
+      {
+        title: "Industrial Emissions & Smokestack Air Contaminants",
+        content: "Unregulated industrial manufacturing facilities, coal-fired power stations, and chemical refineries release gigatons of sulfur dioxide (SO2), nitrogen oxides (NOx), carbon monoxide, and fine particulate matter (PM2.5). These airborne pollutants react in sunlight to form hazardous ground-level ozone and toxic smog corridors over densely populated urban centers."
+      },
+      {
+        title: "Fossil Fuel Combustion & Transportation Exhaust",
+        content: "The global transportation sector relies heavily on internal combustion engines burning petroleum fuels. Vehicle exhaust accounts for over 20% of global carbon dioxide emissions, releasing carcinogenic benzene, volatile organic compounds (VOCs), and black carbon that degrade respiratory health and accelerate global warming."
+      },
+      {
+        title: "Chemical Effluents & Freshwater Contamination",
+        content: "Factories frequently discharge untreated heavy metals including mercury, lead, cadmium, and synthetic solvent waste directly into rivers and freshwater lakes. Contaminating municipal drinking water aquifers leads to toxic bioaccumulation in aquatic food chains, threatening aquatic life and human populations reliant on local fisheries."
+      },
+      {
+        title: "Plastic Pollution & Ocean Microplastic Accumulation",
+        content: "Over 300 million tons of single-use synthetic plastics are manufactured annually, with millions of tons ending up in marine environments. Ocean currents concentrate floating debris into massive oceanic garbage patches, while degrading microplastics infiltrate marine food chains, posing unquantified risks to human food security."
+      },
+      {
+        title: "Agricultural Runoff, Nitrogen Overuse & Soil Degradation",
+        content: "Excessive application of synthetic chemical fertilizers and pesticides leaches nitrogen and phosphorus into nearby lakes and coastal waters. This triggers severe eutrophication and toxic algae blooms that deplete dissolved oxygen, creating biological dead zones in rivers and coastal sea basins."
+      },
+      {
+        title: "Deforestation & Loss of Earth's Carbon Absorption Sinks",
+        content: "Massive land clearing for agriculture, cattle ranching, and commercial logging destroys tropical rainforests that function as planet Earth's primary carbon sinks. Burning forest biomass releases gigatons of sequestered carbon into the atmosphere while driving wildlife habitat extinction."
+      },
+      {
+        title: "Public Health Consequences & Chronic Disease Metrics",
+        content: "According to global environmental health research, ambient air and water pollution contribute to over 9 million premature deaths annually. Exposure to toxic environmental pollutants accelerates chronic obstructive pulmonary disease (COPD), cardiovascular disease, stroke, asthma, and childhood developmental impairments."
+      },
+      {
+        title: "Global Economic Damage & Ecosystem Service Loss",
+        content: "Environmental degradation generates hundreds of billions of dollars in economic losses annually through escalating healthcare expenditures, reduced worker productivity, agricultural crop yield declines, and fisheries collapse. Loss of natural ecosystem services weakens natural storm barriers and air purification capacity."
+      },
+      {
+        title: "Policy Frameworks, Renewable Transition & Circular Economy",
+        content: "Mitigating global pollution requires enforcing international climate agreements, carbon pricing mechanisms, and strict industrial emission standards. Accelerating the transition to solar, wind, and zero-emission electric transport, alongside scaling circular economic recycling systems, is vital for long-term ecological restoration."
+      }
+    ];
+
+    return pollutionSections.slice(0, count).map((s, idx) => `## ${idx + 1}. ${s.title}\n${s.content}`);
+  }
+
+  const sections: string[] = [];
+  const genericSections = getTopicSpecificSections(topic, promptLower);
+  for (let i = 1; i <= count; i++) {
+    const topicName = genericSections[(i - 1) % genericSections.length];
+    sections.push(`## ${i}. ${topicName}
+An in-depth analysis of ${topic} demonstrates crucial operational and theoretical insights regarding ${topicName.toLowerCase()}. As global systems evolve, understanding these core principles remains fundamental for strategic planning and decision-making.
+
+### ${i}.1 Key Drivers & Operational Framework
+- **Primary Factors:** Key environmental, technical, and structural components shaping ${topicName.toLowerCase()}.
+- **Systemic Impact:** Direct implications affecting organizational efficiency, stakeholder engagement, and resource distribution.
+- **Empirical Evidence:** Benchmark data indicates measurable progress and critical performance indicators associated with ${topicName.toLowerCase()}.
+
+### ${i}.2 Strategic Recommendations
+To optimize outcomes in ${topicName.toLowerCase()}, leaders must adopt targeted execution frameworks, leverage data-driven insights, and foster continuous innovation across all functional domains.`);
+  }
+
+  return sections;
+}
+
 function buildRichContent(
   drishthi: DrishthiStatement,
   fullPrompt: string,
@@ -695,7 +813,6 @@ function buildRichContent(
     .replace(/\s*(and give me the link|give me link|link of file|link).*$/i, "")
     .trim();
   const topic = rawTopic ? rawTopic.charAt(0).toUpperCase() + rawTopic.slice(1) : drishthi.subtaskTitle;
-  const sectionsList = getTopicSpecificSections(topic, promptLower);
 
   // 2. Google Slides / Presentation Deck
   if (tool === "slides.createDeck" || tool.includes("slide") || promptLower.includes("presentation") || promptLower.includes("ppt") || promptLower.includes("deck")) {
@@ -708,23 +825,11 @@ function buildRichContent(
   }
 
   // 4. Google Docs / Document File
-  const docSections: string[] = [`# Detailed Report on ${topic}\n\n*Comprehensive ${requestedCount}-Section Analysis Generated by WokAI OS*\n`];
-  for (let i = 1; i <= requestedCount; i++) {
-    const topicName = sectionsList[(i - 1) % sectionsList.length];
-    docSections.push(`## ${i}. ${topicName}
-A thorough examination of ${topic} reveals critical insights specifically concerning ${topicName.toLowerCase()}. Understanding these dynamics is essential for addressing the root factors and long-term implications.
+  const sections = getTopicSpecificDocSections(topic, promptLower, requestedCount);
+  const docHeader = `# Detailed Report on ${topic}\n\n*Comprehensive ${requestedCount}-Section Analysis Generated by WokAI OS*\n\n`;
+  const docFooter = `\n\n---\n*Report compiled by WokAI OS | Topic: "${topic}" | Prompt: "${fullPrompt}"*`;
 
-### ${i}.1 Key Factors & Primary Mechanics
-- **Primary Causes & Triggers:** Specific environmental, technological, or systemic drivers directly contributing to ${topicName.toLowerCase()}.
-- **Observed Impacts:** Direct consequences affecting ecosystems, public health, infrastructure, and socio-economic systems.
-- **Data & Empirical Findings:** Field research confirms measurable shifts and escalating trends associated with ${topicName.toLowerCase()}.
-
-### ${i}.2 Strategic Recommendations & Mitigation
-To effectively manage the challenges posed by ${topicName.toLowerCase()}, stakeholders must implement multi-layered solutions including stricter regulatory enforcement, sustainable technology adoption, and community engagement.`);
-  }
-
-  docSections.push(`\n---\n*Report compiled by WokAI OS | Topic: "${topic}" | Prompt: "${fullPrompt}"*`);
-  return docSections.join("\n\n");
+  return docHeader + sections.join("\n\n") + docFooter;
 }
 
 /* ============================================================================
