@@ -47,10 +47,18 @@ export function getAdminDb() {
 }
 
 export async function verifyFirebaseToken(token: string | null) {
+  // No token provided at all → unauthenticated regardless of admin config
+  if (!token) return null;
+
   const app = getAdminApp();
   if (!app) {
-    // In local development / offline mode where Firebase is not configured,
-    // bypass authentication and return a mock decoded ID token structure.
+    // Admin SDK not configured (local dev / missing service account).
+    // Return a limited local-user identity so server routes can still function,
+    // but log a warning so it's clear this is NOT secure verification.
+    console.warn(
+      "[WokAI OS] Firebase Admin not configured — returning local-user identity. " +
+      "Set FIREBASE_SERVICE_ACCOUNT_BASE64 for production use."
+    );
     return {
       uid: "local-user",
       name: "Deepak Yadav",
@@ -63,7 +71,7 @@ export async function verifyFirebaseToken(token: string | null) {
       sub: "local-user"
     } as any;
   }
-  if (!token) return null;
+
   try {
     return await getAuth(app).verifyIdToken(token);
   } catch {

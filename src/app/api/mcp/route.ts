@@ -157,33 +157,45 @@ export async function POST(request: NextRequest) {
 
   const { tool, arguments: args } = parsed.data;
 
-  // Execute the tool and return the output
+  // Execute the tool via Firestore when available, otherwise report honestly.
   if (tool === "wokai.addTask") {
+    const db = getAdminDb();
+    if (db) {
+      const taskId = `task-${Date.now()}`;
+      await db.collection("wokai_tasks").doc(taskId).set({
+        title: args.title,
+        description: args.description || "",
+        priority: args.priority || "MEDIUM",
+        status: "pending",
+        createdAt: new Date().toISOString()
+      });
+      return NextResponse.json({
+        content: [{ type: "text", text: `Task "${args.title}" created in Firestore (ID: ${taskId}). Status: COMPLETED.` }]
+      });
+    }
     return NextResponse.json({
-      content: [
-        {
-          type: "text",
-          text: `Task "${args.title}" successfully added to WokAI Task Engine.`
-        }
-      ]
+      content: [{ type: "text", text: `Task "${args.title}" staged locally (Firestore Admin not configured). Status: PENDING_PERSISTENCE.` }]
     });
   } else if (tool === "wokai.getDeviceStatus") {
+    // Device status requires a real device agent connection — return honest UNKNOWN
     return NextResponse.json({
-      content: [
-        {
-          type: "text",
-          text: "WokAI Device Agent: 2 devices online (Phone, Laptop). Cwd is C:\\Users\\Deepak\\Documents\\wokai."
-        }
-      ]
+      content: [{ type: "text", text: "Device status: UNKNOWN. No device agent is currently connected. Connect the WokAI companion app to enable device status." }]
     });
   } else if (tool === "wokai.addMemory") {
+    const db = getAdminDb();
+    if (db) {
+      const memId = `mem-${Date.now()}`;
+      await db.collection("wokai_memories").doc(memId).set({
+        title: args.title,
+        content: args.content,
+        createdAt: new Date().toISOString()
+      });
+      return NextResponse.json({
+        content: [{ type: "text", text: `Memory "${args.title}" saved to Firestore (ID: ${memId}). Status: COMPLETED.` }]
+      });
+    }
     return NextResponse.json({
-      content: [
-        {
-          type: "text",
-          text: `Memory "${args.title}" saved successfully.`
-        }
-      ]
+      content: [{ type: "text", text: `Memory "${args.title}" staged locally (Firestore Admin not configured). Status: PENDING_PERSISTENCE.` }]
     });
   }
 

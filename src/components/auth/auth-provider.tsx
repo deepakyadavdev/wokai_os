@@ -3,7 +3,8 @@
 import * as React from "react";
 import { onAuthStateChanged, GoogleAuthProvider, type User } from "firebase/auth";
 
-import { getFirebaseAuth, signInWithGoogle, signOutOfFirebase } from "@/lib/firebase/client";
+import { getFirebaseAuth, signInWithGoogle, signOutOfFirebase, getRedirectResult } from "@/lib/firebase/client";
+import { saveGoogleToken } from "@/lib/google/token";
 import { saveUserProfile } from "@/lib/firebase/workspace-store";
 import type { UserProfile } from "@/lib/types";
 
@@ -74,9 +75,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return undefined;
     }
 
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result) {
+          const credential = GoogleAuthProvider.credentialFromResult(result);
+          if (credential?.accessToken) {
+            saveGoogleToken(credential.accessToken, 3300);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("[WokAI OS] Redirect result error:", err);
+      });
+
     return onAuthStateChanged(auth, async (firebaseUser) => {
       const profile = firebaseUser ? toProfile(firebaseUser) : null;
-      setUser(profile || localUser);
+      setUser(profile);
       
       if (profile) {
         await saveUserProfile(profile);
@@ -134,14 +148,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         const credential = await signInWithGoogle();
-        const googleCredential = GoogleAuthProvider.credentialFromResult(credential);
-        const accessToken = googleCredential?.accessToken;
-        if (accessToken) {
-          localStorage.setItem("googleAccessToken", accessToken);
+        if (credential) {
+          const googleCredential = GoogleAuthProvider.credentialFromResult(credential);
+          const accessToken = googleCredential?.accessToken;
+          if (accessToken) {
+            localStorage.setItem("googleAccessToken", accessToken);
+          }
+          const profile = toProfile(credential.user);
+          setUser(profile);
+          await saveUserProfile(profile);
         }
-        const profile = toProfile(credential.user);
-        setUser(profile);
-        await saveUserProfile(profile);
       },
       signOut: async () => {
         if (auth) await signOutOfFirebase();
@@ -156,8 +172,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loginWithAccessKey: (key: string) => {
         try {
           const trimmed = key.trim();
-          // Only accept base64url-encoded strings
-          if (!/^[A-Za-z0-9\-_]+=*$/.test(trimmed)) {
+          // Accept both standard base64 (+, /) and base64url (-, _) encoded strings
+          if (!/^[A-Za-z0-9+/\-_]+=*$/.test(trimmed)) {
             console.error("[WokAI OS] Invalid access key format: not a valid base64 string");
             return false;
           }

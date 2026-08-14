@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { AgentPlan, ActionStatus, WokaiAction } from "@/lib/types";
 import { getGoogleToken } from "@/lib/google/token";
+import { signInWithGoogle } from "@/lib/firebase/client";
 
 /* ─────────────────────────── Helpers ─────────────────────────── */
 
@@ -135,15 +136,19 @@ function ContentPreview({ content, title = "Generated Content Preview" }: { cont
 function GoogleLoginButton() {
   const handleClick = async () => {
     try {
-      const res = await fetch("/api/google/auth-url");
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        toast.error("Google OAuth is not configured properly in .env");
+      const res = await signInWithGoogle();
+      if (res) {
+        toast.success("Google Account successfully connected!");
+        setTimeout(() => window.location.reload(), 500);
       }
-    } catch {
-      toast.error("Error connecting to Google OAuth");
+      return;
+    } catch (popupErr: any) {
+      console.warn("Firebase Google Sign-In error:", popupErr);
+      if (popupErr?.code === "auth/popup-closed-by-user") {
+        toast.error("Google Sign-In popup was closed.");
+        return;
+      }
+      toast.error(`Google Sign-In failed: ${popupErr?.message || popupErr}`);
     }
   };
 

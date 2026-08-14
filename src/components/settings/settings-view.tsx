@@ -30,6 +30,7 @@ import { useWorkspaceData } from '@/hooks/use-workspace-data';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getGoogleToken, saveGoogleToken, clearGoogleToken, tokenExpiresIn } from '@/lib/google/token';
+import { signInWithGoogle } from '@/lib/firebase/client';
 import { Globe } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -254,7 +255,23 @@ function GoogleTokenManager() {
           placeholder="ya29.a0Acv..."
           className="flex-1 rounded-lg bg-accent/40 border border-border/40 text-foreground text-xs p-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
         />
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-2 shrink-0 flex-wrap">
+          <Button
+            size="sm"
+            className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4"
+            onClick={async () => {
+              try {
+                await signInWithGoogle();
+                setToken(getGoogleToken() || "");
+                setExpiryMs(tokenExpiresIn());
+                toast.success("Google Account connected via Firebase popup!");
+              } catch (err: any) {
+                toast.error(`Sign in failed: ${err?.message || "Unknown error"}`);
+              }
+            }}
+          >
+            Sign in with Google Popup
+          </Button>
           <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-4" onClick={handleSave}>
             Save Token
           </Button>

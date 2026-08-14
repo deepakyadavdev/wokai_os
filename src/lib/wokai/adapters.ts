@@ -91,11 +91,11 @@ export async function createOutboundCall(to: string, message: string) {
  * when authenticated tokens are provided, or returns an honest NEEDS_APPROVAL status if unauthenticated.
  */
 export async function executeAdapterAction(action: any, googleToken?: string) {
+  // Only use actual Google OAuth access tokens — never fall back to API keys
+  // (Gemini/Firebase API keys are not valid OAuth Bearer tokens for GCP REST APIs).
   const activeToken =
     googleToken ||
     process.env.GOOGLE_ACCESS_TOKEN ||
-    process.env.GOOGLE_API_KEY ||
-    process.env.GEMINI_API_KEY ||
     "";
   const toolName = action.tool || "";
   const content = action.content || "";
@@ -226,11 +226,11 @@ export async function executeAdapterAction(action: any, googleToken?: string) {
     return { status: res.status, output: res.output };
   }
 
-  // Default fallback
+  // Default fallback — unknown tool name
   if (activeToken) {
     return {
-      status: "COMPLETED" as const,
-      output: `Executed GCP API adapter [${toolName}] for action: "${label}".`
+      status: "FAILED" as const,
+      output: `Unsupported tool: "${toolName}". No GCP API adapter exists for this action.`
     };
   }
 

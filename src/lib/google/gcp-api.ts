@@ -123,7 +123,7 @@ export async function sendGmailMessage(token: string, to: string, subject: strin
  */
 export async function searchGmail(token: string, query: string): Promise<GcpApiExecutionResult> {
   try {
-    const q = encodeURIComponent(query || "is:unread");
+    const q = encodeURIComponent(query || "");
     const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${q}&maxResults=5`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` }
@@ -216,10 +216,28 @@ export async function listCalendarEvents(token: string): Promise<GcpApiExecution
 /**
  * 6. Google Drive API (Drive v3) - Search Files
  */
-export async function searchGoogleDrive(token: string, query: string): Promise<GcpApiExecutionResult> {
+export async function searchGoogleDrive(token: string, rawQuery: string): Promise<GcpApiExecutionResult> {
   try {
-    const q = encodeURIComponent(query ? `name contains '${query}'` : "trashed = false");
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&pageSize=10&fields=files(id,name,mimeType,webViewLink)`, {
+    // Extract search target keyword from raw query string
+    let keyword = rawQuery.replace(/['"]/g, "").trim();
+    const match = rawQuery.match(/['"]([^'"]+)['"]/);
+    if (match && match[1]) {
+      keyword = match[1];
+    } else {
+      keyword = keyword
+        .replace(/^(execute action for:|search google drive for|search drive for|search|find|look for|get|fetch|list|show)\s+(for\s+)?/i, "")
+        .replace(/\s+(file|files|doc|document|in my drive|my drive|google drive|drive)$/i, "")
+        .trim();
+    }
+
+    let q = "trashed = false";
+    if (keyword && keyword.length > 0) {
+      // Escape single quotes inside keyword to prevent Drive query syntax error
+      const safeKeyword = keyword.replace(/'/g, "\\'");
+      q = `name contains '${safeKeyword}' and trashed = false`;
+    }
+
+    let res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&pageSize=10&fields=files(id,name,mimeType,webViewLink)`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -229,16 +247,23 @@ export async function searchGoogleDrive(token: string, query: string): Promise<G
       return { status: "FAILED", output: `Google Drive API error (${res.status}): ${errText}` };
     }
 
-    const data = await res.json();
-    const files = data.files || [];
+    let data = await res.json();
+    let files = data.files || [];
+
+    // No silent fallback — if the user searched for a specific keyword and got
+    // 0 results, return an honest empty result instead of unrelated recent files.
+    // This complies with Rule 1: Never Invent Facts.
+
     const fileList = files.map((f: any) => `• [${f.name}](${f.webViewLink})`).join("\n");
     return {
       status: "COMPLETED",
-      output: `Google Drive Search found ${files.length} matching files:\n${fileList || "No files found."}`,
+      output: files.length > 0
+        ? `Google Drive found ${files.length} file(s):\n${fileList}`
+        : `Google Drive Search complete: No matching files found.`,
       data
     };
   } catch (err: any) {
-    return { status: "FAILED", output: `Drive Search API error: ${err?.message || err}` };
+    return { status: "FAILED", output: `Google Drive API error: ${err?.message || err}` };
   }
 }
 
@@ -350,8 +375,8 @@ export async function searchGooglePlaces(query: string): Promise<GcpApiExecution
   const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
   if (!apiKey) {
     return {
-      status: "NEEDS_APPROVAL",
-      output: `[Google Maps Places] Query: "${query}". Set GOOGLE_MAPS_API_KEY in .env to perform live places search.`
+      status: "FAILED",
+      output: `[Google Maps Places] GOOGLE_MAPS_API_KEY is not configured. Set it in .env to enable live places search. Query was: "${query}".`
     };
   }
   try {
@@ -378,8 +403,8 @@ export async function getGoogleDirections(origin: string, destination: string): 
   const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
   if (!apiKey) {
     return {
-      status: "NEEDS_APPROVAL",
-      output: `[Google Maps Directions] Origin: "${origin}" -> Destination: "${destination}". Set GOOGLE_MAPS_API_KEY in .env for live route calculation.`
+      status: "FAILED",
+      output: `[Google Maps Directions] GOOGLE_MAPS_API_KEY is not configured. Set it in .env for live route calculation. Route: "${origin}" → "${destination}".`
     };
   }
   try {

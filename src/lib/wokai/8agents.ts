@@ -196,7 +196,12 @@ export async function runTivere(userPrompt: string): Promise<TivereResult> {
 export async function runVichar(userPrompt: string): Promise<VicharPlan> {
   const promptText = `
 You are VICHAR, the Task Breakdown, Ranking & Dispatching Agent of WokAI.
-Decompose the user prompt into 2 to 4 ranked subtasks required for execution.
+Decompose the user prompt into subtasks required for execution.
+
+CRITICAL RULES:
+1. For single, direct user requests (e.g. searching for a file, reading emails, sending an email, checking calendar, creating a document), return EXACTLY 1 subtask.
+2. NEVER invent meta-subtasks like "Identify credentials", "Authenticate user", "Check access", "Verify permissions", or "Review output".
+3. Only create multiple subtasks if the user explicitly requests distinct sequential actions.
 
 User Goal: "${userPrompt}"
 
@@ -215,10 +220,16 @@ Output strictly valid JSON:
   try {
     const responseText = await callModelServer(promptText);
     const parsed = cleanJson(responseText);
-    if (parsed && Array.isArray(parsed.subtasks)) {
-      const subtasks: VicharSubtask[] = parsed.subtasks.map((st: any, idx: number) => ({
+    if (parsed && Array.isArray(parsed.subtasks) && parsed.subtasks.length > 0) {
+      // Filter out meta-subtasks like credential/auth checks
+      const validSubtasks = parsed.subtasks.filter((st: any) => {
+        const title = (st.title || "").toLowerCase();
+        return !/credential|access credential|authenticate|check permission|verify identity/i.test(title);
+      });
+      const finalTasks = validSubtasks.length > 0 ? validSubtasks : [parsed.subtasks[0]];
+      const subtasks: VicharSubtask[] = finalTasks.map((st: any, idx: number) => ({
         id: helperId("subtask"),
-        rank: st.rank || idx + 1,
+        rank: idx + 1,
         title: st.title || `Subtask ${idx + 1}`,
         description: st.description || `Execute step ${idx + 1}`,
         status: "pending" as const
@@ -235,25 +246,37 @@ Output strictly valid JSON:
     console.warn("VICHAR Agent fallback:", e);
   }
 
+  const promptLower = userPrompt.toLowerCase();
+
+  let defaultToolTitle = `Execute action for: ${userPrompt}`;
+  if (/drive|search file|find file|in my drive|proposol|proposal|doc search|file/i.test(promptLower)) {
+    defaultToolTitle = `Search Google Drive for "${userPrompt}"`;
+  } else if (/send email|compose email|send mail/i.test(promptLower)) {
+    defaultToolTitle = `Send Email via Gmail API: "${userPrompt}"`;
+  } else if (/gmail|email|inbox|search mail|read mail/i.test(promptLower)) {
+    defaultToolTitle = `Search Gmail Inbox for "${userPrompt}"`;
+  } else if (/calendar|schedule|meeting|event/i.test(promptLower)) {
+    defaultToolTitle = `Schedule Google Calendar Event: "${userPrompt}"`;
+  } else if (/sheet|tracker|excel|spreadsheet/i.test(promptLower)) {
+    defaultToolTitle = `Create Google Sheet: "${userPrompt}"`;
+  } else if (/slide|presentation|deck/i.test(promptLower)) {
+    defaultToolTitle = `Create Google Slides Deck: "${userPrompt}"`;
+  } else if (/create doc|write doc|new document/i.test(promptLower)) {
+    defaultToolTitle = `Create Google Doc: "${userPrompt}"`;
+  }
+
   return {
     originalPrompt: userPrompt,
     subtasks: [
       {
         id: helperId("subtask"),
         rank: 1,
-        title: "Analyze request & generate draft content",
-        description: `Create content body and details for: ${userPrompt}`,
-        status: "pending"
-      },
-      {
-        id: helperId("subtask"),
-        rank: 2,
-        title: "Execute GCP / Web API action",
-        description: `Perform GCP API call or web integrations for: ${userPrompt}`,
+        title: defaultToolTitle,
+        description: `Execute action for: ${userPrompt}`,
         status: "pending"
       }
     ],
-    totalTasks: 2,
+    totalTasks: 1,
     completedTasks: 0
   };
 }
@@ -270,7 +293,7 @@ export async function runDrishthi(
   try {
     const promptText = `
 You are DRISTHI, the Tool Selection Agent of WokAI.
-Given a specific subtask and the list of available tools, select the best tool(s) and synthesize an enriched execution statement to pass to KRIYA and SAHAYATA.
+Given a specific subtask and the list of available tools, select the single best tool and parameters.
 
 Available Tools:
 ${availableToolList}
@@ -279,16 +302,26 @@ Subtask Title: "${subtask.title}"
 Subtask Description: "${subtask.description}"
 Original User Goal: "${fullPrompt}"
 
+TOOL SELECTION RULES:
+- If user wants to find/search files in Drive: select "drive.search"
+- If user wants to send an email: select "gmail.send"
+- If user wants to search or read emails: select "gmail.search"
+- If user wants to create a doc: select "docs.create"
+- If user wants to create a tracker/spreadsheet: select "sheets.createTracker"
+- If user wants to create slides/deck: select "slides.createDeck"
+- If user wants to create a calendar event: select "calendar.createEvent"
+- If user wants to list/check calendar events: select "calendar.listEvents"
+
 Output strictly valid JSON:
 {
   "selectedTools": [string],
   "enrichedStatement": string,
-  "toolParameters": object
+  "toolParameters": { "query"?: string, "title"?: string }
 }
 `;
     const responseText = await callModelServer(promptText);
     const parsed = cleanJson(responseText);
-    if (parsed && Array.isArray(parsed.selectedTools)) {
+    if (parsed && Array.isArray(parsed.selectedTools) && parsed.selectedTools.length > 0) {
       return {
         subtaskId: subtask.id,
         subtaskTitle: subtask.title,
@@ -301,18 +334,35 @@ Output strictly valid JSON:
     console.warn("DRISTHI Agent fallback:", e);
   }
 
-  let toolName: WokaiToolName = "docs.create";
-  if (/email|send|gmail/i.test(subtask.title + subtask.description)) toolName = "gmail.send";
-  if (/calendar|event|meeting/i.test(subtask.title + subtask.description)) toolName = "calendar.createEvent";
-  if (/sheet|tracker|excel/i.test(subtask.title + subtask.description)) toolName = "sheets.createTracker";
-  if (/slide|deck|presentation/i.test(subtask.title + subtask.description)) toolName = "slides.createDeck";
+  const textToMatch = `${subtask.title} ${subtask.description} ${fullPrompt}`.toLowerCase();
+
+  let toolName: WokaiToolName = "drive.search";
+  if (/drive|search file|find file|in my drive|proposol|proposal|doc search|find doc|look for file|file/i.test(textToMatch)) {
+    toolName = "drive.search";
+  } else if (/gmail\.send|send email|compose email|send mail/i.test(textToMatch)) {
+    toolName = "gmail.send";
+  } else if (/gmail|email|inbox|search mail|find mail|summarize email|read mail/i.test(textToMatch)) {
+    toolName = "gmail.search";
+  } else if (/calendar\.create|create event|schedule meeting|add event|book meeting/i.test(textToMatch)) {
+    toolName = "calendar.createEvent";
+  } else if (/calendar|events|agenda|schedule|upcoming/i.test(textToMatch)) {
+    toolName = "calendar.listEvents";
+  } else if (/sheet|tracker|excel|spreadsheet|csv/i.test(textToMatch)) {
+    toolName = "sheets.createTracker";
+  } else if (/slide|deck|presentation|ppt|powerpoint/i.test(textToMatch)) {
+    toolName = "slides.createDeck";
+  } else if (/contact|people|find phone|find email of/i.test(textToMatch)) {
+    toolName = "contacts.search";
+  } else if (/create doc|new document|write doc|make document/i.test(textToMatch)) {
+    toolName = "docs.create";
+  }
 
   return {
     subtaskId: subtask.id,
     subtaskTitle: subtask.title,
     selectedTools: [toolName],
     enrichedStatement: `Execute subtask ${subtask.title}`,
-    toolParameters: { title: subtask.title }
+    toolParameters: { title: subtask.title, query: fullPrompt }
   };
 }
 
@@ -369,13 +419,19 @@ export async function runKriya(
   sahayata: SahayataPayload,
   googleToken?: string
 ): Promise<KriyaResult> {
-  const toolName = drishthi.selectedTools[0] || "docs.create";
+  const toolName = drishthi.selectedTools[0] || "drive.search";
   const actionId = helperId("act");
+
+  // Determine clean action label (prefer specific query/title parameter over raw subtask title)
+  let actionLabel = drishthi.toolParameters?.query || drishthi.toolParameters?.title || drishthi.subtaskTitle;
+  if (/identify|credentials|authenticate/i.test(actionLabel)) {
+    actionLabel = drishthi.enrichedStatement || drishthi.subtaskTitle;
+  }
 
   const actionToExecute: WokaiAction = {
     id: actionId,
     tool: toolName,
-    label: drishthi.subtaskTitle,
+    label: actionLabel,
     content: sahayata.content,
     status: "RUNNING",
     sensitive: toolName === "gmail.send" || toolName.includes("delete"),
@@ -385,6 +441,8 @@ export async function runKriya(
   try {
     const adapterRes = await executeAdapterAction(actionToExecute, googleToken);
     actionToExecute.status = adapterRes.status;
+    actionToExecute.output = adapterRes.output;
+    actionToExecute.url = adapterRes.url;
 
     return {
       subtaskId: drishthi.subtaskId,
@@ -488,11 +546,16 @@ Output strictly valid JSON:
     console.warn("SAMPARN Agent fallback:", e);
   }
 
+  const apiOutputs = subtaskLogs
+    .map((l) => l.kriya.apiResponse)
+    .filter(Boolean)
+    .join("\n\n");
+
   return {
     finalTitle: `Execution Report: ${vichar.originalPrompt.slice(0, 40)}`,
-    comprehensiveSummary: `Completed all ${subtaskLogs.length} subtasks for prompt: "${vichar.originalPrompt}".`,
+    comprehensiveSummary: `Completed ${subtaskLogs.length} subtask(s) for prompt: "${vichar.originalPrompt}".`,
     completedSubtaskSummaries: completedSummaries,
-    finalOutputPresentation: `All subtasks completed successfully.\n\nSummary of Actions:\n${completedSummaries.join("\n")}`,
-    recommendedNextSteps: ["Review generated documents or actions", "Share results with team"]
+    finalOutputPresentation: apiOutputs || `All subtasks completed successfully.\n\nSummary of Actions:\n${completedSummaries.join("\n")}`,
+    recommendedNextSteps: ["Review generated results or actions", "Share results with team"]
   };
 }

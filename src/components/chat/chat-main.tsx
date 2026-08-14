@@ -28,6 +28,7 @@ import { extractMemories } from "@/lib/wokai/memory-agent";
 import { cn } from "@/lib/utils";
 import type { AgentPlan } from "@/lib/types";
 import { getGoogleToken, saveGoogleToken, clearGoogleToken } from "@/lib/google/token";
+import { signInWithGoogle } from "@/lib/firebase/client";
 
 /* ─────────────────────────── Android/Robot head SVG ─────────────────────────── */
 function AndroidBotIcon({ className }: { className?: string }) {
@@ -528,20 +529,20 @@ export function ChatMain() {
   }
 
   const handleGoogleSignIn = async () => {
-    if (googleAuthUrl) {
-      window.location.href = googleAuthUrl;
-      return;
-    }
     try {
-      const res = await fetch("/api/google/auth-url");
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        toast.error("Google OAuth is not configured properly in .env");
+      const res = await signInWithGoogle();
+      if (res) {
+        setGoogleTokenState(getGoogleToken());
+        toast.success("Google Account successfully connected!");
       }
-    } catch {
-      toast.error("Error connecting to Google OAuth");
+      return;
+    } catch (popupErr: any) {
+      console.warn("Firebase Google Sign-In error:", popupErr);
+      if (popupErr?.code === "auth/popup-closed-by-user") {
+        toast.error("Google Sign-In popup was closed.");
+        return;
+      }
+      toast.error(`Google Sign-In failed: ${popupErr?.message || popupErr}`);
     }
   };
 

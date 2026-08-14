@@ -5,6 +5,8 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   type Auth
 } from "firebase/auth";
@@ -56,16 +58,33 @@ export async function signInWithGoogle() {
   provider.addScope("https://www.googleapis.com/auth/spreadsheets");
   provider.addScope("https://www.googleapis.com/auth/presentations");
   provider.addScope("https://www.googleapis.com/auth/contacts.readonly");
-  const result = await signInWithPopup(auth, provider);
 
-  // Capture the Google OAuth access token and persist it
-  const credential = GoogleAuthProvider.credentialFromResult(result);
-  if (credential?.accessToken) {
-    saveGoogleToken(credential.accessToken, 3300); // 55 min safety margin
+  try {
+    const result = await signInWithPopup(auth, provider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (credential?.accessToken) {
+      saveGoogleToken(credential.accessToken, 3300);
+    }
+    return result;
+  } catch (popupError: any) {
+    // Only fall back to redirect when the popup was actually blocked by the browser.
+    // If the user intentionally closed the popup, treat it as a silent cancellation.
+    if (popupError?.code === "auth/popup-blocked") {
+      await signInWithRedirect(auth, provider);
+      return null;
+    }
+    if (
+      popupError?.code === "auth/popup-closed-by-user" ||
+      popupError?.code === "auth/cancelled-popup-request"
+    ) {
+      // User intentionally cancelled — do not redirect or throw
+      return null;
+    }
+    throw popupError;
   }
-
-  return result;
 }
+
+export { getRedirectResult };
 
 export async function signOutOfFirebase() {
   const auth = getFirebaseAuth();

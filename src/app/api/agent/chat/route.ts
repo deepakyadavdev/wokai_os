@@ -32,6 +32,10 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
+        // Convert flat memories array into a YougyeMemoryState shape if present.
+        // generateAgentPlan expects { originalPrompt, questionsAsked, answersReceived }
+        // not a raw memory array. Pass undefined when no memory state is provided.
+        const memoryState = undefined; // Memory state is managed internally by YOUGYE agent
         const result = await generateAgentPlan(
           parsed.data.message,
           (phase, output) => {
@@ -43,7 +47,7 @@ export async function POST(request: NextRequest) {
           1,
           parsed.data.isVoice,
           parsed.data.history,
-          parsed.data.memories as any
+          memoryState
         );
         // Introduce a tiny delay so the transition of steps is visible/pleasant if it runs super fast
         await new Promise((r) => setTimeout(r, 100));

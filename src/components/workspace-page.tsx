@@ -48,6 +48,7 @@ import { highestRisk, riskCopy } from "@/lib/wokai/risk";
 import type { ActionStatus, BrowserJob, RiskLevel, WokaiMemory, WorkspaceSnapshot, WokaiTask, WokaiDevice } from "@/lib/types";
 import { toast } from "sonner";
 import { getGoogleToken, saveGoogleToken, clearGoogleToken, tokenExpiresIn } from "@/lib/google/token";
+import { signInWithGoogle } from "@/lib/firebase/client";
 import { Plus, Trash } from "lucide-react";
 
 type PageKind =
@@ -1039,7 +1040,23 @@ function GoogleTokenManager() {
           placeholder="ya29.a0Acv..."
           className="flex-1 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
         />
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-2 shrink-0 flex-wrap">
+          <Button
+            size="sm"
+            className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4"
+            onClick={async () => {
+              try {
+                await signInWithGoogle();
+                setToken(getGoogleToken() || "");
+                setExpiryMs(tokenExpiresIn());
+                toast.success("Google Account connected via Firebase popup!");
+              } catch (err: any) {
+                toast.error(`Sign in failed: ${err?.message || "Unknown error"}`);
+              }
+            }}
+          >
+            Sign in with Google Popup
+          </Button>
           <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-4" onClick={handleSave}>
             Save Token
           </Button>
