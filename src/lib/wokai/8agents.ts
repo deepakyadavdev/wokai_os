@@ -33,25 +33,43 @@ export function cleanJson(text: string) {
 }
 
 /**
+ * Options for callModelServer to control timeout, system prompt, temperature, and token limits.
+ */
+interface ModelServerOptions {
+  systemPrompt?: string;
+  timeoutMs?: number;
+  maxTokens?: number;
+  temperature?: number;
+}
+
+/**
  * Executes LLM prompts across Google Colab / Lightning AI GPU server or local Open-Source Model Server.
  */
-export async function callModelServer(promptText: string): Promise<string> {
+export async function callModelServer(promptText: string, options?: ModelServerOptions): Promise<string> {
   const modelServerUrl =
     process.env.MODEL_SERVER_URL ||
     process.env.NEXT_PUBLIC_MODEL_SERVER_URL ||
     process.env.LLM_BASE_URL ||
     "";
 
+  const timeoutMs = options?.timeoutMs ?? 15000;
+  const maxTokens = options?.maxTokens ?? 1024;
+  const temperature = options?.temperature ?? 0.3;
+  const systemPrompt = options?.systemPrompt || "";
+
   if (modelServerUrl) {
     const baseUrl = modelServerUrl.replace(/\/$/, "");
 
     // 1. Try Colab FastAPI /generate endpoint
     try {
+      const colabPrompt = systemPrompt
+        ? `[System Instructions]\n${systemPrompt}\n\n[User Request]\n${promptText}`
+        : promptText;
       const response = await fetch(`${baseUrl}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: promptText }),
-        signal: AbortSignal.timeout(15000)
+        body: JSON.stringify({ prompt: colabPrompt, max_tokens: maxTokens, temperature }),
+        signal: AbortSignal.timeout(timeoutMs)
       });
       if (response.ok) {
         const data = await response.json();
@@ -65,14 +83,22 @@ export async function callModelServer(promptText: string): Promise<string> {
     // 2. Try OpenAI-compatible /v1/chat/completions endpoint
     try {
       const chatUrl = baseUrl.endsWith("/v1") ? `${baseUrl}/chat/completions` : `${baseUrl}/v1/chat/completions`;
+      const messages: Array<{ role: string; content: string }> = [];
+      if (systemPrompt) {
+        messages.push({ role: "system", content: systemPrompt });
+      }
+      messages.push({ role: "user", content: promptText });
+
       const response = await fetch(chatUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: process.env.LLM_MODEL || "qwen2.5:3b",
-          messages: [{ role: "user", content: promptText }]
+          messages,
+          max_tokens: maxTokens,
+          temperature
         }),
-        signal: AbortSignal.timeout(15000)
+        signal: AbortSignal.timeout(timeoutMs)
       });
       if (response.ok) {
         const data = await response.json();
@@ -86,6 +112,69 @@ export async function callModelServer(promptText: string): Promise<string> {
   }
 
   return "";
+}
+
+/**
+ * Dedicated content generation function that sends a well-crafted prompt to the LLM
+ * for producing actual educational/professional document content (not JSON).
+ * Returns raw markdown content or empty string if LLM is unavailable.
+ */
+async function generateContentWithLLM(
+  topic: string,
+  fullPrompt: string,
+  contentType: "doc" | "slides" | "sheet" | "calendar" | "email",
+  sectionCount: number
+): Promise<string> {
+  const contentSystemPrompt = `You are a professional content writer. Write detailed, factual, well-researched content.
+
+STRICT RULES:
+- Write ONLY about the specific topic the user asks for. Every paragraph must contain real information about that topic.
+- NEVER use filler phrases like "demonstrates crucial operational insights" or "strategic recommendations for sustainable implementation".
+- NEVER repeat the same sentence structure across sections. Each section must read differently.
+- Use specific facts, data points, real-world examples, named entities, and concrete details.
+- Write in clear, natural language. Avoid corporate buzzword salad.
+- If you don't know specific facts, write general knowledge that is still accurate and relevant to the topic.`;
+
+  let userPrompt = "";
+
+  if (contentType === "doc") {
+    userPrompt = `Write a detailed ${sectionCount}-section document about: "${topic}"
+
+Format each section as:
+## 1. Section Title
+Two to three paragraphs of detailed, factual content about this specific aspect of ${topic}.
+
+Write ALL ${sectionCount} sections. Each section must cover a DIFFERENT aspect of the topic with real, substantive content. Do NOT output JSON — output the document in markdown directly.`;
+  } else if (contentType === "slides") {
+    userPrompt = `Create ${sectionCount} presentation slides about: "${topic}"
+
+Format each slide as:
+# Slide 1: Slide Title
+- First bullet point with a specific fact or insight
+- Second bullet point with supporting detail
+- Third bullet point with a concrete example or data
+
+Write ALL ${sectionCount} slides. Each slide must have a unique focus area. Use real facts and specific details, not generic filler. Do NOT output JSON — output the slides in markdown directly.`;
+  } else if (contentType === "calendar") {
+    userPrompt = `Write a concise but informative calendar event description for: "${fullPrompt}"
+
+Include: what the event is about, any key preparation needed, expected outcomes. Keep it to 2-3 sentences. Do NOT output JSON — output the description directly.`;
+  } else if (contentType === "email") {
+    userPrompt = `Write a professional email body for: "${fullPrompt}"
+
+Write a clear, natural email. Do NOT output JSON — output the email body directly.`;
+  } else {
+    userPrompt = `Generate structured data content for: "${topic}"\n\nContext: ${fullPrompt}`;
+  }
+
+  const response = await callModelServer(userPrompt, {
+    systemPrompt: contentSystemPrompt,
+    timeoutMs: 30000,
+    maxTokens: 2048,
+    temperature: 0.7
+  });
+
+  return response.trim();
 }
 
 /* ============================================================================
@@ -246,12 +335,12 @@ Output strictly valid JSON:
   }
 
   const promptLower = userPrompt.toLowerCase();
-  const isMultiAction = /and email|and send|and share|and mail|then email|then send|then share|and attach|and schedule|then schedule/i.test(promptLower);
-
   const hasDoc = /doc|docs|document|write doc|create doc|make doc|build doc/i.test(promptLower);
   const hasSlides = /slide|slides|presentation|ppt|deck|powerpoint/i.test(promptLower);
   const hasSheet = /sheet|sheets|tracker|excel|spreadsheet|csv/i.test(promptLower);
-  const hasEmail = /email|mail|send|share/i.test(promptLower);
+  const hasEmail = /send to|send email|compose email|send mail|mail to|email to|email|mail|gmail|share/i.test(promptLower);
+
+  const isMultiAction = (hasDoc || hasSlides || hasSheet) && hasEmail;
 
   if (isMultiAction) {
     const multiSubtasks: VicharSubtask[] = [];
@@ -387,26 +476,27 @@ Output strictly valid JSON:
     }
   } catch (e) {
     console.warn("DRISTHI Agent fallback:", e);
-  }  // Match ONLY subtask title and description (DO NOT match fullPrompt here, because fullPrompt contains words from ALL subtasks!)
-  const textToMatch = `${subtask.title} ${subtask.description}`.toLowerCase();
+  }
+
+  const subtaskTitleLower = subtask.title.toLowerCase();
 
   let toolName: WokaiToolName = "docs.create";
-  if (/send email|compose email|send mail|mail to|email to|gmail\.send|email|gmail|mail/i.test(textToMatch)) {
+  if (/^send email|gmail api|compose email|send mail/i.test(subtaskTitleLower)) {
     toolName = "gmail.send";
-  } else if (/doc|docs|document|write doc|create doc|make doc|build doc/i.test(textToMatch)) {
+  } else if (/^create google doc|create doc|make doc|build doc/i.test(subtaskTitleLower)) {
     toolName = "docs.create";
-  } else if (/slide|slides|presentation|ppt|deck|powerpoint/i.test(textToMatch)) {
+  } else if (/^create google slides|create slides|make slides|create presentation/i.test(subtaskTitleLower)) {
     toolName = "slides.createDeck";
-  } else if (/sheet|sheets|tracker|excel|spreadsheet|csv/i.test(textToMatch)) {
+  } else if (/^create google sheet|create sheet|make sheet|create tracker/i.test(subtaskTitleLower)) {
     toolName = "sheets.createTracker";
-  } else if (/calendar\.create|create event|create meeting|schedule meeting|schedule a meeting|set meeting|set a meeting|add event|add meeting|book meeting|book a meeting|meeting at|meeting on|set event|book event|remind me at/i.test(textToMatch)) {
+  } else if (/^schedule google calendar|create event|schedule meeting/i.test(subtaskTitleLower)) {
     toolName = "calendar.createEvent";
-  } else if (/calendar\.list|list events|upcoming events|get events|check calendar|show calendar|calendar|agenda|what's on my calendar/i.test(textToMatch)) {
+  } else if (/^list google calendar|list events|check calendar/i.test(subtaskTitleLower)) {
     toolName = "calendar.listEvents";
-  } else if (/contact|people|find phone|find email of/i.test(textToMatch)) {
-    toolName = "contacts.search";
-  } else if (/drive|search file|find file|in my drive|proposol|proposal|look for file|where is file/i.test(textToMatch)) {
+  } else if (/^search google drive|search drive|find file/i.test(subtaskTitleLower)) {
     toolName = "drive.search";
+  } else if (/gmail|email|mail/i.test(subtaskTitleLower) && !/doc|slide|sheet/i.test(subtaskTitleLower)) {
+    toolName = "gmail.send";
   }
 
   return {
@@ -752,20 +842,47 @@ function getTopicSpecificDocSections(topic: string, promptLower: string, count: 
     return pollutionSections.slice(0, count).map((s, idx) => `## ${idx + 1}. ${s.title}\n${s.content}`);
   }
 
+  // Generic fallback — produce varied content for each section instead of copy-pasting the same template
   const sections: string[] = [];
   const genericSections = getTopicSpecificSections(topic, promptLower);
+
+  // Each template approaches the topic from a genuinely different angle
+  const sectionTemplates = [
+    (t: string, s: string) =>
+      `${t} encompasses a broad range of interconnected factors that shape how individuals, organizations, and governments engage with ${s.toLowerCase()}. At its core, the subject involves understanding the fundamental principles that drive change, the historical context that brought us to the current state, and the emerging trends that will define the future landscape.\n\nResearchers and practitioners in this field emphasize the importance of evidence-based approaches. Rather than relying on assumptions, effective strategies for ${s.toLowerCase()} require careful analysis of available data, consultation with domain experts, and continuous monitoring of outcomes.`,
+
+    (t: string, s: string) =>
+      `The historical development of ${s.toLowerCase()} can be traced through several distinct phases. Early efforts were often fragmented and lacked coordination, but over time, a more systematic approach emerged. Key milestones include the establishment of dedicated institutions, the development of standardized methodologies, and the growing recognition of ${t.toLowerCase()} as a priority area requiring sustained attention.\n\nToday, the field continues to evolve rapidly. New research findings, technological breakthroughs, and shifting societal expectations all contribute to an environment where adaptability and continuous learning are essential for anyone involved in ${s.toLowerCase()}.`,
+
+    (t: string, s: string) =>
+      `Multiple stakeholders play critical roles in shaping ${s.toLowerCase()}. Government agencies set regulatory frameworks and allocate public resources. Private sector organizations contribute through innovation, investment, and operational expertise. Academic institutions conduct foundational research and train the next generation of professionals. Civil society groups advocate for accountability and ensure that diverse perspectives are represented in decision-making processes.\n\nEffective collaboration among these groups is essential. When stakeholders work in isolation, efforts tend to be duplicated, resources are wasted, and outcomes fall short of their potential. Cross-sector partnerships have proven particularly valuable in addressing the complex challenges associated with ${t.toLowerCase()}.`,
+
+    (t: string, s: string) =>
+      `Several significant challenges confront those working on ${s.toLowerCase()}. Resource constraints — including limited funding, insufficient skilled personnel, and inadequate infrastructure — frequently hinder progress. Information gaps make it difficult to assess the true scope of problems or measure the effectiveness of interventions. Resistance to change, whether from institutional inertia or conflicting interests, can slow the adoption of proven solutions.\n\nAddressing these challenges requires both practical problem-solving and a willingness to experiment with new approaches. Successful initiatives in ${t.toLowerCase()} often share common traits: strong leadership, clear goals, transparent communication, and a commitment to learning from both successes and failures.`,
+
+    (t: string, s: string) =>
+      `Technology has become an increasingly important factor in ${s.toLowerCase()}. Digital tools enable faster data collection, more sophisticated analysis, and broader communication. Automation reduces the burden of repetitive tasks, freeing human resources for higher-value activities. Emerging technologies such as machine learning and advanced sensors offer new capabilities that were previously unimaginable.\n\nHowever, technology alone is not a solution. Its effectiveness depends on how well it is integrated into existing workflows, whether users receive adequate training, and whether the underlying data is accurate and representative. Organizations that treat technology as a complement to — rather than a replacement for — human expertise tend to achieve better outcomes in ${t.toLowerCase()}.`,
+
+    (t: string, s: string) =>
+      `The economic dimensions of ${s.toLowerCase()} are substantial and wide-ranging. Direct costs include the resources spent on planning, implementation, and monitoring. Indirect costs — such as lost productivity, environmental degradation, or social disruption — can be even larger but are often harder to quantify. On the benefit side, well-executed initiatives in ${t.toLowerCase()} can generate significant returns through improved efficiency, reduced risk, and enhanced quality of life.\n\nEconomic analysis plays a vital role in prioritizing interventions and allocating resources effectively. Cost-benefit analysis, return-on-investment calculations, and comparative studies all help decision-makers understand where their efforts will have the greatest impact.`,
+
+    (t: string, s: string) =>
+      `Real-world examples illustrate the practical implications of ${s.toLowerCase()}. Across different regions and contexts, organizations have developed approaches that reflect local conditions, available resources, and specific objectives. Some have achieved notable success by adopting innovative methods, forming strategic alliances, or leveraging unique competitive advantages.\n\nThese case studies offer valuable lessons for others working in ${t.toLowerCase()}. While direct replication is rarely possible — since every context has its own constraints and opportunities — the principles underlying successful initiatives can often be adapted and applied elsewhere.`,
+
+    (t: string, s: string) =>
+      `Policy and regulatory considerations are central to ${s.toLowerCase()}. Effective governance requires clear rules, consistent enforcement, and mechanisms for accountability. Regulations must balance the need for oversight with the importance of flexibility, allowing practitioners to innovate while maintaining minimum standards of quality and safety.\n\nInternational cooperation adds another layer of complexity. Since many aspects of ${t.toLowerCase()} transcend national boundaries, coordinated action among countries is often necessary. International frameworks, bilateral agreements, and multilateral institutions all play roles in facilitating this cooperation.`,
+
+    (t: string, s: string) =>
+      `Education and capacity building are foundational to sustained progress in ${s.toLowerCase()}. Training programs, professional development opportunities, and knowledge-sharing platforms help ensure that practitioners have the skills and knowledge they need. Public awareness campaigns increase understanding of key issues and build support for necessary actions.\n\nThe quality of education in this area varies significantly across different institutions and regions. Bridging these gaps requires investment in curriculum development, instructor training, and access to up-to-date learning resources. Online learning platforms and open educational resources have expanded access in recent years, but significant disparities remain.`,
+
+    (t: string, s: string) =>
+      `Looking ahead, the trajectory of ${s.toLowerCase()} will be shaped by several converging trends. Demographic shifts, climate change, technological disruption, and evolving geopolitical dynamics will all influence priorities and possibilities. Organizations and individuals who anticipate these changes and prepare accordingly will be better positioned to navigate the uncertainties ahead.\n\nStrategic foresight — the practice of systematically exploring possible futures — is becoming an increasingly valuable tool for those involved in ${t.toLowerCase()}. By considering multiple scenarios and developing flexible strategies, decision-makers can reduce their vulnerability to unexpected developments and capitalize on emerging opportunities.`
+  ];
+
   for (let i = 1; i <= count; i++) {
     const topicName = genericSections[(i - 1) % genericSections.length];
-    sections.push(`## ${i}. ${topicName}
-An in-depth analysis of ${topic} demonstrates crucial operational and theoretical insights regarding ${topicName.toLowerCase()}. As global systems evolve, understanding these core principles remains fundamental for strategic planning and decision-making.
-
-### ${i}.1 Key Drivers & Operational Framework
-- **Primary Factors:** Key environmental, technical, and structural components shaping ${topicName.toLowerCase()}.
-- **Systemic Impact:** Direct implications affecting organizational efficiency, stakeholder engagement, and resource distribution.
-- **Empirical Evidence:** Benchmark data indicates measurable progress and critical performance indicators associated with ${topicName.toLowerCase()}.
-
-### ${i}.2 Strategic Recommendations
-To optimize outcomes in ${topicName.toLowerCase()}, leaders must adopt targeted execution frameworks, leverage data-driven insights, and foster continuous innovation across all functional domains.`);
+    const templateFn = sectionTemplates[(i - 1) % sectionTemplates.length];
+    sections.push(`## ${i}. ${topicName}\n${templateFn(topic, topicName)}`);
   }
 
   return sections;
