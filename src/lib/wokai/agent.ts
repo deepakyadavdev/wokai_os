@@ -75,17 +75,16 @@ export async function generateAgentPlan(
 
   const refinedPrompt = yougyeRes.refinedPrompt || message;
 
-  // 2. TIVERE + VICHAR AGENTS (Parallel Execution)
-  onPhaseChange?.("tivere", "TIVERE Agent: Sending fast acknowledgement...");
+  // 2. TIVERE AGENT - Fast Ack (Dispatched immediately!)
+  onPhaseChange?.("tivere", "TIVERE Agent: Generating fast acknowledgement...");
+  const tivereRes = await runTivere(refinedPrompt);
+  onPhaseChange?.("tivere_done", tivereRes.ackMessage);
+
+  // 3. VICHAR AGENT - Deconstruct subtasks
   onPhaseChange?.("vichar", "VICHAR Agent: Decomposing task into ranked subtasks...");
-
-  const [tivereRes, vicharPlan] = await Promise.all([
-    runTivere(refinedPrompt),
-    runVichar(refinedPrompt)
-  ]);
-
+  const vicharPlan = await runVichar(refinedPrompt);
   onPhaseChange?.(
-    "vichar",
+    "vichar_done",
     `VICHAR Agent: Created ${vicharPlan.subtasks.length} ranked subtasks.`
   );
 
@@ -98,27 +97,22 @@ export async function generateAgentPlan(
     mulye: any;
   }> = [];
 
-  const plannedActions: WokaiAction[] = [];
-
   for (const st of vicharPlan.subtasks) {
-    // DRISTHI
-    onPhaseChange?.("drishthi", `DRISTHI Agent: Selecting tools for Subtask #${st.rank} (${st.title})...`);
+    onPhaseChange?.("drishthi", `DRISTHI Agent: Selecting GCP tools for "${st.title}"...`);
     const drishthiRes = await runDrishthi(st, refinedPrompt);
+    onPhaseChange?.("drishthi_done", `DRISTHI Agent: Mapped to tools [${drishthiRes.selectedTools.join(", ")}]`);
 
-    // SAHAYATA & KRIYA (Parallel)
-    onPhaseChange?.("sahayata", `SAHAYATA Agent: Generating content payload for Subtask #${st.rank}...`);
-    onPhaseChange?.("kriya", `KRIYA Agent: Preparing GCP API execution for Subtask #${st.rank}...`);
-
+    onPhaseChange?.("sahayata", `SAHAYATA Agent: Generating content payload for "${st.title}"...`);
     const sahayataRes = await runSahayata(drishthiRes, refinedPrompt);
+    onPhaseChange?.("sahayata_done", `SAHAYATA Agent: Payload ready (${sahayataRes.content.length} chars).`);
+
+    onPhaseChange?.("kriya", `KRIYA Agent: Executing GCP action for "${st.title}"...`);
     const kriyaRes = await runKriya(drishthiRes, sahayataRes, googleToken);
+    onPhaseChange?.("kriya_done", `KRIYA Agent: Action result: ${kriyaRes.status}`);
 
-    if (kriyaRes.actionCreated) {
-      plannedActions.push(kriyaRes.actionCreated);
-    }
-
-    // MULYE
-    onPhaseChange?.("mulye", `MULYE Agent: Verifying output for Subtask #${st.rank}...`);
+    onPhaseChange?.("mulye", `MULYE Agent: Auditing subtask "${st.title}"...`);
     const mulyeRes = await runMulye(st, kriyaRes, sahayataRes);
+    onPhaseChange?.("mulye_done", `MULYE Agent: Audit result: ${mulyeRes.success ? "PASSED" : "FAILED"}`);
 
     subtaskLogs.push({
       subtask: st,
@@ -129,29 +123,31 @@ export async function generateAgentPlan(
     });
   }
 
-  // 4. SAMPARN AGENT - Final Synthesis & Report Presentation
-  onPhaseChange?.("samparn", "SAMPARN Agent: Synthesizing final execution report...");
+  // 4. SAMPARN AGENT - Synthesis & Presentation Report
+  onPhaseChange?.("samparn", "SAMPARN Agent: Synthesizing final presentation report...");
   const samparnRes = await runSamparn(vicharPlan, subtaskLogs);
+  onPhaseChange?.("samparn_done", "SAMPARN Agent: Presentation report complete.");
 
-  // Build suggested WokaiTask
+  const finalResponseText = samparnRes.finalOutputPresentation || samparnRes.comprehensiveSummary || "8-Agent Task Execution Complete.";
+  const plannedActions = subtaskLogs.map((l) => l.kriya.actionCreated).filter(Boolean) as WokaiAction[];
+
   const createdTask: WokaiTask = {
     id: makeId("task"),
-    title: `8-Agent Execution: ${vicharPlan.originalPrompt.slice(0, 40)}`,
-    description: samparnRes.comprehensiveSummary,
-    deadline: new Date(Date.now() + 24 * 36e5).toISOString(),
+    title: `8-Agent Execution: ${refinedPrompt.slice(0, 40)}`,
+    description: finalResponseText,
+    deadline: null,
     priority: riskLevel,
-    status: "done",
-    progress: 100,
-    subtasks: vicharPlan.subtasks.map((st) => st.title),
+    status: subtaskLogs.every((l) => l.mulye.success) ? "done" : "in_progress",
+    progress: Math.round((subtaskLogs.filter((l) => l.mulye.success).length / subtaskLogs.length) * 100),
+    subtasks: vicharPlan.subtasks.map((s) => s.title),
     source: "chat"
   };
-
-  const finalResponseText = `${tivereRes.ackMessage}\n\n${samparnRes.finalOutputPresentation}`;
 
   return {
     intent: `Execute: ${vicharPlan.originalPrompt.slice(0, 50)}`,
     riskLevel,
     response: finalResponseText,
+    tivereAck: tivereRes.ackMessage,
     reasoning: [
       `YOUGYE: ${yougyeRes.reasoning}`,
       `VICHAR: Created ${vicharPlan.subtasks.length} subtasks`,
