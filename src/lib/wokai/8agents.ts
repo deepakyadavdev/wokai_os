@@ -425,6 +425,152 @@ function getTopicSpecificSections(topic: string, promptLower: string): string[] 
   ];
 }
 
+function getTopicSpecificSlides(topic: string, promptLower: string, count: number): string {
+  const isPollution = /pollut|environment|emiss|waste|climate|smog|toxic/i.test(topic + " " + promptLower);
+  const isAi = /ai|artificial intelligence|machine learning|robot|technology|digital/i.test(topic + " " + promptLower);
+
+  const pollutionSlides = [
+    { title: "Environmental Pollution Overview", bullets: [
+      "Environmental pollution threatens global ecosystems, human health, and climate stability.",
+      "Major forms include air emissions, industrial effluent, ocean plastics, and toxic soil buildup.",
+      "Demands urgent international policy regulation, sustainable technology, and clean energy adoption."
+    ]},
+    { title: "Industrial Emissions & Air Contaminants", bullets: [
+      "Heavy industrial manufacturing releases high volumes of SO2, NOx, and fine particulate matter.",
+      "Unregulated factory smokestacks and power plants create toxic urban smog corridors.",
+      "Prolonged exposure to airborne pollutants causes severe respiratory and cardiovascular illnesses."
+    ]},
+    { title: "Fossil Fuel Combustion & Transportation", bullets: [
+      "Internal combustion vehicles burn gasoline and diesel, releasing massive CO2 greenhouse gas emissions.",
+      "Transportation sector accounts for over 20% of total global carbon emissions driving climate change.",
+      "High urban traffic density concentrates hazardous ground-level ozone in populated cities."
+    ]},
+    { title: "Chemical Effluents & Water Contamination", bullets: [
+      "Factories discharge untreated chemical waste, heavy metals (mercury, lead), and synthetic toxins into rivers.",
+      "Contaminating vital freshwater lakes and underground aquifers essential for municipal drinking water.",
+      "Bioaccumulation in aquatic food chains destroys marine ecosystems and harms coastal populations."
+    ]},
+    { title: "Plastic Accumulation & Marine Microplastics", bullets: [
+      "Over 300 million tons of non-biodegradable synthetic plastics enter landfills and oceans annually.",
+      "Microplastics break down into marine food chains, threatening sea life and human food supplies.",
+      "Ocean plastic gyres like the Great Pacific Garbage Patch choke marine habitats."
+    ]},
+    { title: "Agricultural Pesticides & Soil Degradation", bullets: [
+      "Overuse of synthetic fertilizers and chemical pesticides causes severe soil toxicity and nutrient depletion.",
+      "Agricultural runoff washes nitrogen and phosphorus into lakes, triggering toxic algae blooms.",
+      "Erosion and soil degradation reduce arable farmland required for global food security."
+    ]},
+    { title: "Deforestation & Loss of Natural Carbon Sinks", bullets: [
+      "Massive forest clearing for agriculture and logging reduces planet's natural carbon absorption capacity.",
+      "Destruction of tropical rainforests accelerates biodiversity loss and wildlife habitat extinction.",
+      "Tree burning releases gigatons of stored carbon directly back into the atmosphere."
+    ]},
+    { title: "Public Health Consequences & Disease Risks", bullets: [
+      "Air and water pollution cause over 9 million premature deaths globally every year.",
+      "Contaminated drinking water spreads waterborne diseases and toxic heavy metal poisoning.",
+      "Vulnerable populations in developing regions suffer disproportionately high environmental risks."
+    ]},
+    { title: "Global Economic Impact & Ecosystem Degradation", bullets: [
+      "Environmental degradation costs the global economy trillions of dollars in healthcare and lost productivity.",
+      "Damage to fisheries, agriculture, and eco-tourism impacts livelihoods across developing nations.",
+      "Climate-induced extreme weather events disrupt infrastructure and global supply chains."
+    ]},
+    { title: "Policy Governance & Sustainable Solutions", bullets: [
+      "Enforcing strict industrial emission limits and implementing international climate treaties (Paris Agreement).",
+      "Transitioning from fossil fuels to solar, wind, and clean renewable energy systems.",
+      "Promoting circular economy practices, plastic recycling, and reforestation initiatives."
+    ]}
+  ];
+
+  const aiSlides = [
+    { title: "Overview of Artificial Intelligence", bullets: [
+      "Artificial Intelligence (AI) simulates human cognitive capabilities using advanced machine learning models.",
+      "Encompasses natural language processing, computer vision, robotics, and generative AI systems.",
+      "Transforming global industries by automating complex workflows and accelerating decision-making."
+    ]},
+    { title: "Machine Learning & Neural Networks", bullets: [
+      "Machine Learning algorithms learn from vast empirical datasets to identify non-linear patterns.",
+      "Deep Neural Networks process unstructured data including text, images, video, and audio streams.",
+      "High-performance GPU clusters enable training multi-billion parameter foundation models."
+    ]},
+    { title: "Enterprise Automation & Workflow Optimization", bullets: [
+      "Automating repetitive administrative tasks, customer support, and software code generation.",
+      "Enhancing enterprise resource planning, real-time data analytics, and operational efficiency.",
+      "Reducing human error while scaling organizational productivity across global teams."
+    ]},
+    { title: "Healthcare & Diagnostic Innovations", bullets: [
+      "AI-driven diagnostic models analyze medical imagery with high precision for early disease detection.",
+      "Accelerating drug discovery pipelines by predicting protein structures and molecular interactions.",
+      "Personalized treatment plans tailored to patient genetic profiles and clinical histories."
+    ]},
+    { title: "Ethical Considerations & Algorithmic Safety", bullets: [
+      "Mitigating training data bias to ensure fair and equitable AI deployment across demographics.",
+      "Preventing model hallucinations and ensuring verifiable transparency in critical decision systems.",
+      "Establishing robust privacy safeguards to protect user data and intellectual property."
+    ]},
+    { title: "Job Market Evolution & Workforce Upskilling", bullets: [
+      "Shift toward human-AI collaboration where AI augments human expertise rather than replacing it.",
+      "Emergence of new specialized career fields in prompt engineering, AI safety, and data governance.",
+      "Imperative for continuous workforce training to keep pace with rapid technological shifts."
+    ]},
+    { title: "Cybersecurity & Threat Detection", bullets: [
+      "Real-time threat monitoring and autonomous detection of network security breaches.",
+      "Combating AI-generated phishing, deepfakes, and synthetic social engineering attacks.",
+      "Securing machine learning pipelines against adversarial attacks and data poisoning."
+    ]},
+    { title: "Global Regulatory Compliance & Governance", bullets: [
+      "Development of comprehensive AI regulations such as the EU AI Act and international standards.",
+      "Mandating risk assessments, auditing mechanisms, and clear accountability for high-risk applications.",
+      "Fostering open governance frameworks to align AI development with human values."
+    ]},
+    { title: "Frontier Innovations & Next-Gen Architecture", bullets: [
+      "Multimodal foundation models capable of reasoning across text, code, audio, and spatial inputs.",
+      "Neuromorphic computing and quantum machine learning unlocking exponential speedups.",
+      "Autonomous agent swarms executing multi-step problem solving in complex environments."
+    ]},
+    { title: "Strategic Roadmap for Safe AI Adoption", bullets: [
+      "Establish clear enterprise governance and ethical alignment principles prior to deployment.",
+      "Invest in robust data infrastructure, secure APIs, and continuous model evaluation.",
+      "Foster cross-functional collaboration between engineering, legal, and operational leadership."
+    ]}
+  ];
+
+  const genericSlideTopics = [
+    "Executive Overview", "Historical Context", "Core Mechanics & Principles",
+    "Key Drivers & Growth Factors", "Socioeconomic Impact", "Technological Developments",
+    "Challenges & Systemic Risks", "Regulatory & Policy Frameworks", "Market Trends & Benchmark Analysis",
+    "Future Strategic Outlook"
+  ];
+
+  const slides: string[] = [];
+  for (let i = 1; i <= count; i++) {
+    let slideData = { title: "", bullets: [] as string[] };
+
+    if (isPollution) {
+      slideData = pollutionSlides[(i - 1) % pollutionSlides.length];
+    } else if (isAi) {
+      slideData = aiSlides[(i - 1) % aiSlides.length];
+    } else {
+      const topicName = genericSlideTopics[(i - 1) % genericSlideTopics.length];
+      slideData = {
+        title: `${topicName}`,
+        bullets: [
+          `Detailed examination of ${topicName.toLowerCase()} in relation to ${topic}.`,
+          `Analysis of primary operational drivers, empirical observations, and structural impacts.`,
+          `Strategic takeaways and actionable execution principles compiled for ${topic}.`
+        ]
+      };
+    }
+
+    slides.push(`# Slide ${i}: ${topic} - ${slideData.title}
+- ${slideData.bullets[0]}
+- ${slideData.bullets[1]}
+- ${slideData.bullets[2]}`);
+  }
+
+  return slides.join("\n\n");
+}
+
 function buildRichContent(drishthi: DrishthiStatement, fullPrompt: string): string {
   const tool = (drishthi.selectedTools[0] || "") as string;
   const promptLower = fullPrompt.toLowerCase();
@@ -439,15 +585,7 @@ function buildRichContent(drishthi: DrishthiStatement, fullPrompt: string): stri
 
   // 1. Google Slides / Presentation Deck
   if (tool === "slides.createDeck" || tool.includes("slide") || promptLower.includes("presentation") || promptLower.includes("ppt") || promptLower.includes("deck")) {
-    const slides: string[] = [];
-    for (let i = 1; i <= requestedCount; i++) {
-      const topicName = sectionsList[(i - 1) % sectionsList.length];
-      slides.push(`# Slide ${i}: ${topic} - ${topicName}
-- Key operational and analytical breakdown regarding ${topicName}
-- Critical drivers, empirical observations, and strategic takeaways for ${topic}
-- Recommended policy frameworks and implementation roadmap prepared by WokAI OS`);
-    }
-    return slides.join("\n\n");
+    return getTopicSpecificSlides(topic, promptLower, requestedCount);
   }
 
   // 2. Google Sheets / Spreadsheet / Tracker
