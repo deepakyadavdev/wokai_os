@@ -225,6 +225,7 @@ export function ChatMain() {
 
   const [googleTokenState, setGoogleTokenState] = React.useState<string | null>(null);
   const [googleAuthUrl, setGoogleAuthUrl] = React.useState<string | null>(null);
+  const [liveTivereAck, setLiveTivereAck] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -245,6 +246,10 @@ export function ChatMain() {
         if (data.configured && data.url) setGoogleAuthUrl(data.url);
       })
       .catch(() => {});
+
+    const updateToken = () => setGoogleTokenState(getGoogleToken());
+    window.addEventListener("focus", updateToken);
+    return () => window.removeEventListener("focus", updateToken);
   }, []);
 
   const {
@@ -341,6 +346,7 @@ export function ChatMain() {
       textareaRef.current.style.height = "28px";
     }
     setPending(true);
+    setLiveTivereAck(null);
     setCurrentThinkingLogs([]);
     thinkingLogsRef.current = [];
 
@@ -386,6 +392,9 @@ export function ChatMain() {
               const data = JSON.parse(trimmed);
               if (data.status && data.status !== "done" && data.status !== "error") {
                 setProgressStatus(data.status);
+                if (data.status === "tivere_done" && data.output) {
+                  setLiveTivereAck(data.output);
+                }
                 if (data.status.endsWith("_done") && data.output) {
                   const friendly = getFriendlyAgentName(data.status);
                   const exists = thinkingLogsRef.current.some((p) => p.agent === friendly);
@@ -462,6 +471,7 @@ export function ChatMain() {
       addMessage(sessionId, {
         role: "assistant",
         content: result.response,
+        tivereResponse: result.tivereAck || liveTivereAck || undefined,
         result,
         thinkingLogs: thinkingLogsRef.current
       });
@@ -914,6 +924,13 @@ export function ChatMain() {
                       </div>
                     )}
 
+                    {/* Tivere Fast-Ack Banner */}
+                    {message.role === "assistant" && message.tivereResponse && (
+                      <div className="p-3 mb-3.5 rounded-xl border border-blue-500/20 bg-blue-500/10 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 text-xs shadow-sm">
+                        <MarkdownRenderer content={message.tivereResponse} />
+                      </div>
+                    )}
+
                     {message.role === "user" ? (
                       <p className="whitespace-pre-wrap text-slate-900 dark:text-slate-100">{message.content}</p>
                     ) : (
@@ -1032,21 +1049,38 @@ export function ChatMain() {
 
               {/* Thinking logs & progress indicator */}
               {pending && (
-                <motion.div key="thinking" className="flex flex-col items-start w-full gap-4">
-                  {/* Display current thinking logs so far */}
-                  {currentThinkingLogs.map((log) => (
-                    <div key={log.agent} className="w-full border border-slate-150 dark:border-border/50 bg-slate-50/50 dark:bg-card/40 rounded-xl p-4 text-xs shadow-sm">
-                      <div className="font-bold text-slate-500 dark:text-muted-foreground mb-2 flex items-center gap-1.5 uppercase select-none">
-                        <span className="inline-block size-1.5 rounded-full bg-blue-500 animate-ping" />
-                        {log.agent}
-                      </div>
-                      <div className="text-slate-700 dark:text-slate-350 leading-relaxed font-mono whitespace-pre-wrap max-h-48 overflow-y-auto bg-white dark:bg-[#111622] p-3 rounded-lg border border-slate-100 dark:border-border/40 shadow-inner">
-                        {log.output}
-                      </div>
+                <motion.div key="thinking" className="flex flex-col items-start w-full gap-3">
+                  <div className="px-5 py-4 text-sm leading-7 w-full border rounded-2xl shadow-sm bg-white dark:bg-card/90 border-slate-100 dark:border-border/50 text-slate-900 dark:text-slate-100">
+                    <div className="flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 mb-2 tracking-wide uppercase select-none">
+                      CHAT A.I +
                     </div>
-                  ))}
 
-                  <ThinkingIndicator status={progressStatus} />
+                    {/* Instant Tivere Fast-Ack Card */}
+                    {liveTivereAck && (
+                      <div className="p-3 mb-3.5 rounded-xl border border-blue-500/20 bg-blue-500/10 dark:bg-blue-500/10 text-blue-800 dark:text-blue-300 text-xs shadow-sm">
+                        <MarkdownRenderer content={liveTivereAck} />
+                      </div>
+                    )}
+
+                    <ThinkingIndicator status={progressStatus} />
+                  </div>
+
+                  {/* Display current thinking logs so far */}
+                  {currentThinkingLogs.length > 0 && (
+                    <div className="w-full flex flex-col gap-2">
+                      {currentThinkingLogs.map((log) => (
+                        <div key={log.agent} className="w-full border border-slate-100 dark:border-border/40 bg-slate-50/50 dark:bg-card/25 rounded-xl p-3 text-xs">
+                          <div className="font-bold text-slate-500 dark:text-muted-foreground mb-1 flex items-center gap-1.5 uppercase select-none">
+                            <span className="inline-block size-1.5 rounded-full bg-blue-500 animate-pulse" />
+                            {log.agent}
+                          </div>
+                          <div className="text-slate-700 dark:text-slate-350 leading-relaxed font-mono whitespace-pre-wrap max-h-40 overflow-y-auto bg-white dark:bg-[#111622] p-2.5 rounded-lg border border-slate-100 dark:border-border/40 shadow-inner">
+                            {log.output}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

@@ -8,6 +8,7 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  tivereResponse?: string;
   result?: AgentPlan;
   thinkingLogs?: Array<{ agent: string; output: string }>;
   timestamp: string; // ISO

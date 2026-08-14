@@ -130,6 +130,7 @@ export interface AgentPlan {
   intent: string;
   riskLevel: RiskLevel;
   response: string;
+  tivereAck?: string;
   reasoning: string[];
   plan: string[];
   actions: WokaiAction[];
