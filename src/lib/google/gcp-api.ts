@@ -8,6 +8,84 @@ export interface GcpApiExecutionResult {
 /**
  * 1. Google Docs API (Docs v1)
  */
+function parseMarkdownForGoogleDocs(content: string) {
+  const lines = content.split("\n");
+  let currentIndex = 1;
+  let cleanText = "";
+  const requests: any[] = [];
+
+  lines.forEach((line) => {
+    let rawLine = line;
+    let headingType: string | null = null;
+
+    if (/^#\s+/.test(rawLine)) {
+      headingType = "TITLE";
+      rawLine = rawLine.replace(/^#\s+/, "");
+    } else if (/^##\s+/.test(rawLine)) {
+      headingType = "HEADING_1";
+      rawLine = rawLine.replace(/^##\s+/, "");
+    } else if (/^###\s+/.test(rawLine)) {
+      headingType = "HEADING_2";
+      rawLine = rawLine.replace(/^###\s+/, "");
+    } else if (/^####\s+/.test(rawLine)) {
+      headingType = "HEADING_3";
+      rawLine = rawLine.replace(/^####\s+/, "");
+    } else if (/^\s*[-*]\s+/.test(rawLine)) {
+      rawLine = "• " + rawLine.replace(/^\s*[-*]\s+/, "");
+    }
+
+    const cleanLine = rawLine.replace(/\*\*(.*?)\*\*/g, "$1").replace(/\*(.*?)\*/g, "$1");
+    const lineStartIndex = currentIndex;
+    const lineEndIndex = currentIndex + cleanLine.length;
+
+    cleanText += cleanLine + "\n";
+    currentIndex = lineEndIndex + 1;
+
+    if (headingType && lineEndIndex > lineStartIndex) {
+      requests.push({
+        updateParagraphStyle: {
+          range: {
+            startIndex: lineStartIndex,
+            endIndex: lineEndIndex
+          },
+          paragraphStyle: {
+            namedStyleType: headingType
+          },
+          fields: "namedStyleType"
+        }
+      });
+    }
+
+    const boldRegex = /\*\*(.*?)\*\*/g;
+    let boldMatch: RegExpExecArray | null;
+    while ((boldMatch = boldRegex.exec(rawLine)) !== null) {
+      const matchText = boldMatch[1];
+      if (matchText) {
+        const cleanPreceding = rawLine.slice(0, boldMatch.index).replace(/\*\*(.*?)\*\*/g, "$1").replace(/\*(.*?)\*/g, "$1");
+        const boldStart = lineStartIndex + cleanPreceding.length;
+        const boldEnd = boldStart + matchText.length;
+
+        if (boldEnd > boldStart) {
+          requests.push({
+            updateTextStyle: {
+              range: {
+                startIndex: boldStart,
+                endIndex: boldEnd
+              },
+              textStyle: {
+                bold: true
+              },
+              fields: "bold"
+            }
+          });
+        }
+      }
+    }
+  });
+
+  return { cleanText, requests };
+}
+
 export async function createGoogleDoc(token: string, title: string, content: string): Promise<GcpApiExecutionResult> {
   try {
     const createRes = await fetch("https://docs.googleapis.com/v1/documents", {
@@ -32,6 +110,9 @@ export async function createGoogleDoc(token: string, title: string, content: str
     const docUrl = `https://docs.google.com/document/d/${documentId}/edit`;
 
     if (content) {
+      const { cleanText, requests } = parseMarkdownForGoogleDocs(content);
+
+      // 1. Insert clean text
       await fetch(`https://docs.googleapis.com/v1/documents/${documentId}:batchUpdate`, {
         method: "POST",
         headers: {
@@ -43,12 +124,24 @@ export async function createGoogleDoc(token: string, title: string, content: str
             {
               insertText: {
                 location: { index: 1 },
-                text: content
+                text: cleanText
               }
             }
           ]
         })
       });
+
+      // 2. Apply Heading styles and Bold formatting
+      if (requests.length > 0) {
+        await fetch(`https://docs.googleapis.com/v1/documents/${documentId}:batchUpdate`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ requests })
+        }).catch((err) => console.warn("Google Docs formatting warning:", err));
+      }
     }
 
     return {
