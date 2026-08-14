@@ -368,9 +368,47 @@ Output strictly valid JSON:
   };
 }
 
+function extractRequestedCount(fullPrompt: string, defaultCount = 10): number {
+  const match = fullPrompt.match(/\b(\d+)\s*(pages?|slides?|sections?|rows?)\b/i);
+  if (match) {
+    const num = parseInt(match[1], 10);
+    if (num > 0 && num <= 50) return num;
+  }
+  return defaultCount;
+}
+
+const SECTION_TOPICS = [
+  "Executive Summary & Core Overview",
+  "Historical Background & Early Foundations",
+  "Key Drivers, Capital & Infrastructure",
+  "Structural Evolution & Major Phases",
+  "Socioeconomic Impact & Workforce Dynamics",
+  "Technological Innovations & Automation",
+  "Environmental & Resource Challenges",
+  "Policy, Governance & Compliance Frameworks",
+  "Market Dynamics & Global Competitiveness",
+  "Modern Digital Transformation & Industry Standards",
+  "Risk Assessment & Systemic Bottlenecks",
+  "Operational Execution & Process Optimization",
+  "Intellectual Property & R&D Strategy",
+  "Supply Chain Resilience & Integration",
+  "Future Outlook & Strategic Roadmap",
+  "Case Studies & Empirical Field Data",
+  "Comparative Regional & Global Benchmark Analysis",
+  "Sustainability Metrics & Circular Economy Principles",
+  "Workforce Upskilling & Talent Retention Strategy",
+  "Financial Projections & Return on Investment",
+  "Regulatory Evolution & Cross-Border Legalities",
+  "Quality Assurance & Continuous Improvement",
+  "Emerging Frontier Technologies & Next-Gen Trends",
+  "Stakeholder Engagement & Ecosystem Alliances",
+  "Conclusion & Final Actionable Takeaways"
+];
+
 function buildRichContent(drishthi: DrishthiStatement, fullPrompt: string): string {
   const tool = (drishthi.selectedTools[0] || "") as string;
   const promptLower = fullPrompt.toLowerCase();
+  const requestedCount = extractRequestedCount(fullPrompt, 10);
 
   // 1. Google Slides / Presentation Deck
   if (tool === "slides.createDeck" || tool.includes("slide") || promptLower.includes("presentation") || promptLower.includes("ppt") || promptLower.includes("deck")) {
@@ -379,55 +417,15 @@ function buildRichContent(drishthi: DrishthiStatement, fullPrompt: string): stri
       .trim();
     const topic = rawTopic ? rawTopic.charAt(0).toUpperCase() + rawTopic.slice(1) : drishthi.subtaskTitle;
 
-    return `# Slide 1: ${topic} - Executive Overview
-- Comprehensive analysis of ${topic}
-- Key drivers, strategic impacts, and technological developments
-- Prepared by WokAI OS
-
-# Slide 2: Historical Background & Early Origins
-- Fundamental emergence of ${topic} in global history
-- Early industrial mechanisms and structural transformations
-- Transition from traditional frameworks to scalable systems
-
-# Slide 3: Core Drivers & Technological Innovations
-- Major breakthroughs in mechanization and power systems
-- Automation, process optimization, and industrial standards
-- Capital investments and infrastructure expansion
-
-# Slide 4: Socioeconomic Impact & Urbanization
-- Demographic shifts: rural-to-urban population migration
-- Creation of specialized industrial workforces and modern cities
-- Rapid increases in productivity and global trade volume
-
-# Slide 5: Key Challenges & Industrial Bottlenecks
-- Environmental implications and resource management
-- Labor regulation and workforce safety transitions
-- Managing structural economic disruptions during growth
-
-# Slide 6: Industrial Standardization & Policy
-- Establishment of quality standards and compliance frameworks
-- International trade agreements and regulatory evolution
-- Balancing innovation speed with regulatory safety
-
-# Slide 7: Modern Digital Transformation
-- Integration of digital networks, IoT, and AI automation
-- Transition toward smart manufacturing and sustainable industry
-- Real-time data analytics driving operational efficiency
-
-# Slide 8: Global Market & Economic Dynamics
-- Cross-border supply chain integration and resilience
-- Competitive landscape across emerging and developed markets
-- Economic sustainability and long-term capital allocation
-
-# Slide 9: Future Outlook & Strategic Roadmap
-- Emerging trends in green technology and renewable energy
-- Next-generation automation and human-AI collaboration
-- Strategic imperative for continuous learning and adaptation
-
-# Slide 10: Conclusion & Key Takeaways
-- Summary of core findings on ${topic}
-- Long-term strategic value and legacy of industrial evolution
-- Actionable steps for future growth and policy execution`;
+    const slides: string[] = [];
+    for (let i = 1; i <= requestedCount; i++) {
+      const topicName = SECTION_TOPICS[(i - 1) % SECTION_TOPICS.length];
+      slides.push(`# Slide ${i}: ${topic} - ${topicName}
+- Key strategic analysis regarding ${topicName.toLowerCase()} in relation to ${topic}
+- Core operational metrics, historical benchmarks, and structural impacts
+- Actionable guidelines and execution principles prepared by WokAI OS`);
+    }
+    return slides.join("\n\n");
   }
 
   // 2. Google Sheets / Spreadsheet / Tracker
@@ -437,13 +435,14 @@ function buildRichContent(drishthi: DrishthiStatement, fullPrompt: string): stri
       .trim();
     const topic = rawTopic ? rawTopic.charAt(0).toUpperCase() + rawTopic.slice(1) : drishthi.subtaskTitle;
 
-    return `ID, Module Name, Task Description, Status, Priority, Assigned Owner, Target Date
-1, ${topic} - Overview, Initial research & scope definition, Completed, HIGH, Deepak Yadav, 2026-08-15
-2, ${topic} - Data Analysis, Data gathering & structural audit, In Progress, HIGH, Deepak Yadav, 2026-08-18
-3, ${topic} - Architecture, Core system setup & API configuration, Pending, CRITICAL, Deepak Yadav, 2026-08-20
-4, ${topic} - Implementation, Feature development & adapter integration, Pending, HIGH, WokAI Agent, 2026-08-22
-5, ${topic} - Verification, Testing & compliance audit, Pending, MEDIUM, WokAI Agent, 2026-08-25
-6, ${topic} - Final Release, Deployment & documentation review, Pending, MEDIUM, Team Lead, 2026-08-30`;
+    const rows: string[] = ["ID, Module Name, Task Description, Status, Priority, Assigned Owner, Target Date"];
+    for (let i = 1; i <= requestedCount; i++) {
+      const topicName = SECTION_TOPICS[(i - 1) % SECTION_TOPICS.length];
+      const status = i % 3 === 1 ? "Completed" : i % 3 === 2 ? "In Progress" : "Pending";
+      const priority = i % 4 === 0 ? "CRITICAL" : i % 2 === 0 ? "HIGH" : "MEDIUM";
+      rows.push(`${i}, ${topic} - ${topicName}, Detailed execution step for ${topicName.toLowerCase()}, ${status}, ${priority}, Deepak Yadav, 2026-08-${String(15 + (i % 15)).padStart(2, "0")}`);
+    }
+    return rows.join("\n");
   }
 
   // 3. Google Docs / Document File
@@ -453,57 +452,23 @@ function buildRichContent(drishthi: DrishthiStatement, fullPrompt: string): stri
     .trim();
   const topic = rawTopic ? rawTopic.charAt(0).toUpperCase() + rawTopic.slice(1) : drishthi.subtaskTitle;
 
-  return `# ${topic}
+  const docSections: string[] = [`# ${topic}\n\n*Comprehensive ${requestedCount}-Section Document Generated by WokAI OS*\n`];
+  for (let i = 1; i <= requestedCount; i++) {
+    const topicName = SECTION_TOPICS[(i - 1) % SECTION_TOPICS.length];
+    docSections.push(`## ${i}. ${topicName}
+The domain of ${topic} as it relates to ${topicName.toLowerCase()} demonstrates profound structural significance across global frameworks.
 
-## 1. Executive Summary & Overview
-The subject of ${topic} represents a crucial field of historical, economic, and technological development. This document presents a structured and detailed analysis of its core principles, historical evolution, socio-economic impacts, and future outlook.
+### ${i}.1 Core Principles & Findings
+- **Strategic Impact:** Primary operational models drive high-efficiency throughput and organizational scalability.
+- **Resource Allocation:** Capital investments and infrastructure development provide long-term resilience.
+- **Empirical Evidence:** Quantitative benchmarks indicate steady advancement across regional and international metrics.
 
-## 2. Historical Origins & Foundations
-The emergence of ${topic} was driven by a conjunction of pivotal factors:
-- **Technological Breakthroughs:** Major advances in machinery, energy systems, and process optimization transformed traditional frameworks.
-- **Economic Infrastructure:** The creation of new financial models, expanded trade routes, and infrastructure investment accelerated adoption.
-- **Societal & Demographic Factors:** Shifting population dynamics, urban expansion, and specialized workforce development created high momentum.
+### ${i}.2 Analytical Breakdown
+Detailed investigation into ${topicName.toLowerCase()} reveals key technological, economic, and policy factors. Organization leaders must maintain adaptive governance to optimize long-term outcomes while mitigating systemic risks.`);
+  }
 
-## 3. Key Drivers of Growth & Expansion
-1. **Infrastructure Investments:** Roads, transport systems, and digital networks provided the physical and logistical backbone.
-2. **Capital Mobilization:** Access to private equity, public funding, and commercial banking enabled high-capital industrial scaling.
-3. **Intellectual Capital:** Research institutions and technical training institutions expanded the knowledge frontier.
-
-## 4. Structural Evolution & Major Phases
-1. **Inception & Early Adoption:** Initial concepts were established and piloted across primary sectors.
-2. **Rapid Scaling & Standardization:** Production standards, regulatory guidelines, and global networks expanded exponentially.
-3. **Integration & Modern Era:** Advanced automation, digital integration, and sustainability frameworks became central imperatives.
-
-## 5. Socioeconomic Impact & Workforce Transformation
-- **Economic Productivity:** Industrial efficiency and output per capita increased dramatically across regions.
-- **Social Transformation:** Traditional communities transitioned into urban industrial hubs, redefining work environments and lifestyle standards.
-- **Demographic Shifts:** Rapid growth of metropolitan areas and international migration patterns.
-
-## 6. Technological Innovation & Automation
-- **Process Automation:** Mechanized workflows reduced production errors and operating overhead.
-- **Data-Driven Operations:** Real-time metrics and quality assurance systems became standard industry practice.
-- **Scalable Architecture:** Modular design principles enabled rapid replication across international locations.
-
-## 7. Environmental & Systemic Challenges
-- **Resource Management:** Balancing high industrial throughput with raw material availability and ecological stewardship.
-- **Regulatory Compliance:** Navigating international labor laws, safety standards, and environmental protection guidelines.
-- **Transition Costs:** Retraining workforces and modernizing legacy equipment during technological shifts.
-
-## 8. Policy, Governance & Regulatory Frameworks
-- **Governmental Policy:** Tax incentives, trade tariffs, and public infrastructure grants shaping industry direction.
-- **International Cooperation:** Global standard organizations ensuring interoperability and environmental compliance.
-- **Corporate Governance:** Ethical standards, stakeholder accountability, and sustainable reporting practices.
-
-## 9. Modern Industry Trends & Future Horizons
-- **Digital Twin & Smart Systems:** Virtual modeling and predictive maintenance optimizing supply chains.
-- **Human-AI Collaboration:** Augmenting human workforce capabilities with intelligent agent orchestration.
-- **Green Transition:** Circular economy practices and renewable energy integration becoming primary competitive advantages.
-
-## 10. Conclusion & Strategic Recommendations
-In conclusion, ${topic} remains a fundamental pillar of economic and technological progress. Sustained innovation, balanced policy frameworks, and adaptive strategy will ensure long-term prosperity and resilience.
-
----
-*Document compiled by WokAI OS | Prompt: "${fullPrompt}"*`;
+  docSections.push(`\n---\n*Document compiled by WokAI OS | Prompt: "${fullPrompt}"*`);
+  return docSections.join("\n\n");
 }
 
 /* ============================================================================
@@ -513,11 +478,16 @@ export async function runSahayata(
   drishthi: DrishthiStatement,
   fullPrompt: string
 ): Promise<SahayataPayload> {
+  const requestedCount = extractRequestedCount(fullPrompt, 10);
+  const isSlides = drishthi.selectedTools.includes("slides.createDeck") || fullPrompt.toLowerCase().includes("ppt") || fullPrompt.toLowerCase().includes("slide");
+
   try {
     const promptText = `
 You are SAHAYATA, the Content & Payload Generation Agent of WokAI.
-Generate rich, full-length, highly detailed content (document body, article, email body, report, or spreadsheet data) to fulfill the user's goal.
-If the user asks for a document on a topic (e.g. "Rise of Industrialization"), write a comprehensive, multi-section essay/article covering history, key factors, socioeconomic impact, key developments, and conclusion.
+Generate rich, full-length, highly detailed content (document body, article, email body, report, or presentation slides) to fulfill the user's goal.
+
+TARGET LENGTH REQUIRED: ${requestedCount} ${isSlides ? "slides" : "pages/sections"}.
+${isSlides ? `Output EXACTLY ${requestedCount} slides formatted with headers \`# Slide 1: ...\` through \`# Slide ${requestedCount}: ...\`. Each slide must contain bullet points.` : `Output EXACTLY ${requestedCount} detailed sections formatted as \`## 1. ...\` through \`## ${requestedCount}. ...\`.`}
 
 DRISTHI Statement: "${drishthi.enrichedStatement}"
 Tools selected: ${drishthi.selectedTools.join(", ")}
