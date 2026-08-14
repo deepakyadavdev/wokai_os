@@ -104,7 +104,14 @@ export async function executeAdapterAction(action: any, googleToken?: string) {
   // 1. Google Docs API
   if (toolName === "docs.create" || toolName === "docs") {
     if (activeToken) {
-      const res = await createGoogleDoc(activeToken, label, content);
+      let docTitle = label;
+      if (!docTitle || docTitle.startsWith("Execute action") || docTitle.startsWith("Create Google Doc") || docTitle.toLowerCase().includes("page")) {
+        const titleLine = content.split("\n").find((l: string) => l.trim().startsWith("#"));
+        docTitle = titleLine
+          ? titleLine.replace(/^#+\s*/, "").trim()
+          : label.replace(/^(create|write|make|generate)\s+(a|an)?\s+(\d+-page|page)?\s*(google\s*)?(doc|docs|document|file)\s*(on|about|for|on topic|mainy on topic)?\s*/i, "").trim() || "WokAI Document";
+      }
+      const res = await createGoogleDoc(activeToken, docTitle, content);
       return { status: res.status, output: res.output, url: res.url };
     }
     return {
