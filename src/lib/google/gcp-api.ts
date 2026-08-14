@@ -149,10 +149,42 @@ export async function searchGmail(token: string, query: string): Promise<GcpApiE
 /**
  * 4. Google Calendar API (Calendar v3) - Create Event
  */
-export async function createCalendarEvent(token: string, title: string, description: string): Promise<GcpApiExecutionResult> {
+export async function createCalendarEvent(token: string, rawTitle: string, description: string): Promise<GcpApiExecutionResult> {
   try {
-    const startIso = new Date(Date.now() + 3600 * 1000).toISOString();
-    const endIso = new Date(Date.now() + 7200 * 1000).toISOString();
+    let summary = rawTitle
+      .replace(/^(schedule|create|set|add|book)\s+(a|an)?\s+(google\s*)?(calendar\s*)?(event|meeting)\s*(for|on|at|about)?\s*/i, "")
+      .replace(/^"(.*)"$/, "$1")
+      .replace(/\s+(at|on|tomorrow|today|next week)\s+\d+.*$/i, "")
+      .trim();
+
+    if (!summary || summary.startsWith("Execute action") || summary.startsWith("Schedule Google Calendar")) {
+      summary = description ? description.split("\n")[0].slice(0, 60) : "WokAI Scheduled Meeting";
+    }
+
+    let startTime = new Date(Date.now() + 3600 * 1000);
+
+    const timeMatch = (rawTitle + " " + description).match(/\b(at\s+)?(\d{1,2})(:\d{2})?\s*(am|pm)?\b/i);
+    if (timeMatch) {
+      let hours = parseInt(timeMatch[2], 10);
+      const isPm = timeMatch[4] && timeMatch[4].toLowerCase() === "pm";
+      const isAm = timeMatch[4] && timeMatch[4].toLowerCase() === "am";
+
+      if (isPm && hours < 12) hours += 12;
+      if (isAm && hours === 12) hours = 0;
+
+      const target = new Date();
+      if ((rawTitle + " " + description).toLowerCase().includes("tomorrow")) {
+        target.setDate(target.getDate() + 1);
+      }
+      target.setHours(hours, timeMatch[3] ? parseInt(timeMatch[3].slice(1), 10) : 0, 0, 0);
+
+      if (target.getTime() < Date.now()) {
+        target.setDate(target.getDate() + 1);
+      }
+      startTime = target;
+    }
+
+    const endTime = new Date(startTime.getTime() + 3600 * 1000);
 
     const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
       method: "POST",
@@ -161,10 +193,10 @@ export async function createCalendarEvent(token: string, title: string, descript
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        summary: title || "WokAI Scheduled Task",
-        description: description || "",
-        start: { dateTime: startIso },
-        end: { dateTime: endIso }
+        summary: summary || "WokAI Scheduled Meeting",
+        description: description || "Created by WokAI OS",
+        start: { dateTime: startTime.toISOString() },
+        end: { dateTime: endTime.toISOString() }
       })
     });
 
@@ -176,7 +208,7 @@ export async function createCalendarEvent(token: string, title: string, descript
     const data = await res.json();
     return {
       status: "COMPLETED",
-      output: `Google Calendar Event "${data.summary}" created! Link: ${data.htmlLink}`,
+      output: `Google Calendar Event "${data.summary}" set for ${new Date(data.start.dateTime).toLocaleString()}! Event Link: ${data.htmlLink}`,
       url: data.htmlLink,
       data
     };

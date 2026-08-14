@@ -259,8 +259,10 @@ Output strictly valid JSON:
     defaultToolTitle = `Send Email via Gmail API: "${userPrompt}"`;
   } else if (/gmail|email|inbox|search mail|read mail|check mail/i.test(promptLower)) {
     defaultToolTitle = `Search Gmail Inbox for "${userPrompt}"`;
-  } else if (/calendar|schedule|meeting|event/i.test(promptLower)) {
+  } else if (/create meeting|set meeting|schedule meeting|set a meeting|schedule a meeting|add meeting|book meeting|create event|add event|schedule event|book event|set event|meeting at|meeting on|remind me at/i.test(promptLower)) {
     defaultToolTitle = `Schedule Google Calendar Event: "${userPrompt}"`;
+  } else if (/list events|upcoming events|get events|check calendar|show calendar|calendar|agenda|what's on my calendar/i.test(promptLower)) {
+    defaultToolTitle = `List Google Calendar Events: "${userPrompt}"`;
   } else if (/search drive|find file|search file|in my drive|proposol|proposal|look for file|find doc|search doc|where is file/i.test(promptLower)) {
     defaultToolTitle = `Search Google Drive for "${userPrompt}"`;
   }
@@ -306,11 +308,11 @@ TOOL SELECTION RULES:
 - If user wants to create a doc: select "docs.create"
 - If user wants to create slides/deck: select "slides.createDeck"
 - If user wants to create a tracker/spreadsheet: select "sheets.createTracker"
+- If user wants to create or set a calendar event/meeting: select "calendar.createEvent"
+- If user wants to list/check calendar events: select "calendar.listEvents"
 - If user wants to find/search files in Drive: select "drive.search"
 - If user wants to send an email: select "gmail.send"
 - If user wants to search or read emails: select "gmail.search"
-- If user wants to create a calendar event: select "calendar.createEvent"
-- If user wants to list/check calendar events: select "calendar.listEvents"
 
 Output strictly valid JSON:
 {
@@ -343,14 +345,14 @@ Output strictly valid JSON:
     toolName = "slides.createDeck";
   } else if (/sheet|sheets|tracker|excel|spreadsheet|csv/i.test(textToMatch)) {
     toolName = "sheets.createTracker";
+  } else if (/calendar\.create|create event|create meeting|schedule meeting|schedule a meeting|set meeting|set a meeting|add event|add meeting|book meeting|book a meeting|meeting at|meeting on|set event|book event|remind me at/i.test(textToMatch)) {
+    toolName = "calendar.createEvent";
+  } else if (/calendar\.list|list events|upcoming events|get events|check calendar|show calendar|calendar|agenda|what's on my calendar/i.test(textToMatch)) {
+    toolName = "calendar.listEvents";
   } else if (/gmail\.send|send email|compose email|send mail/i.test(textToMatch)) {
     toolName = "gmail.send";
   } else if (/gmail|email|inbox|search mail|find mail|summarize email|read mail/i.test(textToMatch)) {
     toolName = "gmail.search";
-  } else if (/calendar\.create|create event|schedule meeting|add event|book meeting/i.test(textToMatch)) {
-    toolName = "calendar.createEvent";
-  } else if (/calendar|events|agenda|schedule|upcoming/i.test(textToMatch)) {
-    toolName = "calendar.listEvents";
   } else if (/contact|people|find phone|find email of/i.test(textToMatch)) {
     toolName = "contacts.search";
   } else if (/drive|search file|find file|in my drive|proposol|proposal|look for file|where is file/i.test(textToMatch)) {
