@@ -249,20 +249,20 @@ Output strictly valid JSON:
   const promptLower = userPrompt.toLowerCase();
 
   let defaultToolTitle = `Execute action for: ${userPrompt}`;
-  if (/drive|search file|find file|in my drive|proposol|proposal|doc search|file/i.test(promptLower)) {
-    defaultToolTitle = `Search Google Drive for "${userPrompt}"`;
-  } else if (/send email|compose email|send mail/i.test(promptLower)) {
+  if (/doc|docs|document|write doc|create doc|make doc|build doc/i.test(promptLower)) {
+    defaultToolTitle = `Create Google Doc for "${userPrompt}"`;
+  } else if (/slide|slides|presentation|ppt|deck|powerpoint/i.test(promptLower)) {
+    defaultToolTitle = `Create Google Slides Deck for "${userPrompt}"`;
+  } else if (/sheet|sheets|tracker|excel|spreadsheet|csv/i.test(promptLower)) {
+    defaultToolTitle = `Create Google Sheet for "${userPrompt}"`;
+  } else if (/send email|compose email|send mail|mail to|email to/i.test(promptLower)) {
     defaultToolTitle = `Send Email via Gmail API: "${userPrompt}"`;
-  } else if (/gmail|email|inbox|search mail|read mail/i.test(promptLower)) {
+  } else if (/gmail|email|inbox|search mail|read mail|check mail/i.test(promptLower)) {
     defaultToolTitle = `Search Gmail Inbox for "${userPrompt}"`;
   } else if (/calendar|schedule|meeting|event/i.test(promptLower)) {
     defaultToolTitle = `Schedule Google Calendar Event: "${userPrompt}"`;
-  } else if (/sheet|tracker|excel|spreadsheet/i.test(promptLower)) {
-    defaultToolTitle = `Create Google Sheet: "${userPrompt}"`;
-  } else if (/slide|presentation|deck/i.test(promptLower)) {
-    defaultToolTitle = `Create Google Slides Deck: "${userPrompt}"`;
-  } else if (/create doc|write doc|new document/i.test(promptLower)) {
-    defaultToolTitle = `Create Google Doc: "${userPrompt}"`;
+  } else if (/search drive|find file|search file|in my drive|proposol|proposal|look for file|find doc|search doc|where is file/i.test(promptLower)) {
+    defaultToolTitle = `Search Google Drive for "${userPrompt}"`;
   }
 
   return {
@@ -303,12 +303,12 @@ Subtask Description: "${subtask.description}"
 Original User Goal: "${fullPrompt}"
 
 TOOL SELECTION RULES:
+- If user wants to create a doc: select "docs.create"
+- If user wants to create slides/deck: select "slides.createDeck"
+- If user wants to create a tracker/spreadsheet: select "sheets.createTracker"
 - If user wants to find/search files in Drive: select "drive.search"
 - If user wants to send an email: select "gmail.send"
 - If user wants to search or read emails: select "gmail.search"
-- If user wants to create a doc: select "docs.create"
-- If user wants to create a tracker/spreadsheet: select "sheets.createTracker"
-- If user wants to create slides/deck: select "slides.createDeck"
 - If user wants to create a calendar event: select "calendar.createEvent"
 - If user wants to list/check calendar events: select "calendar.listEvents"
 
@@ -336,9 +336,13 @@ Output strictly valid JSON:
 
   const textToMatch = `${subtask.title} ${subtask.description} ${fullPrompt}`.toLowerCase();
 
-  let toolName: WokaiToolName = "drive.search";
-  if (/drive|search file|find file|in my drive|proposol|proposal|doc search|find doc|look for file|file/i.test(textToMatch)) {
-    toolName = "drive.search";
+  let toolName: WokaiToolName = "docs.create";
+  if (/doc|docs|document|write doc|create doc|make doc|build doc/i.test(textToMatch)) {
+    toolName = "docs.create";
+  } else if (/slide|slides|presentation|ppt|deck|powerpoint/i.test(textToMatch)) {
+    toolName = "slides.createDeck";
+  } else if (/sheet|sheets|tracker|excel|spreadsheet|csv/i.test(textToMatch)) {
+    toolName = "sheets.createTracker";
   } else if (/gmail\.send|send email|compose email|send mail/i.test(textToMatch)) {
     toolName = "gmail.send";
   } else if (/gmail|email|inbox|search mail|find mail|summarize email|read mail/i.test(textToMatch)) {
@@ -347,14 +351,10 @@ Output strictly valid JSON:
     toolName = "calendar.createEvent";
   } else if (/calendar|events|agenda|schedule|upcoming/i.test(textToMatch)) {
     toolName = "calendar.listEvents";
-  } else if (/sheet|tracker|excel|spreadsheet|csv/i.test(textToMatch)) {
-    toolName = "sheets.createTracker";
-  } else if (/slide|deck|presentation|ppt|powerpoint/i.test(textToMatch)) {
-    toolName = "slides.createDeck";
   } else if (/contact|people|find phone|find email of/i.test(textToMatch)) {
     toolName = "contacts.search";
-  } else if (/create doc|new document|write doc|make document/i.test(textToMatch)) {
-    toolName = "docs.create";
+  } else if (/drive|search file|find file|in my drive|proposol|proposal|look for file|where is file/i.test(textToMatch)) {
+    toolName = "drive.search";
   }
 
   return {
