@@ -107,7 +107,7 @@ export async function generateAgentPlan(
     onPhaseChange?.("sahayata_done", `SAHAYATA Agent: Payload ready (${sahayataRes.content.length} chars).`);
 
     onPhaseChange?.("kriya", `KRIYA Agent: Executing GCP action for "${st.title}"...`);
-    const kriyaRes = await runKriya(drishthiRes, sahayataRes, googleToken);
+    const kriyaRes = await runKriya(drishthiRes, sahayataRes, googleToken, subtaskLogs);
     onPhaseChange?.("kriya_done", `KRIYA Agent: Action result: ${kriyaRes.status}`);
 
     onPhaseChange?.("mulye", `MULYE Agent: Auditing subtask "${st.title}"...`);

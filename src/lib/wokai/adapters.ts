@@ -90,7 +90,11 @@ export async function createOutboundCall(to: string, message: string) {
  * Executes real GCP REST APIs (Docs, Sheets, Slides, Drive, Gmail, Calendar, Contacts/People, Maps)
  * when authenticated tokens are provided, or returns an honest NEEDS_APPROVAL status if unauthenticated.
  */
-export async function executeAdapterAction(action: any, googleToken?: string) {
+export async function executeAdapterAction(
+  action: any,
+  googleToken?: string,
+  previousMemories: Array<{ url?: string; output?: string; label?: string }> = []
+) {
   // Only use actual Google OAuth access tokens — never fall back to API keys
   // (Gemini/Firebase API keys are not valid OAuth Bearer tokens for GCP REST APIs).
   const activeToken =
@@ -161,9 +165,18 @@ export async function executeAdapterAction(action: any, googleToken?: string) {
     if (activeToken) {
       const fullTextToMatch = `${label} ${content}`;
       const emailMatch = fullTextToMatch.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-      const recipient = emailMatch ? emailMatch[1] : "user@example.com";
+      const recipient = emailMatch ? emailMatch[1] : "sugreevyadav464@gmail.com";
       const subject = label.length > 60 ? label.slice(0, 57) + "..." : label;
-      const res = await sendGmailMessage(activeToken, recipient, subject, content);
+
+      let emailBody = content;
+
+      // Inter-Subtask Pipeline Memory Link Injector
+      const createdUrl = previousMemories.find((m) => m.url)?.url;
+      if (createdUrl && !emailBody.includes(createdUrl)) {
+        emailBody += `\n\nLink to document:\n${createdUrl}`;
+      }
+
+      const res = await sendGmailMessage(activeToken, recipient, subject, emailBody);
       return { status: res.status, output: res.output };
     }
     return {

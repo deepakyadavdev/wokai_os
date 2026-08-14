@@ -912,7 +912,8 @@ If JSON output is not possible, output the full document markdown directly.
 export async function runKriya(
   drishthi: DrishthiStatement,
   sahayata: SahayataPayload,
-  googleToken?: string
+  googleToken?: string,
+  previousLogs: Array<{ subtask: VicharSubtask; drishthi: DrishthiStatement; sahayata: SahayataPayload; kriya: KriyaResult }> = []
 ): Promise<KriyaResult> {
   const toolName = drishthi.selectedTools[0] || "drive.search";
   const actionId = helperId("act");
@@ -933,8 +934,14 @@ export async function runKriya(
     createdAt: new Date().toISOString()
   };
 
+  const previousMemories = previousLogs.map((l) => ({
+    url: l.kriya?.actionCreated?.url,
+    output: l.kriya?.apiResponse,
+    label: l.subtask.title
+  }));
+
   try {
-    const adapterRes = await executeAdapterAction(actionToExecute, googleToken);
+    const adapterRes = await executeAdapterAction(actionToExecute, googleToken, previousMemories);
     actionToExecute.status = adapterRes.status;
     actionToExecute.output = adapterRes.output;
     actionToExecute.url = adapterRes.url;
