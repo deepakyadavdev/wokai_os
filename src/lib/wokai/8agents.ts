@@ -186,6 +186,9 @@ export async function runTivere(userPrompt: string): Promise<TivereResult> {
   const shortSnippet = userPrompt.length > 50 ? userPrompt.slice(0, 50) + "..." : userPrompt;
   return {
     ackMessage: `⚡ **Tivere Fast-Ack**: Received task "${shortSnippet}...". Initializing subtask breakdown and parallel execution now!`,
+    dispatchedAt: new Date().toISOString()
+  };
+}
 /* ============================================================================
  * AGENT 3: VICHAR (Task Breakdown, Ranking & Dispatching Agent)
  * ============================================================================ */
@@ -335,6 +338,8 @@ Output strictly valid JSON:
 
 /* ============================================================================
  * AGENT 4: DRISTHI (Tool Selection & Statement Enrichment Agent)
+ * ============================================================================ */
+export async function runDrishthi(
   subtask: VicharSubtask,
   fullPrompt: string
 ): Promise<DrishthiStatement> {
