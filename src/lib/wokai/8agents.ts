@@ -377,97 +377,108 @@ function extractRequestedCount(fullPrompt: string, defaultCount = 10): number {
   return defaultCount;
 }
 
-const SECTION_TOPICS = [
-  "Executive Summary & Core Overview",
-  "Historical Background & Early Foundations",
-  "Key Drivers, Capital & Infrastructure",
-  "Structural Evolution & Major Phases",
-  "Socioeconomic Impact & Workforce Dynamics",
-  "Technological Innovations & Automation",
-  "Environmental & Resource Challenges",
-  "Policy, Governance & Compliance Frameworks",
-  "Market Dynamics & Global Competitiveness",
-  "Modern Digital Transformation & Industry Standards",
-  "Risk Assessment & Systemic Bottlenecks",
-  "Operational Execution & Process Optimization",
-  "Intellectual Property & R&D Strategy",
-  "Supply Chain Resilience & Integration",
-  "Future Outlook & Strategic Roadmap",
-  "Case Studies & Empirical Field Data",
-  "Comparative Regional & Global Benchmark Analysis",
-  "Sustainability Metrics & Circular Economy Principles",
-  "Workforce Upskilling & Talent Retention Strategy",
-  "Financial Projections & Return on Investment",
-  "Regulatory Evolution & Cross-Border Legalities",
-  "Quality Assurance & Continuous Improvement",
-  "Emerging Frontier Technologies & Next-Gen Trends",
-  "Stakeholder Engagement & Ecosystem Alliances",
-  "Conclusion & Final Actionable Takeaways"
-];
+function getTopicSpecificSections(topic: string, promptLower: string): string[] {
+  if (/pollut|environment|emiss|waste|climate|smog|toxic/i.test(topic + " " + promptLower)) {
+    return [
+      "Overview of Environmental Pollution & Major Types",
+      "Industrial Emissions & Atmospheric Contaminants",
+      "Fossil Fuel Combustion & Transportation Smog",
+      "Chemical Effluents & Freshwater Contamination",
+      "Plastic Accumulation & Ocean Acidification",
+      "Agricultural Pesticides, Fertilizers & Soil Degradation",
+      "Deforestation, Biodiversity Loss & Carbon Sink Loss",
+      "Public Health Consequences & Disease Risks",
+      "Global Economic Impacts & Ecosystem Degradation",
+      "Policy Governance, Regulations & International Treaties",
+      "Renewable Energy Transition & Clean Technology",
+      "Waste Management, Recycling & Circular Systems",
+      "Community Awareness & Sustainable Action Plan"
+    ];
+  }
+
+  if (/ai|artificial intelligence|machine learning|robot|technology|digital/i.test(topic + " " + promptLower)) {
+    return [
+      "Executive Overview of Artificial Intelligence",
+      "Foundational Algorithms & Deep Neural Networks",
+      "Data Infrastructure & High-Performance Computing",
+      "Enterprise Automation & Efficiency Breakthroughs",
+      "Ethical Considerations, Bias & Algorithmic Safety",
+      "Job Market Impacts & Human-AI Collaboration",
+      "Cybersecurity, Privacy & Data Protection",
+      "Regulatory Compliance & Global AI Standards",
+      "Frontier Innovations & Next-Generation Models",
+      "Strategic Roadmap for Safe AI Integration"
+    ];
+  }
+
+  return [
+    `Executive Overview of ${topic}`,
+    `Historical Background & Early Foundations of ${topic}`,
+    `Core Drivers, Factors & Key Elements of ${topic}`,
+    `Structural Evolution & Primary Components of ${topic}`,
+    `Socioeconomic & Environmental Impact of ${topic}`,
+    `Technological Innovations & Modern Developments in ${topic}`,
+    `Major Challenges, Bottlenecks & Risk Factors in ${topic}`,
+    `Policy, Governance & Compliance Standards for ${topic}`,
+    `Global Market Trends & Comparative Benchmark Analysis of ${topic}`,
+    `Future Outlook & Strategic Takeaways for ${topic}`
+  ];
+}
 
 function buildRichContent(drishthi: DrishthiStatement, fullPrompt: string): string {
   const tool = (drishthi.selectedTools[0] || "") as string;
   const promptLower = fullPrompt.toLowerCase();
   const requestedCount = extractRequestedCount(fullPrompt, 10);
 
+  const rawTopic = fullPrompt
+    .replace(/^(create|write|make|generate|build)\s+(a|an)?\s+(\d+-page|\d+-slide|page|slide|short|long|detailed)?\s*(google\s*)?(doc|docs|document|slides|presentation|deck|sheet|tracker|file)\s*(on|about|for|on topic|mainy on topic)?\s*/i, "")
+    .replace(/\s*(and give me the link|give me link|link of file|link).*$/i, "")
+    .trim();
+  const topic = rawTopic ? rawTopic.charAt(0).toUpperCase() + rawTopic.slice(1) : drishthi.subtaskTitle;
+  const sectionsList = getTopicSpecificSections(topic, promptLower);
+
   // 1. Google Slides / Presentation Deck
   if (tool === "slides.createDeck" || tool.includes("slide") || promptLower.includes("presentation") || promptLower.includes("ppt") || promptLower.includes("deck")) {
-    const rawTopic = fullPrompt
-      .replace(/^(create|write|make|generate|build)\s+(a|an)?\s+(\d+-slide|slide|\d+\s+slides|presentation|deck|ppt)?\s*(google\s*)?(slides|presentation|deck|file)?\s*(on|about|for|on topic)?\s*/i, "")
-      .trim();
-    const topic = rawTopic ? rawTopic.charAt(0).toUpperCase() + rawTopic.slice(1) : drishthi.subtaskTitle;
-
     const slides: string[] = [];
     for (let i = 1; i <= requestedCount; i++) {
-      const topicName = SECTION_TOPICS[(i - 1) % SECTION_TOPICS.length];
+      const topicName = sectionsList[(i - 1) % sectionsList.length];
       slides.push(`# Slide ${i}: ${topic} - ${topicName}
-- Key strategic analysis regarding ${topicName.toLowerCase()} in relation to ${topic}
-- Core operational metrics, historical benchmarks, and structural impacts
-- Actionable guidelines and execution principles prepared by WokAI OS`);
+- Key operational and analytical breakdown regarding ${topicName}
+- Critical drivers, empirical observations, and strategic takeaways for ${topic}
+- Recommended policy frameworks and implementation roadmap prepared by WokAI OS`);
     }
     return slides.join("\n\n");
   }
 
   // 2. Google Sheets / Spreadsheet / Tracker
   if (tool === "sheets.createTracker" || tool.includes("sheet") || promptLower.includes("spreadsheet") || promptLower.includes("tracker") || promptLower.includes("excel")) {
-    const rawTopic = fullPrompt
-      .replace(/^(create|write|make|generate|build)\s+(a|an)?\s*(google\s*)?(sheet|sheets|spreadsheet|tracker|excel)?\s*(on|about|for|on topic)?\s*/i, "")
-      .trim();
-    const topic = rawTopic ? rawTopic.charAt(0).toUpperCase() + rawTopic.slice(1) : drishthi.subtaskTitle;
-
-    const rows: string[] = ["ID, Module Name, Task Description, Status, Priority, Assigned Owner, Target Date"];
+    const rows: string[] = ["ID, Topic Focus, Action Description, Status, Risk Level, Assigned Owner, Target Date"];
     for (let i = 1; i <= requestedCount; i++) {
-      const topicName = SECTION_TOPICS[(i - 1) % SECTION_TOPICS.length];
+      const topicName = sectionsList[(i - 1) % sectionsList.length];
       const status = i % 3 === 1 ? "Completed" : i % 3 === 2 ? "In Progress" : "Pending";
       const priority = i % 4 === 0 ? "CRITICAL" : i % 2 === 0 ? "HIGH" : "MEDIUM";
-      rows.push(`${i}, ${topic} - ${topicName}, Detailed execution step for ${topicName.toLowerCase()}, ${status}, ${priority}, Deepak Yadav, 2026-08-${String(15 + (i % 15)).padStart(2, "0")}`);
+      rows.push(`${i}, ${topic} - ${topicName}, Detailed investigation into ${topicName.toLowerCase()}, ${status}, ${priority}, Deepak Yadav, 2026-08-${String(15 + (i % 15)).padStart(2, "0")}`);
     }
     return rows.join("\n");
   }
 
   // 3. Google Docs / Document File
-  const rawTopic = fullPrompt
-    .replace(/^(create|write|make|generate|build)\s+(a|an)?\s+(\d+-page|page|short|long|detailed)?\s*(google\s*)?(doc|docs|document|file)\s*(on|about|for|on topic|mainy on topic)?\s*/i, "")
-    .replace(/\s*(and give me the link|give me link|link of file|link).*$/i, "")
-    .trim();
-  const topic = rawTopic ? rawTopic.charAt(0).toUpperCase() + rawTopic.slice(1) : drishthi.subtaskTitle;
-
-  const docSections: string[] = [`# ${topic}\n\n*Comprehensive ${requestedCount}-Section Document Generated by WokAI OS*\n`];
+  const docSections: string[] = [`# Detailed Report on ${topic}\n\n*Comprehensive ${requestedCount}-Section Analysis Generated by WokAI OS*\n`];
   for (let i = 1; i <= requestedCount; i++) {
-    const topicName = SECTION_TOPICS[(i - 1) % SECTION_TOPICS.length];
+    const topicName = sectionsList[(i - 1) % sectionsList.length];
     docSections.push(`## ${i}. ${topicName}
-The domain of ${topic} as it relates to ${topicName.toLowerCase()} demonstrates profound structural significance across global frameworks.
+A thorough examination of ${topic} reveals critical insights specifically concerning ${topicName.toLowerCase()}. Understanding these dynamics is essential for addressing the root factors and long-term implications.
 
-### ${i}.1 Core Principles & Findings
-- **Strategic Impact:** Primary operational models drive high-efficiency throughput and organizational scalability.
-- **Resource Allocation:** Capital investments and infrastructure development provide long-term resilience.
-- **Empirical Evidence:** Quantitative benchmarks indicate steady advancement across regional and international metrics.
+### ${i}.1 Key Factors & Primary Mechanics
+- **Primary Causes & Triggers:** Specific environmental, technological, or systemic drivers directly contributing to ${topicName.toLowerCase()}.
+- **Observed Impacts:** Direct consequences affecting ecosystems, public health, infrastructure, and socio-economic systems.
+- **Data & Empirical Findings:** Field research confirms measurable shifts and escalating trends associated with ${topicName.toLowerCase()}.
 
-### ${i}.2 Analytical Breakdown
-Detailed investigation into ${topicName.toLowerCase()} reveals key technological, economic, and policy factors. Organization leaders must maintain adaptive governance to optimize long-term outcomes while mitigating systemic risks.`);
+### ${i}.2 Strategic Recommendations & Mitigation
+To effectively manage the challenges posed by ${topicName.toLowerCase()}, stakeholders must implement multi-layered solutions including stricter regulatory enforcement, sustainable technology adoption, and community engagement.`);
   }
 
-  docSections.push(`\n---\n*Document compiled by WokAI OS | Prompt: "${fullPrompt}"*`);
+  docSections.push(`\n---\n*Report compiled by WokAI OS | Topic: "${topic}" | Prompt: "${fullPrompt}"*`);
   return docSections.join("\n\n");
 }
 
@@ -484,14 +495,13 @@ export async function runSahayata(
   try {
     const promptText = `
 You are SAHAYATA, the Content & Payload Generation Agent of WokAI.
-Generate rich, full-length, highly detailed content (document body, article, email body, report, or presentation slides) to fulfill the user's goal.
+Generate rich, full-length, highly detailed content specifically tailored to the user's topic: "${fullPrompt}".
 
-TARGET LENGTH REQUIRED: ${requestedCount} ${isSlides ? "slides" : "pages/sections"}.
-${isSlides ? `Output EXACTLY ${requestedCount} slides formatted with headers \`# Slide 1: ...\` through \`# Slide ${requestedCount}: ...\`. Each slide must contain bullet points.` : `Output EXACTLY ${requestedCount} detailed sections formatted as \`## 1. ...\` through \`## ${requestedCount}. ...\`.`}
-
-DRISTHI Statement: "${drishthi.enrichedStatement}"
-Tools selected: ${drishthi.selectedTools.join(", ")}
-Full User Goal: "${fullPrompt}"
+IMPORTANT:
+- Write ONLY about the exact subject requested (e.g., if asked about "pollution causes", discuss air emissions, industrial effluent, plastic waste, deforestation, and climate impact).
+- DO NOT write generic business jargon. Focus 100% on the user's specific topic.
+- TARGET LENGTH: ${requestedCount} ${isSlides ? "slides" : "sections"}.
+${isSlides ? `Output EXACTLY ${requestedCount} slides formatted as \`# Slide 1: ...\` through \`# Slide ${requestedCount}: ...\`. Each slide must contain bullet points.` : `Output EXACTLY ${requestedCount} detailed sections formatted as \`## 1. ...\` through \`## ${requestedCount}. ...\`.`}
 
 Output strictly valid JSON:
 {
@@ -502,14 +512,20 @@ Output strictly valid JSON:
     "title"?: string
   }
 }
+If JSON output is not possible, output the full document markdown directly.
 `;
     const responseText = await callModelServer(promptText);
-    const parsed = cleanJson(responseText);
-    if (parsed && typeof parsed.content === "string" && parsed.content.length > 50) {
+
+    if (responseText && responseText.trim().length > 50) {
+      const parsed = cleanJson(responseText);
+      const content = (parsed && typeof parsed.content === "string" && parsed.content.length > 50)
+        ? parsed.content
+        : responseText.replace(/^```(json|markdown)?\s*/i, "").replace(/\s*```$/g, "").trim();
+
       return {
         subtaskId: drishthi.subtaskId,
-        content: parsed.content,
-        drafts: parsed.drafts
+        content,
+        drafts: parsed?.drafts
       };
     }
   } catch (e) {
