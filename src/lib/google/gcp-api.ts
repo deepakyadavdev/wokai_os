@@ -353,29 +353,104 @@ export async function createGoogleSlides(token: string, title: string, content: 
     if (content) {
       const sections = content.split(/(?=\n#+ |\nSlide \d+:?)/i).filter((s) => s.trim().length > 0);
       const requests: any[] = [];
+      const timestamp = Date.now();
 
       sections.forEach((sec, idx) => {
-        const slideId = `slide_${idx + 1}_${Date.now()}`;
+        const slideId = `slide_${idx + 1}_${timestamp}`;
+        const titleBoxId = `title_${idx + 1}_${timestamp}`;
+        const bodyBoxId = `body_${idx + 1}_${timestamp}`;
+
+        const lines = sec.trim().split("\n").filter((l) => l.trim().length > 0);
+        const rawTitle = lines[0] || `Slide ${idx + 1}`;
+        const slideTitle = rawTitle.replace(/^#+\s*/, "").replace(/^Slide \d+:?\s*/i, "").trim() || `Slide ${idx + 1}`;
+        const slideBody = lines.slice(1).join("\n").trim();
+
+        // 1. Create Blank Slide
         requests.push({
           createSlide: {
             objectId: slideId,
             insertionIndex: idx + 1,
             slideLayoutReference: {
-              predefinedLayout: idx === 0 ? "TITLE" : "TITLE_AND_BODY"
+              predefinedLayout: "BLANK"
             }
           }
         });
+
+        // 2. Create Title Text Box
+        requests.push({
+          createShape: {
+            objectId: titleBoxId,
+            shapeType: "TEXT_BOX",
+            elementProperties: {
+              pageObjectId: slideId,
+              size: {
+                width: { magnitude: 650, unit: "PT" },
+                height: { magnitude: 50, unit: "PT" }
+              },
+              transform: {
+                scaleX: 1,
+                scaleY: 1,
+                translateX: 35,
+                translateY: 30,
+                unit: "PT"
+              }
+            }
+          }
+        });
+
+        // 3. Insert Title Text
+        requests.push({
+          insertText: {
+            objectId: titleBoxId,
+            text: slideTitle
+          }
+        });
+
+        // 4. Create Body Text Box if content exists
+        if (slideBody) {
+          requests.push({
+            createShape: {
+              objectId: bodyBoxId,
+              shapeType: "TEXT_BOX",
+              elementProperties: {
+                pageObjectId: slideId,
+                size: {
+                  width: { magnitude: 650, unit: "PT" },
+                  height: { magnitude: 280, unit: "PT" }
+                },
+                transform: {
+                  scaleX: 1,
+                  scaleY: 1,
+                  translateX: 35,
+                  translateY: 95,
+                  unit: "PT"
+                }
+              }
+            }
+          });
+
+          // 5. Insert Body Text
+          requests.push({
+            insertText: {
+              objectId: bodyBoxId,
+              text: slideBody
+            }
+          });
+        }
       });
 
       if (requests.length > 0) {
-        await fetch(`https://slides.googleapis.com/v1/presentations/${presentationId}:batchUpdate`, {
+        const batchRes = await fetch(`https://slides.googleapis.com/v1/presentations/${presentationId}:batchUpdate`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json"
           },
           body: JSON.stringify({ requests })
-        }).catch(() => null);
+        });
+        if (!batchRes.ok) {
+          console.warn("Google Slides batchUpdate warning:", await batchRes.text().catch(() => ""));
+        }
       }
     }
 
