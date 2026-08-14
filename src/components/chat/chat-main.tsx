@@ -231,7 +231,7 @@ export function ChatMain() {
     const accessToken = params.get("access_token");
     const expiresIn = params.get("expires_in");
     if (accessToken) {
-      saveGoogleToken(accessToken, expiresIn ? Number(expiresIn) : 3600);
+      saveGoogleToken(accessToken, expiresIn ? Number(expiresIn) : 3300);
       setGoogleTokenState(accessToken);
       toast.success("Google Account successfully connected!");
       window.history.replaceState({}, "", window.location.pathname);
@@ -534,15 +534,18 @@ export function ChatMain() {
       if (res) {
         setGoogleTokenState(getGoogleToken());
         toast.success("Google Account successfully connected!");
+        return;
       }
-      return;
     } catch (popupErr: any) {
       console.warn("Firebase Google Sign-In error:", popupErr);
       if (popupErr?.code === "auth/popup-closed-by-user") {
         toast.error("Google Sign-In popup was closed.");
         return;
       }
-      toast.error(`Google Sign-In failed: ${popupErr?.message || popupErr}`);
+    }
+
+    if (googleAuthUrl) {
+      window.location.href = googleAuthUrl;
     }
   };
 
