@@ -534,18 +534,15 @@ export function ChatMain() {
       if (res) {
         setGoogleTokenState(getGoogleToken());
         toast.success("Google Account successfully connected!");
-        return;
       }
+      return;
     } catch (popupErr: any) {
       console.warn("Firebase Google Sign-In error:", popupErr);
       if (popupErr?.code === "auth/popup-closed-by-user") {
         toast.error("Google Sign-In popup was closed.");
         return;
       }
-    }
-
-    if (googleAuthUrl) {
-      window.location.href = googleAuthUrl;
+      toast.error(`Google Sign-In failed: ${popupErr?.message || popupErr}`);
     }
   };
 
